@@ -1,0 +1,93 @@
+# =============================================================================
+# Graph-DITTO Option 1: Ego-Only Policy
+# =============================================================================
+# Single ego-agent learns to imitate expert driving via DITTO's latent
+# divergence reward in a graph-based world model.
+# =============================================================================
+
+mode: "option1"
+
+# --- Scene Configuration ---
+scene:
+  max_agents: 32
+  max_lanes: 128
+  agent_feat_dim: 8      # [x, y, vx, vy, cos_h, sin_h, length, width]
+  lane_feat_dim: 6       # [x, y, cos_t, sin_t, lane_type, speed_limit]
+  action_dim: 2          # [steering, acceleration]
+  ego_centric: True      # normalize coordinates to ego frame
+
+# --- Data ---
+data:
+  data_source: "synthetic"     # "synthetic" | "nuscenes" | "waymo" | "custom"
+  n_episodes: 200
+  episode_length: 100
+  seed: 42
+  load_device: "cpu"
+  train_device: "cuda:0"
+
+# --- Scene Encoder (Attention-based GNN) ---
+encoder:
+  agent_feat_dim: 8
+  lane_feat_dim: 6
+  hidden_dim: 128
+  num_heads: 4
+  num_layers: 3
+  out_dim: 256
+  dropout: 0.1
+
+# --- RSSM World Model ---
+rssm:
+  embed_dim: 256           # must match encoder.out_dim
+  action_dim: 2            # ego action dim
+  deter_dim: 512
+  stoch_dim: 32
+  stoch_rank: 32
+  hidden_dim: 512
+  gru_layers: 1
+
+# --- Scene Decoder ---
+decoder:
+  max_agents: 32
+  agent_state_dim: 6       # predicted [x, y, vx, vy, cos_h, sin_h]
+  hidden_dim: 256
+  num_layers: 2
+  reconstruction_weight: 1.0
+
+# --- World Model Training ---
+wm_training:
+  batch_size: 32
+  seq_length: 20
+  lr: 3.0e-4
+  eps: 1.0e-5
+  kl_weight: 0.1
+  kl_balance: 0.8
+  max_grad_norm: 100.0
+  train_steps: 100000
+  checkpoint_interval: 10000
+  checkpoint_path: "checkpoints/option1/wm/"
+
+# --- Actor-Critic Agent ---
+agent:
+  hidden_dim: 256
+  layers: 4
+  action_scale: 1.0       # max magnitude of actions
+
+# --- DITTO Policy Training ---
+policy_training:
+  batch_size: 256
+  seq_length: 20           # sequence length for sampling expert latents
+  dream_horizon: 15        # H: how many steps to unroll in WM
+  lr: 3.0e-4
+  gamma: 0.99
+  lambda_gae: 0.95
+  entropy_coef: 0.01
+  value_coef: 0.01
+  max_grad_norm: 100.0
+  train_steps: 50000
+  val_interval: 200
+  checkpoint_path: "checkpoints/option1/policy/"
+
+# --- WM Loss Weights (passed to GraphWorldModel) ---
+loss_weights:
+  kl_weight: 0.1
+  kl_balance: 0.8
