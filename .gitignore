@@ -9,4 +9,9 @@ videos
 .pytest_cache
 checkpoints/*
 .vscode
-runs/
+# ignore bulky run outputs but track small result/summary files
+runs/**
+!runs/**/
+!runs/**/*.md
+!runs/**/*.json
+runs/smoke/
