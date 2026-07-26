@@ -16,6 +16,8 @@ module load 2024r1 python/3.10.12
 source /scratch/$USER/ditto_av/envs/ditto/bin/activate
 export OMP_NUM_THREADS=1
 export PYTHONUNBUFFERED=1
+export WANDB_MODE=${WANDB_MODE:-offline}
+export WANDB_DIR=/scratch/$USER/ditto_av/outputs
 
 CONFIG=${1:-configs/b2d.yaml}
 SUFFIX=${2:-$SLURM_JOB_ID}

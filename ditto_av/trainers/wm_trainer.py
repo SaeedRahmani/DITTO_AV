@@ -8,6 +8,7 @@ import torch
 from ..config import Config
 from ..data import TrajectoryData
 from ..models.world_model import VectorWorldModel
+from .. import wandb_util
 
 
 def train_world_model(cfg: Config, data: TrajectoryData,
@@ -39,6 +40,14 @@ def train_world_model(cfg: Config, data: TrajectoryData,
         loss.backward()
         torch.nn.utils.clip_grad_norm_(wm.parameters(), cfg.wm.grad_clip)
         opt.step()
+        if step % 100 == 0 or step == 1:
+            wandb_util.log({"step": step,
+                            "loss": float(metrics["loss"]),
+                            "recon": float(metrics["loss_recon"]),
+                            "kl": float(metrics["loss_kl"]),
+                            "entropy_prior":
+                                float(metrics["entropy_prior"])},
+                           prefix="wm")
         if step % 500 == 0 or step == 1:
             print(f"wm step {step:5d} | loss {metrics['loss']:.3f} "
                   f"| recon {metrics['loss_recon']:.3f} "

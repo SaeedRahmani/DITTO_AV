@@ -204,12 +204,15 @@ def main():
     args = ap.parse_args()
     cfg = load_config(args.config)
     save_config(cfg, cfg.dirs()["run"] / "config.yaml")
+    from ditto_av import wandb_util
+    wandb_util.init(cfg, name=f"b2d_{Path(cfg.run_dir).name}")
     stages = list(STAGES) if args.stage == "all" else [args.stage]
     for s in stages:
         t0 = time.time()
         print(f"\n===== stage: {s} =====")
         STAGES[s](cfg, args)
         print(f"===== stage {s} done in {time.time() - t0:.0f}s =====")
+    wandb_util.finish()
 
 
 if __name__ == "__main__":

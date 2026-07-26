@@ -11,6 +11,7 @@ from ..data import LatentBank
 from ..models.nets import make_actor_critic
 from ..models.world_model import VectorWorldModel
 from ..rewards import LatentMatcher, lambda_return
+from .. import wandb_util
 
 
 def train_latent_policy(cfg: Config, wm: VectorWorldModel, bank: LatentBank,
@@ -105,6 +106,14 @@ def train_latent_policy(cfg: Config, wm: VectorWorldModel, bank: LatentBank,
         critic_opt.step()
         policy.update_target(acfg.target_tau)
 
+        if step % 100 == 0 or step == 1:
+            wandb_util.log({"step": step,
+                            "reward": float(rewards.mean()),
+                            "return": float(returns.mean()),
+                            "entropy": float(entropy),
+                            "actor_loss": float(actor_loss),
+                            "critic_loss": float(critic_loss)},
+                           prefix=name)
         if step % 500 == 0 or step == 1:
             # imitation quality at the seed step against expert actions
             with torch.no_grad():

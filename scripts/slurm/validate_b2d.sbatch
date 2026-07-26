@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=b2d-validate
 #SBATCH --partition=compute-p1
-#SBATCH --time=01:00:00
+#SBATCH --time=03:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=2
 #SBATCH --mem-per-cpu=3900M

@@ -9,6 +9,7 @@ import torch.nn.functional as F
 from ..config import Config
 from ..data import LatentBank
 from ..models.nets import make_actor_critic
+from .. import wandb_util
 
 
 def train_bc(cfg: Config, bank: LatentBank, seed: int = 0):
@@ -44,6 +45,9 @@ def train_bc(cfg: Config, bank: LatentBank, seed: int = 0):
         opt.zero_grad()
         loss.backward()
         opt.step()
+        if step % 100 == 0 or step == 1:
+            wandb_util.log({"step": step, "loss": float(loss.item())},
+                           prefix="bc")
         if step % 1000 == 0 or step == 1:
             with torch.no_grad():
                 if continuous:
@@ -57,6 +61,8 @@ def train_bc(cfg: Config, bank: LatentBank, seed: int = 0):
                     label = "val acc"
             print(f"bc step {step:5d} | loss {loss.item():.3f} "
                   f"| {label} {metric:.3f}")
+            wandb_util.log({"step": step, label.replace(" ", "_"):
+                            float(metric)}, prefix="bc")
 
     ckpt = Path(cfg.dirs()["ckpt"]) / "bc.pt"
     torch.save(policy.state_dict(), ckpt)
