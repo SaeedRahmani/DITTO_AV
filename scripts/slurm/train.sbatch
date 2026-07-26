@@ -4,7 +4,7 @@
 #SBATCH --time=04:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
-#SBATCH --mem-per-cpu=4G
+#SBATCH --mem-per-cpu=3900M
 #SBATCH --output=/scratch/%u/ditto_av/outputs/slurm-%j.out
 #SBATCH --account=research-ceg-tp
 # Usage:
