@@ -85,7 +85,21 @@ Set single-threaded BLAS (`torch.set_num_threads(1)`, done automatically in
 `scripts/run_pipeline.py`) — the small sequential RSSM ops are 15-30x slower
 under multi-threaded BLAS on Apple Silicon.
 
-## Original DITTO (Atari)
+## Credit: original DITTO
 
-The original pre-release Atari implementation lives in `src/` unchanged; the
-paper sources are in `paper/`. See the [paper](https://arxiv.org/abs/2302.03086).
+This project began as a fork of and builds directly on
+[**DITTO** by Branton DeMoss et al.](https://github.com/brantondemoss/DITTO)
+([paper: *DITTO: Offline Imitation Learning with World Models*, arXiv:2302.03086](https://arxiv.org/abs/2302.03086)).
+The RSSM world-model core in `ditto_av/models/` is adapted from that
+codebase, and the original pre-release Atari implementation is preserved
+unchanged in `src/` with the paper sources in `paper/`. If you use the
+world-model imitation ideas here, please cite DITTO:
+
+```bibtex
+@article{demoss2023ditto,
+  title={DITTO: Offline Imitation Learning with World Models},
+  author={DeMoss, Branton and Duckworth, Paul and Hawes, Nick and Posner, Ingmar},
+  journal={arXiv preprint arXiv:2302.03086},
+  year={2023}
+}
+```
