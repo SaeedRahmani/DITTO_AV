@@ -1,0 +1,26 @@
+# Tiny end-to-end smoke test (< 2 min)
+run_dir: runs/smoke
+device: cpu
+
+collect:
+  n_expert_episodes: 8
+  n_noisy_episodes: 4
+  seed: 0
+
+wm:
+  train_steps: 30
+  batch_size: 8
+  seq_len: 8
+
+ac:
+  train_steps: 20
+  horizon: 8
+  batch_size: 8
+  k_modes: 4
+
+bc:
+  train_steps: 50
+  batch_size: 64
+
+eval:
+  n_episodes: 3

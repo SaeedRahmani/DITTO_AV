@@ -1,0 +1,27 @@
+# DITTO-AV default experiment (highway-env, vectorized obs)
+run_dir: runs/av1
+device: cpu
+
+collect:
+  n_expert_episodes: 300
+  n_noisy_episodes: 100
+  noise_eps: 0.3
+  aggressive_prob: 0.5
+  seed: 0
+
+wm:
+  train_steps: 4000
+  batch_size: 32
+  seq_len: 16
+
+ac:
+  train_steps: 3000
+  horizon: 15
+  batch_size: 64
+  k_modes: 8
+
+bc:
+  train_steps: 3000
+
+eval:
+  n_episodes: 50
