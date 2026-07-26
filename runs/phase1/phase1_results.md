@@ -44,6 +44,30 @@
 | ditto_single | 13.60 ± 1.61 | 0.48 ± 0.07 | 18.81 ± 0.82 |
 | ditto_multi | 18.27 ± 1.47 | 0.21 ± 0.11 | 16.37 ± 0.86 |
 
+## Trajectory-consistent matching (K=16, H=5; ditto_multi_traj commits to one mode per rollout) (3 seeds)
+
+### in_distribution
+
+| policy | return | collision rate | mean speed |
+|---|---|---|---|
+| expert | 21.56 ± 0.00 | 0.00 ± 0.00 | 19.85 ± 0.00 |
+| random | 7.26 ± 0.00 | 0.82 ± 0.00 | 22.47 ± 0.00 |
+| bc | 12.58 ± 0.93 | 0.57 ± 0.03 | 21.63 ± 0.66 |
+| ditto_single | 18.54 ± 1.29 | 0.19 ± 0.08 | 18.52 ± 1.05 |
+| ditto_multi | 20.67 ± 0.30 | 0.07 ± 0.05 | 17.32 ± 1.06 |
+| ditto_multi_traj | 20.67 ± 0.24 | 0.09 ± 0.04 | 17.40 ± 0.93 |
+
+### shifted
+
+| policy | return | collision rate | mean speed |
+|---|---|---|---|
+| expert | 20.53 ± 0.00 | 0.04 ± 0.00 | 18.02 ± 0.00 |
+| random | 5.96 ± 0.00 | 0.92 ± 0.00 | 21.69 ± 0.00 |
+| bc | 9.06 ± 1.37 | 0.69 ± 0.08 | 21.09 ± 0.89 |
+| ditto_single | 14.52 ± 0.60 | 0.39 ± 0.06 | 18.43 ± 0.54 |
+| ditto_multi | 18.65 ± 1.97 | 0.19 ± 0.14 | 16.02 ± 0.67 |
+| ditto_multi_traj | 18.97 ± 1.78 | 0.15 ± 0.13 | 16.06 ± 0.70 |
+
 ## K (retrieval modes, ditto_multi)
 
 | setting | return (ID) | collisions (ID) | return (shift) | collisions (shift) |
