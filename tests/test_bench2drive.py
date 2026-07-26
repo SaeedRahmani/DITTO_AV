@@ -1,5 +1,6 @@
 import gzip
 import json
+import os
 from pathlib import Path
 
 import numpy as np
@@ -8,16 +9,19 @@ import pytest
 from ditto_av.bench2drive import clips_to_npz, load_clip
 from ditto_av.data import TrajectoryData
 
-SCRATCH_CLIP = Path("/private/tmp/claude-1546708966/-Users-srahmani-Git-ditto-av-new-DITTO-AV/"
-                    "a26acff9-1a88-4f88-ac24-41383ffaa076/scratchpad/"
-                    "Accident_Town03_Route101_Weather23")
+# real-clip test: set B2D_CLIP_DIR to an extracted clip directory, or rely on
+# the DelftBlue default layout (see scripts/validate_b2d.py); skips if absent
+SCRATCH_CLIP = Path(os.environ.get(
+    "B2D_CLIP_DIR",
+    f"/scratch/{os.environ.get('USER', '')}/ditto_av/data/bench2drive/"
+    "extracted/Accident_Town03_Route101_Weather23"))
 
 
-def write_frame(path: Path, t: float):
+def write_frame(path: Path, t: float, theta: float = 0.0):
     """Synthetic Bench2Drive-style annotation frame."""
     ego_x, ego_y = 100.0 + 5.0 * t, 50.0
     frame = {
-        "x": ego_x, "y": ego_y, "theta": 0.0, "speed": 5.0,
+        "x": ego_x, "y": ego_y, "theta": theta, "speed": 5.0,
         "throttle": 0.6, "steer": 0.05, "brake": 0.0,
         "bounding_boxes": [
             {"class": "ego_vehicle", "id": "ego",
@@ -70,6 +74,21 @@ def test_leader_velocity_from_finite_difference(synthetic_clip):
     assert np.allclose(rows[1:, 1, 3], 5.0 / 40.0, atol=1e-4)
     # frame 0 has no history: velocity defaults to 0
     assert np.allclose(rows[0, 1, 3], 0.0)
+
+
+def test_nan_theta_frame_uses_last_finite_heading(tmp_path):
+    # real Bench2Drive clips occasionally record theta = NaN for one frame
+    # (e.g. BlockedIntersection_Town03_Route136_Weather6 frame 22)
+    anno = tmp_path / "clip" / "anno"
+    anno.mkdir(parents=True)
+    for i in range(10):
+        theta = float("nan") if i == 4 else 0.0
+        write_frame(anno / f"{i:05d}.json.gz", t=i * 0.1, theta=theta)
+    d = load_clip(tmp_path / "clip", n_neighbors=6)
+    assert np.isfinite(d["obs"]).all()
+    rows = d["obs"].reshape(10, 7, 7)
+    # heading carried forward => frame 4 identical to its neighbors
+    assert np.allclose(rows[4], rows[5])
 
 
 def test_clips_to_npz_roundtrip(synthetic_clip, tmp_path):

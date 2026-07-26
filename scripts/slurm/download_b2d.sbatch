@@ -12,12 +12,15 @@
 #   sbatch scripts/slurm/download_b2d.sbatch manifests/b2d_clips.txt
 # where the manifest is a text file with one clip tarball name per line, e.g.
 #   Accident_Town03_Route101_Weather23.tar.gz
-# Compute nodes on DelftBlue have outbound internet via proxy; if downloads
-# fail on a compute node, run this script's body on a login node with nohup
-# instead (transfers are allowed there).
+# NOTE (verified 2026-07-26, job 10521023): DelftBlue compute nodes have NO
+# outbound internet (curl: connection refused) and no proxy is configured.
+# Run this script's body on a login node with nohup instead (transfers are
+# allowed there):
+#   nohup bash scripts/slurm/download_b2d.sbatch manifests/b2d_clips.txt \
+#       > /scratch/$USER/ditto_av/outputs/b2d_download.log 2>&1 &
 
 set -euo pipefail
-MANIFEST=${1:?usage: sbatch download_b2d.sbatch <manifest.txt>}
+MANIFEST=$(readlink -f "${1:?usage: sbatch download_b2d.sbatch <manifest.txt>}")
 DEST=/scratch/$USER/ditto_av/data/bench2drive
 mkdir -p "$DEST"
 cd "$DEST"

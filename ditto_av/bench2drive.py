@@ -49,6 +49,18 @@ def load_clip(clip_dir: Path, n_neighbors: int = 6,
 
     raw = [_load_frame(p) for p in frames]
 
+    # Bench2Drive annotations occasionally record theta = NaN for isolated
+    # frames; carry the last finite heading forward (backfill leading NaNs).
+    yaws = np.array([float(fr["theta"]) for fr in raw])
+    finite = np.isfinite(yaws)
+    if not finite.any():
+        raise ValueError(f"no finite ego heading in {clip_dir}")
+    if not finite.all():
+        idx = np.where(finite, np.arange(len(yaws)), -1)
+        np.maximum.accumulate(idx, out=idx)
+        idx[idx < 0] = np.flatnonzero(finite)[0]
+        yaws = yaws[idx]
+
     # actor world positions per frame, keyed by id, for velocity estimation
     tracks: List[Dict[str, np.ndarray]] = []
     for fr in raw:
@@ -66,7 +78,7 @@ def load_clip(clip_dir: Path, n_neighbors: int = 6,
 
     for t, fr in enumerate(raw):
         ego_xy = np.array([fr["x"], fr["y"]], dtype=np.float64)
-        ego_yaw = float(fr["theta"])
+        ego_yaw = float(yaws[t])
         c, s = np.cos(ego_yaw), np.sin(ego_yaw)
         world_to_ego = np.array([[c, s], [-s, c]])
 
