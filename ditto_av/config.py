@@ -87,6 +87,9 @@ class ACConfig:
     reward_mode: str = "multi"  # "single" (DITTO) | "multi" (ours)
     k_modes: int = 8
     n_negatives: int = 16   # contrastive baseline windows (0 = raw DITTO)
+    # also train the trajectory-consistent variant (commits to one retrieved
+    # mode per rollout instead of a per-step max that can splice modes)
+    train_multi_traj: bool = False
     # BC anchor: init actor from the BC checkpoint and keep a KL trust region
     # to it on imagined states (prevents drift into world-model exploits)
     bc_init: bool = True

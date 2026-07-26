@@ -69,6 +69,14 @@ def runs_matrix():
                      {"seed": s, "collect": {"seed": s},
                       "ac": {"k_modes": 16, "horizon": 5}},
                      f"main_seed{s}"))
+    # trajectory-consistent matching (no per-step mode splicing) at the
+    # improved config, to test whether multi's gains are reward relaxation
+    for s in SEEDS:
+        runs.append((f"mt_seed{s}",
+                     {"seed": s, "collect": {"seed": s},
+                      "ac": {"k_modes": 16, "horizon": 5,
+                             "train_multi_traj": True}},
+                     f"main_seed{s}"))
     return runs
 
 
@@ -109,15 +117,21 @@ def cmd_aggregate(args):
     raw = {}
 
     # ---- main table: mean ± std over seeds ----
-    for group, prefix in (("main", "main_seed"), ("k16h5", "k16h5_seed")):
+    titles = {
+        "main": "Main comparison",
+        "k16h5": "Improved config (K=16, H=5), ditto_multi vs same"
+                 " baselines",
+        "mt": "Trajectory-consistent matching (K=16, H=5;"
+              " ditto_multi_traj commits to one mode per rollout)",
+    }
+    for group, prefix in (("main", "main_seed"), ("k16h5", "k16h5_seed"),
+                          ("mt", "mt_seed")):
         mains = {s: _load(sweep, f"{prefix}{s}") for s in SEEDS}
         have = {s: r for s, r in mains.items() if r}
         if not have:
             continue
         raw[group] = {f"seed{s}": r for s, r in have.items()}
-        title = ("Main comparison" if group == "main"
-                 else "Improved config (K=16, H=5), ditto_multi vs same"
-                 " baselines")
+        title = titles[group]
         lines += [f"## {title} ({len(have)} seeds)", ""]
         for cond in ("in_distribution", "shifted"):
             lines += [f"### {cond}", "",

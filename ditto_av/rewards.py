@@ -29,11 +29,17 @@ class LatentMatcher:
         latent. From near-identical traffic states, different expert episodes
         continue differently (overtake vs follow); nearest-mode matching
         rewards reproducing *any* expert mode instead of averaging them.
+        Note the per-step max can splice modes mid-rollout (a hybrid
+        trajectory can score well); ablate against multi_traj.
+    mode="multi_traj": same K retrieved windows, but the rollout commits to
+        the single window that best matches over the whole horizon
+        (argmax of summed similarity) and is rewarded against that one mode
+        at every step — trajectory-consistent nearest-mode matching.
     """
 
     def __init__(self, bank: LatentBank, mode: str = "multi", k: int = 8,
                  n_negatives: int = 0):
-        assert mode in ("single", "multi")
+        assert mode in ("single", "multi", "multi_traj")
         self.bank = bank
         self.mode = mode
         self.k = k
@@ -72,7 +78,12 @@ class LatentMatcher:
         d = dreamed_h[1:].permute(1, 0, 2).unsqueeze(1)    # (B, 1, H, D)
         t = targets[:, :, 1:, :]                           # (B, K, H, D)
         sim = max_cos(d, t)                                # (B, K, H)
-        reward = sim.max(dim=1).values.permute(1, 0)       # (H, B)
+        if self.mode == "multi_traj":
+            best = sim.sum(dim=2).argmax(dim=1)            # (B,)
+            reward = sim[torch.arange(len(best)), best]    # (B, H)
+            reward = reward.permute(1, 0)                  # (H, B)
+        else:
+            reward = sim.max(dim=1).values.permute(1, 0)   # (H, B)
         if self.n_negatives > 0:
             B = targets.shape[0]
             idx = torch.randint(self.bank.n_windows, (B, self.n_negatives),

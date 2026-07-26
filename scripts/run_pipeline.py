@@ -68,6 +68,9 @@ def stage_policies(cfg):
     train_bc(cfg, bank, seed=cfg.seed)
     train_latent_policy(cfg, wm, bank, reward_mode="single", seed=cfg.seed)
     train_latent_policy(cfg, wm, bank, reward_mode="multi", seed=cfg.seed)
+    if cfg.ac.train_multi_traj:
+        train_latent_policy(cfg, wm, bank, reward_mode="multi_traj",
+                            seed=cfg.seed)
 
 
 def stage_eval(cfg):
@@ -101,6 +104,11 @@ def stage_eval(cfg):
                                       cfg.env.action_dim, device,
                                       cfg.eval.stochastic),
     }
+    if (d["ckpt"] / "ditto_multi_traj.pt").exists():
+        drivers["ditto_multi_traj"] = WMPolicyDriver(
+            wm, load_policy("ditto_multi_traj", cfg.ac.hidden_dim,
+                            cfg.ac.layers),
+            cfg.env.action_dim, device, cfg.eval.stochastic)
     evaluate_suite(cfg, drivers, out_path=d["results"] / "results.json")
 
 

@@ -85,6 +85,32 @@ def test_multi_mode_max_over_modes():
     assert torch.allclose(r, torch.ones_like(r), atol=1e-5)
 
 
+def test_multi_traj_commits_to_one_mode():
+    """Per-step max rewards mode splicing; multi_traj must not.
+
+    A hybrid rollout (first half of one retrieved window, second half of
+    another) scores near-1 under per-step max but strictly lower under
+    trajectory-consistent matching; a pure single-mode rollout still scores
+    1 under multi_traj."""
+    bank = make_bank()
+    multi = LatentMatcher(bank, mode="multi", k=4)
+    traj = LatentMatcher(bank, mode="multi_traj", k=4)
+    ids = torch.tensor([3])
+    targets = multi.targets(ids)
+    H = targets.shape[2] - 1
+    hybrid = targets[0, 0].clone()
+    hybrid[H // 2 + 1:] = targets[0, 1, H // 2 + 1:]
+    hybrid = hybrid.unsqueeze(1)                     # (H+1, 1, D)
+    r_multi = multi.rewards(hybrid, targets)
+    r_traj = traj.rewards(hybrid, targets)
+    assert torch.allclose(r_multi, torch.ones_like(r_multi), atol=1e-5)
+    assert r_traj.mean() < r_multi.mean() - 0.05
+    # pure mode: full reward under trajectory-consistent matching too
+    pure = targets[0, 1].unsqueeze(1)
+    r_pure = traj.rewards(pure, traj.targets(ids))
+    assert torch.allclose(r_pure, torch.ones_like(r_pure), atol=1e-5)
+
+
 def test_contrastive_reward_subtracts_negative_baseline():
     """The contrastive reward subtracts the mean similarity to random expert
     windows; the exact-match rollout must still rank above a random rollout,

@@ -1,0 +1,30 @@
+{
+  "n_val_frames": 10321,
+  "n_val_clips": 49,
+  "horizon": 15,
+  "wm_recon_mse": 0.010973374359309673,
+  "expert_replay": {
+    "latent_match": 0.7997530102729797,
+    "hstep_obs_mse": 0.09254353493452072
+  },
+  "policies": {
+    "bc": {
+      "action_nll": -0.02772662043571472,
+      "action_mae": 0.215910404920578,
+      "latent_match": 0.7975336909294128,
+      "hstep_obs_mse": 0.09249752759933472
+    },
+    "ditto_single": {
+      "action_nll": 0.008819949813187122,
+      "action_mae": 0.22085364162921906,
+      "latent_match": 0.7970226407051086,
+      "hstep_obs_mse": 0.09245359897613525
+    },
+    "ditto_multi": {
+      "action_nll": 0.009176995605230331,
+      "action_mae": 0.22015860676765442,
+      "latent_match": 0.7968286275863647,
+      "hstep_obs_mse": 0.09273314476013184
+    }
+  }
+}

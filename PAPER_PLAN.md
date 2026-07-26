@@ -123,9 +123,23 @@ mode-averaging).
   (`ditto_av/bench2drive.py`) already parses clips into the vector format
   (validated on a real clip).
 - Changes needed: continuous-action actor (Gaussian head on
-  throttle/steer/brake) — WM side already supports continuous actions;
-  scene features could add route/command conditioning (command_near /
-  command_far fields are in the annotations).
+  throttle/steer/brake) — DONE (`ditto_av/models/nets.py`,
+  `scripts/run_b2d.py`). Still needed before any closed-loop claim:
+  (a) route/command conditioning (command_near / command_far fields are
+  in the annotations) — without a goal signal the policy cannot follow
+  routes; (b) a CARLA agent adapter that builds our vector observation
+  online. NOTE the current observation uses privileged annotation fields
+  (ground-truth actor boxes, global ego pose): results must be positioned
+  as a *privileged planner* trained offline, comparable to privileged
+  baselines (e.g. AD-MLP-style state input, Think2Drive), NOT to
+  sensor-based methods (UniAD/VAD) without an explicit caveat.
+- Open-loop results so far (60-clip v1, 297-clip v2 in `runs/b2d_v*`):
+  useful for WM quality and sanity (v2: H-step obs MSE 0.093, policies
+  within 0.003 of the expert-replay latent-match ceiling 0.800) but NOT
+  evidence of driving performance — open-loop metrics conditioned on
+  expert history cannot separate valid-but-different actions from errors
+  (the three policies are near-identical open-loop while differing
+  drastically closed-loop in Phase 1). Closed-loop CARLA is the gate.
 - Evaluation: official Bench2Drive closed-loop protocol (CARLA leaderboard
   v2 routes, multi-ability splits) against published baselines (AD-MLP, UniAD,
   VAD, TCP); needs a CUDA Linux box with CARLA 0.9.15.
@@ -157,7 +171,19 @@ first tier.
 - Latent bank retrieval is O(N) per batch (fine to ~1M windows; ANN index
   afterwards).
 - Nearest-mode matching assumes retrieved neighbors are behaviorally
-  compatible with the rollout's start; degenerate retrieval (K too large,
-  sparse data) can reward mode-switching mid-rollout. Ablate K.
+  compatible with the rollout's start; the per-step max over K windows can
+  additionally reward mode *splicing* mid-rollout (a hybrid trajectory can
+  score well without reproducing any single expert mode). Addressed two
+  ways: K ablation, and a trajectory-consistent variant
+  (`reward_mode: multi_traj`, commits to the argmax window over the whole
+  horizon) ablated over 3 seeds at the K=16/H=5 config (`mt_seed*`).
+- The collected data contains no *paired* same-state continuations by
+  construction (each episode has one sampled style). Conditional
+  multimodality is established empirically instead
+  (`runs/phase1/multimodality_analysis.md`): 57% of paired expert
+  rollouts from identical reset states diverge (median first divergence:
+  step 0), and in the trained latent bank the top-16 retrieved windows
+  (start cosine 0.979) come 36% from the opposite style with 33% action
+  disagreement at the matched step.
 - The highway-env expert is scripted; Bench2Drive's Think2Drive expert and
   real logs (Phase 3) address "real expert" concerns.
