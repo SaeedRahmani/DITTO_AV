@@ -63,6 +63,12 @@ def runs_matrix():
                      {"collect": {"n_expert_episodes": n_ep,
                                   "n_noisy_episodes": n_ep // 3}}, None))
     runs.append(("style25", {"collect": {"aggressive_prob": 0.25}}, None))
+    # improved config suggested by the K/H ablations, validated over seeds
+    for s in SEEDS:
+        runs.append((f"k16h5_seed{s}",
+                     {"seed": s, "collect": {"seed": s},
+                      "ac": {"k_modes": 16, "horizon": 5}},
+                     f"main_seed{s}"))
     return runs
 
 
@@ -103,11 +109,16 @@ def cmd_aggregate(args):
     raw = {}
 
     # ---- main table: mean ± std over seeds ----
-    mains = {s: _load(sweep, f"main_seed{s}") for s in SEEDS}
-    have = {s: r for s, r in mains.items() if r}
-    if have:
-        raw["main"] = {f"seed{s}": r for s, r in have.items()}
-        lines += [f"## Main comparison ({len(have)} seeds)", ""]
+    for group, prefix in (("main", "main_seed"), ("k16h5", "k16h5_seed")):
+        mains = {s: _load(sweep, f"{prefix}{s}") for s in SEEDS}
+        have = {s: r for s, r in mains.items() if r}
+        if not have:
+            continue
+        raw[group] = {f"seed{s}": r for s, r in have.items()}
+        title = ("Main comparison" if group == "main"
+                 else "Improved config (K=16, H=5), ditto_multi vs same"
+                 " baselines")
+        lines += [f"## {title} ({len(have)} seeds)", ""]
         for cond in ("in_distribution", "shifted"):
             lines += [f"### {cond}", "",
                       "| policy | return | collision rate | mean speed |",
