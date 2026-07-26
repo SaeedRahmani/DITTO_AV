@@ -1,0 +1,7 @@
+# DittoCarlaAgent config: which trained run to drive with.
+# run_config: the archived config of the training run (defines obs layout,
+# net sizes, and run_dir with checkpoints).
+run_config: /scratch/srahmani/ditto_av/outputs/b2d_v3_route_config.yaml
+policy: ditto_multi
+stochastic: false
+action_repeat: 2   # leaderboard ticks at 20 Hz; the world model at 10 Hz

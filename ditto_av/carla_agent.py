@@ -119,19 +119,145 @@ class ContinuousWMDriver:
         return a.cpu().numpy()
 
 
-try:  # pragma: no cover - requires the carla package + leaderboard
-    import carla  # noqa: F401
-    from leaderboard.autoagents.autonomous_agent import AutonomousAgent
+def plan_to_command_points(plan: Sequence[Tuple[float, float, int]],
+                           ego_xy: np.ndarray,
+                           min_ahead: float = 5.0,
+                           near_fallback: float = 20.0,
+                           far_fallback: float = 50.0) -> dict:
+    """Compress a route plan into the near/far command signal.
+
+    plan: [(x, y, command_int)] in world coords, ordered along the route
+        (leaderboard `_global_plan_world_coord` with RoadOption -> int).
+    Command points are where the command changes (junction decisions,
+    matching Bench2Drive's sparse command annotations). near = first
+    change point at least `min_ahead` beyond the closest plan index;
+    far = the next one. Fallback: lane-follow points ~20/50 m ahead.
+    Returns the `route` dict for featurize_frame.
+    """
+    if len(plan) == 0:
+        return {"near_xy": None, "near_cmd": 4,
+                "far_xy": None, "far_cmd": 4}
+    xy = np.asarray([(p[0], p[1]) for p in plan], dtype=np.float64)
+    cmds = [int(p[2]) for p in plan]
+    dist_to_ego = np.linalg.norm(xy - ego_xy, axis=1)
+    cur = int(np.argmin(dist_to_ego))
+
+    # arc-length ahead of the current index
+    seg = np.linalg.norm(np.diff(xy[cur:], axis=0), axis=1)
+    s = np.concatenate([[0.0], np.cumsum(seg)])  # s[j] = dist to plan[cur+j]
+
+    changes = [cur + j for j in range(1, len(s))
+               if cmds[cur + j] != cmds[cur + j - 1] and s[j] >= min_ahead]
+
+    def fallback(dist):
+        j = int(np.searchsorted(s, dist))
+        j = min(j, len(s) - 1)
+        return {"xy": xy[cur + j], "cmd": cmds[cur + j]}
+
+    if len(changes) >= 1:
+        near = {"xy": xy[changes[0]], "cmd": cmds[changes[0]]}
+        far = ({"xy": xy[changes[1]], "cmd": cmds[changes[1]]}
+               if len(changes) >= 2 else fallback(far_fallback))
+    else:
+        near, far = fallback(near_fallback), fallback(far_fallback)
+    return {"near_xy": near["xy"], "near_cmd": near["cmd"],
+            "far_xy": far["xy"], "far_cmd": far["cmd"]}
+
+
+try:  # pragma: no cover - requires the carla package + leaderboard on path
+    import carla
+    from leaderboard.autoagents.autonomous_agent import (AutonomousAgent,
+                                                         Track)
+    from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
+
+    def get_entry_point():
+        return "DittoCarlaAgent"
 
     class DittoCarlaAgent(AutonomousAgent):
-        """Bench2Drive/leaderboard entry point (privileged track).
+        """Bench2Drive closed-loop agent (privileged planner track).
 
-        TODO(closed-loop): wire in setup() to load config/checkpoints,
-        track the route plan for near/far commands (leaderboard provides
-        _global_plan in GPS/world coords), read actors from
-        CarlaDataProvider, and map ContinuousWMDriver output to
-        carla.VehicleControl at 10 Hz. See PAPER_PLAN Phase-2 notes.
+        Reads ground-truth actors and the route plan (privileged — see
+        PAPER_PLAN positioning), builds the training-time observation via
+        featurize_frame, and drives with ContinuousWMDriver. The world
+        model runs at 10 Hz (annotation rate); with the 20 Hz leaderboard
+        tick we repeat each control `action_repeat` frames.
         """
 
-except ImportError:  # carla not installed (e.g. on DelftBlue login nodes)
+        def setup(self, path_to_conf_file):
+            import yaml
+
+            from .config import load_config
+            from .models.nets import make_actor_critic
+            from .trainers.wm_trainer import load_world_model
+
+            self.track = Track.MAP
+            conf = yaml.safe_load(open(path_to_conf_file))
+            run_cfg = load_config(conf["run_config"])
+            self._cfg = run_cfg
+            wm = load_world_model(run_cfg, run_cfg.env.obs_dim)
+            policy = make_actor_critic(
+                True, run_cfg.wm.feature_dim, run_cfg.env.action_dim,
+                run_cfg.ac.hidden_dim, run_cfg.ac.layers)
+            import torch as _torch
+            ckpt = (run_cfg.dirs()["ckpt"]
+                    / f"{conf.get('policy', 'ditto_multi')}.pt")
+            policy.load_state_dict(_torch.load(ckpt, map_location="cpu"))
+            policy.eval()
+            self._driver = ContinuousWMDriver(
+                wm, policy, run_cfg.env.action_dim,
+                stochastic=bool(conf.get("stochastic", False)))
+            self._with_route = run_cfg.env.extra_obs_dims > 0
+            self._repeat = int(conf.get("action_repeat", 2))
+            self._prev_xy: Dict[object, np.ndarray] = {}
+            self._step = -1
+            self._last = carla.VehicleControl()
+
+        def sensors(self):
+            return [{"type": "sensor.speedometer", "id": "speed",
+                     "reading_frequency": 20}]
+
+        def run_step(self, input_data, timestamp):
+            self._step += 1
+            if self._step % self._repeat:
+                return self._last
+            ego = CarlaDataProvider.get_hero_actor()
+            tr = ego.get_transform()
+            ego_xy = np.array([tr.location.x, tr.location.y])
+            ego_yaw = float(np.deg2rad(tr.rotation.yaw))
+            v = ego.get_velocity()
+            ego_speed = float(np.linalg.norm([v.x, v.y, v.z]))
+
+            actors = []
+            world = CarlaDataProvider.get_world()
+            for pattern in ("vehicle.*", "walker.*"):
+                for a in world.get_actors().filter(pattern):
+                    if a.id == ego.id:
+                        continue
+                    loc = a.get_transform()
+                    actors.append((a.id,
+                                   np.array([loc.location.x,
+                                             loc.location.y]),
+                                   float(np.deg2rad(loc.rotation.yaw))))
+
+            route = None
+            if self._with_route:
+                plan = [(t.location.x, t.location.y, int(opt.value))
+                        for t, opt in self._global_plan_world_coord]
+                route = plan_to_command_points(plan, ego_xy)
+
+            obs, self._prev_xy = featurize_frame(
+                ego_xy, ego_yaw, ego_speed, actors, self._prev_xy,
+                route=route)
+            a = self._driver.act(obs)
+            self._last = carla.VehicleControl(
+                throttle=float(np.clip(a[0], 0.0, 1.0)),
+                steer=float(np.clip(a[1], -1.0, 1.0)),
+                brake=float(np.clip(a[2], 0.0, 1.0)))
+            return self._last
+
+        def destroy(self):
+            if hasattr(self, "_driver"):
+                self._driver.reset()
+
+except ImportError:  # carla/leaderboard not on path (e.g. login nodes)
     DittoCarlaAgent = None
