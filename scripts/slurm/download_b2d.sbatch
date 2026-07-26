@@ -4,7 +4,7 @@
 #SBATCH --time=12:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=2
-#SBATCH --mem=4G
+#SBATCH --mem-per-cpu=2G
 #SBATCH --output=/scratch/%u/ditto_av/outputs/slurm-%j.out
 #SBATCH --account=research-ceg-tp
 # DO NOT SUBMIT until the user approves the download (~200 GB full base split).
