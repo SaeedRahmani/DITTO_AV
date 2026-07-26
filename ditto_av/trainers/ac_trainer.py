@@ -8,36 +8,38 @@ import torch.nn.functional as F
 
 from ..config import Config
 from ..data import LatentBank
-from ..models.nets import ActorCritic
+from ..models.nets import make_actor_critic
 from ..models.world_model import VectorWorldModel
 from ..rewards import LatentMatcher, lambda_return
 
 
 def train_latent_policy(cfg: Config, wm: VectorWorldModel, bank: LatentBank,
                         reward_mode: str, seed: int = 0,
-                        name: str = None) -> ActorCritic:
+                        name: str = None):
     """DITTO policy learning: on-policy RL in imagination, rewarded by
     latent similarity to expert windows (single or multimodal matching)."""
     torch.manual_seed(seed)
     rng = np.random.default_rng(seed)
     device = cfg.device
     acfg = cfg.ac
+    continuous = cfg.env.continuous
     name = name or f"ditto_{reward_mode}"
 
-    policy = ActorCritic(cfg.wm.feature_dim, cfg.env.action_dim,
-                         acfg.hidden_dim, acfg.layers).to(device)
+    policy = make_actor_critic(continuous, cfg.wm.feature_dim,
+                               cfg.env.action_dim, acfg.hidden_dim,
+                               acfg.layers).to(device)
 
     # BC anchor: start from the cloned policy and stay in its trust region
-    bc_actor = None
+    bc_policy = None
     bc_ckpt = Path(cfg.dirs()["ckpt"]) / "bc.pt"
     if acfg.bc_init and bc_ckpt.exists():
-        bc_policy = ActorCritic(cfg.wm.feature_dim, cfg.env.action_dim,
-                                cfg.bc.hidden_dim, cfg.bc.layers).to(device)
+        bc_policy = make_actor_critic(continuous, cfg.wm.feature_dim,
+                                      cfg.env.action_dim, cfg.bc.hidden_dim,
+                                      cfg.bc.layers).to(device)
         bc_policy.load_state_dict(torch.load(bc_ckpt, map_location=device))
         policy.actor.load_state_dict(bc_policy.actor.state_dict())
-        bc_actor = bc_policy.actor
-        bc_actor.requires_grad_(False)
-        bc_actor.eval()
+        bc_policy.requires_grad_(False)
+        bc_policy.eval()
 
     actor_opt = torch.optim.Adam(policy.actor.parameters(), lr=acfg.actor_lr)
     critic_opt = torch.optim.Adam(policy.critic.parameters(),
@@ -55,15 +57,15 @@ def train_latent_policy(cfg: Config, wm: VectorWorldModel, bank: LatentBank,
         with torch.no_grad():
             for _ in range(H):
                 feat = torch.cat((h, z), dim=-1)
-                a = torch.distributions.Categorical(
-                    logits=policy.actor(feat)).sample()
+                a = policy.dist(feat).sample()
                 feats.append(feat)
                 actions.append(a)
-                a_onehot = F.one_hot(a, cfg.env.action_dim).float()
-                h, z = wm.dream(a_onehot, (h, z))
+                a_wm = (policy.clamp(a) if continuous
+                        else F.one_hot(a, cfg.env.action_dim).float())
+                h, z = wm.dream(a_wm, (h, z))
             feats.append(torch.cat((h, z), dim=-1))
         feats = torch.stack(feats)          # (H+1, B, F)
-        actions = torch.stack(actions)      # (H, B)
+        actions = torch.stack(actions)      # (H, B) or (H, B, A)
         dreamed_h = feats[..., :cfg.wm.deter_dim]
 
         # --- rewards and return targets ---
@@ -74,17 +76,16 @@ def train_latent_policy(cfg: Config, wm: VectorWorldModel, bank: LatentBank,
         returns = lambda_return(rewards, values_t, acfg.gamma, acfg.lam)
 
         # --- losses ---
-        dist = torch.distributions.Categorical(logits=policy.actor(feats[:-1]))
+        dist = policy.dist(feats[:-1])
         logp = dist.log_prob(actions)
         advantage = returns - values_t[:-1]
         advantage = (advantage - advantage.mean()) / (advantage.std() + 1e-8)
         policy_loss = -(logp * advantage.detach()).mean()
         entropy = dist.entropy().mean()
         actor_loss = policy_loss - acfg.entropy_coef * entropy
-        if bc_actor is not None and acfg.bc_kl_coef > 0:
+        if bc_policy is not None and acfg.bc_kl_coef > 0:
             with torch.no_grad():
-                bc_dist = torch.distributions.Categorical(
-                    logits=bc_actor(feats[:-1]))
+                bc_dist = bc_policy.dist(feats[:-1])
             kl_bc = torch.distributions.kl.kl_divergence(dist, bc_dist).mean()
             actor_loss = actor_loss + acfg.bc_kl_coef * kl_bc
 
@@ -105,13 +106,18 @@ def train_latent_policy(cfg: Config, wm: VectorWorldModel, bank: LatentBank,
         policy.update_target(acfg.target_tau)
 
         if step % 500 == 0 or step == 1:
-            # imitation accuracy at the seed step against expert actions
+            # imitation quality at the seed step against expert actions
             with torch.no_grad():
                 expert_a = bank.action[bank.window_starts[window_ids]]
-                acc = (actions[0] == expert_a).float().mean()
+                if continuous:
+                    m = (policy.clamp(actions[0]) - expert_a).abs().mean()
+                    m_label = "step0 mae"
+                else:
+                    m = (actions[0] == expert_a).float().mean()
+                    m_label = "step0 acc"
             print(f"{name} step {step:5d} | reward {rewards.mean():.3f} "
                   f"| return {returns.mean():.3f} | entropy {entropy:.3f} "
-                  f"| step0 acc {acc:.3f}")
+                  f"| {m_label} {m:.3f}")
 
     ckpt = Path(cfg.dirs()["ckpt"]) / f"{name}.pt"
     torch.save(policy.state_dict(), ckpt)

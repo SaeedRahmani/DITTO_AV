@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import copy
+from typing import Optional, Sequence
 
 import torch
 import torch.nn as nn
-from torch.distributions import Categorical
+from torch.distributions import Categorical, Independent, Normal
 
 
 def mlp(in_dim: int, hidden_dim: int, out_dim: int, layers: int,
@@ -73,3 +74,68 @@ class ActorCritic(nn.Module):
         d = self.dist(features)
         a = d.sample() if stochastic else d.logits.argmax(-1)
         return int(a.item())
+
+
+class GaussianActorCritic(nn.Module):
+    """Continuous-action counterpart of ActorCritic: diagonal Gaussian actor
+    over world-model features, with the same EMA target critic.
+
+    The actor outputs (mean, log_std) per action dim. Sampled actions are
+    clamped to `low`/`high` before being fed to the world model; log-probs
+    and KL use the unclamped Gaussian (standard for bounded driving controls
+    like throttle/steer/brake).
+    """
+
+    LOG_STD_MIN, LOG_STD_MAX = -5.0, 1.0
+
+    def __init__(self, feature_dim: int, action_dim: int,
+                 hidden_dim: int = 256, layers: int = 2,
+                 low: Optional[Sequence[float]] = None,
+                 high: Optional[Sequence[float]] = None):
+        super().__init__()
+        self.action_dim = action_dim
+        self.actor = mlp(feature_dim, hidden_dim, 2 * action_dim, layers)
+        self.critic = mlp(feature_dim, hidden_dim, 1, layers)
+        self.target_critic = copy.deepcopy(self.critic)
+        for p in self.target_critic.parameters():
+            p.requires_grad_(False)
+        low = torch.tensor(low if low is not None else [-1.0] * action_dim)
+        high = torch.tensor(high if high is not None else [1.0] * action_dim)
+        self.register_buffer("low", low.float())
+        self.register_buffer("high", high.float())
+
+    def dist(self, features) -> Independent:
+        mu, log_std = self.actor(features).chunk(2, dim=-1)
+        log_std = log_std.clamp(self.LOG_STD_MIN, self.LOG_STD_MAX)
+        return Independent(Normal(mu, log_std.exp()), 1)
+
+    def clamp(self, action: torch.Tensor) -> torch.Tensor:
+        return torch.max(torch.min(action, self.high), self.low)
+
+    def value(self, features):
+        return self.critic(features).squeeze(-1)
+
+    def target_value(self, features):
+        return self.target_critic(features).squeeze(-1)
+
+    @torch.no_grad()
+    def update_target(self, tau: float):
+        for p, tp in zip(self.critic.parameters(),
+                         self.target_critic.parameters()):
+            tp.data.lerp_(p.data, tau)
+
+    @torch.no_grad()
+    def act(self, features, stochastic: bool = False) -> torch.Tensor:
+        d = self.dist(features)
+        a = d.sample() if stochastic else d.base_dist.loc
+        return self.clamp(a)
+
+
+def make_actor_critic(continuous: bool, feature_dim: int, action_dim: int,
+                      hidden_dim: int, layers: int):
+    """B2D bounds (throttle, steer, brake); highway stays discrete."""
+    if continuous:
+        return GaussianActorCritic(feature_dim, action_dim, hidden_dim,
+                                   layers, low=[0.0, -1.0, 0.0],
+                                   high=[1.0, 1.0, 1.0])
+    return ActorCritic(feature_dim, action_dim, hidden_dim, layers)

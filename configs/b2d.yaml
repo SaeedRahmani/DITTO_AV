@@ -1,0 +1,22 @@
+# DITTO-AV Phase 2: Bench2Drive (continuous actions, offline, open-loop eval)
+run_dir: runs/b2d
+seed: 0
+device: cpu
+
+env:
+  action_space: continuous
+
+wm:
+  train_steps: 6000
+  batch_size: 32
+  seq_len: 16
+
+ac:
+  train_steps: 3000
+  horizon: 15
+  batch_size: 64
+  k_modes: 8
+  n_negatives: 16
+
+bc:
+  train_steps: 5000
