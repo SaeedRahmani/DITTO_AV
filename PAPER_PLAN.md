@@ -177,6 +177,10 @@ first tier.
   ways: K ablation, and a trajectory-consistent variant
   (`reward_mode: multi_traj`, commits to the argmax window over the whole
   horizon) ablated over 3 seeds at the K=16/H=5 config (`mt_seed*`).
+  RESULT: multi_traj ≈ multi closed-loop (ID return 20.67±0.24 vs
+  20.67±0.30; shifted collisions 0.15±0.13 vs 0.19±0.14) — the multimodal
+  gains are NOT explained by per-step reward relaxation, and the
+  trajectory-consistent variant is the cleaner method to present.
 - The collected data contains no *paired* same-state continuations by
   construction (each episode has one sampled style). Conditional
   multimodality is established empirically instead
