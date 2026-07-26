@@ -132,11 +132,15 @@ mode-averaging).
   (validated on a real clip).
 - Changes needed: continuous-action actor (Gaussian head on
   throttle/steer/brake) — DONE (`ditto_av/models/nets.py`,
-  `scripts/run_b2d.py`). Still needed before any closed-loop claim:
-  (a) route/command conditioning (command_near / command_far fields are
-  in the annotations) — without a goal signal the policy cannot follow
-  routes; (b) a CARLA agent adapter that builds our vector observation
-  online. NOTE the current observation uses privileged annotation fields
+  `scripts/run_b2d.py`). Route/command conditioning — DONE (16-dim
+  ego-frame near/far command block; v3 run `runs/b2d_v3`: WM ceiling
+  0.844 vs 0.800 and H-step obs MSE 0.073 vs 0.093 against the
+  unconditioned v2 — route input makes the world model markedly more
+  predictable). Online featurizer verified equal to the offline adapter
+  (`ditto_av/carla_agent.py`, tested). Still needed before any
+  closed-loop claim: wiring `DittoCarlaAgent` to the Bench2Drive
+  leaderboard harness and CARLA 0.9.15 runtime (apptainer image on
+  DelftBlue scratch). NOTE the current observation uses privileged annotation fields
   (ground-truth actor boxes, global ego pose): results must be positioned
   as a *privileged planner* trained offline, comparable to privileged
   baselines (e.g. AD-MLP-style state input, Think2Drive), NOT to
