@@ -85,10 +85,13 @@ collision rate ≈ 0.07):
 - Style 25/75 (imbalanced, NOT unimodal): the multi-vs-single return gap
   *widens* (+3.7 ID / +5.0 shifted vs +1.7/+1.6 at 50/50) — under
   imbalance the time-aligned source window is the minority mode 25% of
-  the time, and retrieval substitutes the right mode exactly there. A
-  true unimodal control (aggressive_prob=1.0, 3 seeds, `unimodal_seed*`)
-  tests the falsifiable prediction that the gap vanishes without
-  multimodality.
+  the time, and retrieval substitutes the right mode exactly there.
+- **Unimodal control confirms the causal claim** (aggressive_prob=1.0,
+  3 seeds, `unimodal_seed*`): the multi-vs-single gap collapses to
+  −0.05 ± 0.84 return under shift (vs +1.6 to +5.0 whenever the data is
+  multimodal) and +1.3 ± 1.6 in-distribution (noise-compatible). The
+  advantage appears when and only when the demonstrations are
+  multimodal.
 - Data scale is noisy at a single seed (150 eps < 75 eps in-dist); needs
   seeds before claiming a trend.
 

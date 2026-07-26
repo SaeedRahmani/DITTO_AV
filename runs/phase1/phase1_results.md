@@ -68,6 +68,28 @@
 | ditto_multi | 18.65 ± 1.97 | 0.19 ± 0.14 | 16.02 ± 0.67 |
 | ditto_multi_traj | 18.97 ± 1.78 | 0.15 ± 0.13 | 16.06 ± 0.70 |
 
+## Unimodal control (aggressive only — multi advantage should vanish) (3 seeds)
+
+### in_distribution
+
+| policy | return | collision rate | mean speed |
+|---|---|---|---|
+| expert | 21.21 ± 0.00 | 0.02 ± 0.00 | 20.27 ± 0.00 |
+| random | 7.26 ± 0.00 | 0.82 ± 0.00 | 22.47 ± 0.00 |
+| bc | 13.05 ± 1.52 | 0.55 ± 0.09 | 21.30 ± 0.73 |
+| ditto_single | 11.77 ± 0.62 | 0.63 ± 0.06 | 21.61 ± 0.37 |
+| ditto_multi | 13.10 ± 1.78 | 0.52 ± 0.09 | 21.23 ± 1.05 |
+
+### shifted
+
+| policy | return | collision rate | mean speed |
+|---|---|---|---|
+| expert | 20.65 ± 0.00 | 0.04 ± 0.00 | 18.37 ± 0.00 |
+| random | 5.96 ± 0.00 | 0.92 ± 0.00 | 21.69 ± 0.00 |
+| bc | 7.80 ± 1.61 | 0.76 ± 0.07 | 21.28 ± 0.88 |
+| ditto_single | 7.39 ± 1.43 | 0.81 ± 0.09 | 22.07 ± 0.82 |
+| ditto_multi | 7.34 ± 0.62 | 0.81 ± 0.04 | 21.50 ± 0.34 |
+
 ## K (retrieval modes, ditto_multi)
 
 | setting | return (ID) | collisions (ID) | return (shift) | collisions (shift) |
