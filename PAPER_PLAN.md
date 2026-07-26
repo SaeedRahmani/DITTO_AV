@@ -86,8 +86,21 @@ collision rate ≈ 0.07):
   the story that expert multimodality is the failure source being fixed.
 - Data scale is noisy at a single seed (150 eps < 75 eps in-dist); needs
   seeds before claiming a trend.
-- K=16 + H=5 combined is being validated over 3 seeds
-  (`k16h5_seed*` runs) as the candidate main config.
+
+**Headline result — improved config (K=16, H=5), 3 seeds** (validated,
+`k16h5_seed*`; this becomes the main paper table):
+
+| policy | in-dist return | in-dist collisions | shifted return | shifted collisions |
+| --- | --- | --- | --- | --- |
+| expert (oracle) | 21.6 | 0.00 | 20.5 | 0.04 |
+| BC (latent) | 13.9 ± 0.7 | 0.49 ± 0.05 | 10.5 ± 2.2 | 0.63 ± 0.10 |
+| DITTO-single | 18.0 ± 1.5 | 0.21 ± 0.10 | 13.6 ± 1.6 | 0.48 ± 0.07 |
+| **DITTO-multi (ours)** | **20.1 ± 0.9** | **0.10 ± 0.06** | **18.3 ± 1.5** | **0.21 ± 0.11** |
+
+DITTO-multi is near-expert in-distribution and loses only ~2 return points
+under density shift while BC/single degrade sharply — the multi-vs-single
+gap widens exactly where the theory predicts (distribution shift exposes
+mode-averaging).
 
 ## Experiment matrix
 
