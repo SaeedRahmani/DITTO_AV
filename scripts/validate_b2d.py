@@ -12,6 +12,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import shutil
 import sys
 import tarfile
 from pathlib import Path
@@ -26,8 +27,13 @@ def extract_anno(tar_path: Path, out_root: Path) -> Path:
     """Extract only anno/*.json.gz; returns the extracted clip directory."""
     clip_name = tar_path.name.removesuffix(".tar.gz")
     clip_dir = out_root / clip_name
-    if (clip_dir / "anno").is_dir() and any((clip_dir / "anno").iterdir()):
+    # clip_dir only ever appears via the atomic rename below, so its
+    # existence proves a complete extraction
+    if (clip_dir / "anno").is_dir():
         return clip_dir
+    tmp_dir = out_root / (clip_name + ".extracting")
+    if tmp_dir.exists():
+        shutil.rmtree(tmp_dir)
     with tarfile.open(tar_path, "r:gz") as tf:
         members = [m for m in tf.getmembers()
                    if "/anno/" in m.name and m.name.endswith(".json.gz")]
@@ -37,7 +43,8 @@ def extract_anno(tar_path: Path, out_root: Path) -> Path:
         for m in members:
             parts = m.name.split("/")
             m.name = "/".join(parts[parts.index("anno"):])
-        tf.extractall(clip_dir, members=members)
+        tf.extractall(tmp_dir, members=members)
+    tmp_dir.rename(clip_dir)
     return clip_dir
 
 

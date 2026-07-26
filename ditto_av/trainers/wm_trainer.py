@@ -18,9 +18,13 @@ def train_world_model(cfg: Config, data: TrajectoryData,
     wm = VectorWorldModel(data.obs_dim, cfg.env.action_dim, cfg.wm).to(device)
     opt = torch.optim.Adam(wm.parameters(), lr=cfg.wm.lr)
 
-    # episode-level train/val split
+    # episode-level train/val split, random but fixed across training seeds
+    # (a tail split would put all-noisy episodes in val: files concatenate
+    # expert first, noisy second)
     n_val = max(1, int(len(data.episodes) * cfg.wm.val_fraction))
-    val_eps = set(range(len(data.episodes) - n_val, len(data.episodes)))
+    split_rng = np.random.default_rng(12345)
+    val_eps = set(split_rng.choice(len(data.episodes), n_val,
+                                   replace=False).tolist())
     train_data = _subset(data, [i for i in range(len(data.episodes))
                                 if i not in val_eps])
     val_data = _subset(data, sorted(val_eps))

@@ -17,7 +17,8 @@ SCRATCH_CLIP = Path(os.environ.get(
     "extracted/Accident_Town03_Route101_Weather23"))
 
 
-def write_frame(path: Path, t: float, theta: float = 0.0):
+def write_frame(path: Path, t: float, theta: float = 0.0,
+                leader_dx: float = 20.0):
     """Synthetic Bench2Drive-style annotation frame."""
     ego_x, ego_y = 100.0 + 5.0 * t, 50.0
     frame = {
@@ -26,9 +27,10 @@ def write_frame(path: Path, t: float, theta: float = 0.0):
         "bounding_boxes": [
             {"class": "ego_vehicle", "id": "ego",
              "location": [ego_x, ego_y, 0.0], "rotation": [0, 0, 0.0]},
-            # leader 20 m ahead, driving at the same speed
+            # leader ahead, driving at the same speed
             {"class": "vehicle", "id": "v1",
-             "location": [ego_x + 20.0, ego_y, 0.0], "rotation": [0, 0, 0.0]},
+             "location": [ego_x + leader_dx, ego_y, 0.0],
+             "rotation": [0, 0, 0.0]},
             # oncoming vehicle in the other lane
             {"class": "vehicle", "id": "v2",
              "location": [ego_x + 40.0, ego_y - 4.0, 0.0],
@@ -89,6 +91,23 @@ def test_nan_theta_frame_uses_last_finite_heading(tmp_path):
     rows = d["obs"].reshape(10, 7, 7)
     # heading carried forward => frame 4 identical to its neighbors
     assert np.allclose(rows[4], rows[5])
+
+
+def test_teleport_velocity_rejected(tmp_path):
+    # a tracked actor jumping 30 m between 10 Hz frames implies 300 m/s;
+    # that finite-difference is a respawn artifact and must be zeroed,
+    # not clipped into the observation
+    anno = tmp_path / "clip" / "anno"
+    anno.mkdir(parents=True)
+    for i in range(10):
+        dx = 50.0 if i >= 5 else 20.0
+        write_frame(anno / f"{i:05d}.json.gz", t=i * 0.1, leader_dx=dx)
+    d = load_clip(tmp_path / "clip", n_neighbors=6)
+    rows = d["obs"].reshape(10, 7, 7)
+    # after the jump the leader (50 m) sorts behind v2 (~40 m): row 2
+    assert np.allclose(rows[5, 2, 3], 0.0)          # spike rejected
+    assert np.allclose(rows[6:, 2, 3], 5.0 / 40.0,  # tracking resumes
+                       atol=1e-4)
 
 
 def test_clips_to_npz_roundtrip(synthetic_clip, tmp_path):

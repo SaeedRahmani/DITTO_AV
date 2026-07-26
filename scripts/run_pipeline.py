@@ -55,7 +55,7 @@ def stage_wm(cfg):
     data = TrajectoryData(all_paths(cfg))
     print(f"world-model data: {len(data.obs)} steps, "
           f"{len(data.episodes)} episodes")
-    train_world_model(cfg, data)
+    train_world_model(cfg, data, seed=cfg.seed)
 
 
 def stage_policies(cfg):
@@ -65,9 +65,9 @@ def stage_policies(cfg):
                              cfg.ac.horizon, cfg.device)
     print(f"latent bank: {bank.feat.shape[0]} steps, "
           f"{bank.n_windows} windows")
-    train_bc(cfg, bank)
-    train_latent_policy(cfg, wm, bank, reward_mode="single")
-    train_latent_policy(cfg, wm, bank, reward_mode="multi")
+    train_bc(cfg, bank, seed=cfg.seed)
+    train_latent_policy(cfg, wm, bank, reward_mode="single", seed=cfg.seed)
+    train_latent_policy(cfg, wm, bank, reward_mode="multi", seed=cfg.seed)
 
 
 def stage_eval(cfg):

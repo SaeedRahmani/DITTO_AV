@@ -16,14 +16,22 @@ class EnvConfig:
     duration: int = 30
     observed_vehicles: int = 7
     obs_features: tuple = ("presence", "x", "y", "vx", "vy", "cos_h", "sin_h")
+    # "discrete_meta": highway-env 5-way meta-actions;
+    # "continuous": e.g. Bench2Drive (throttle, steer, brake)
+    action_space: str = "discrete_meta"
+    continuous_dims: int = 3
 
     @property
     def obs_dim(self) -> int:
         return self.observed_vehicles * len(self.obs_features)
 
     @property
+    def continuous(self) -> bool:
+        return self.action_space == "continuous"
+
+    @property
     def action_dim(self) -> int:
-        return 5  # DiscreteMetaAction
+        return self.continuous_dims if self.continuous else 5
 
 
 @dataclass
@@ -108,6 +116,7 @@ class EvalConfig:
 class Config:
     run_dir: str = "runs/av1"
     device: str = "cpu"
+    seed: int = 0  # training seed for wm/bc/ac stages (collect has its own)
     env: EnvConfig = field(default_factory=EnvConfig)
     collect: CollectConfig = field(default_factory=CollectConfig)
     wm: WMConfig = field(default_factory=WMConfig)

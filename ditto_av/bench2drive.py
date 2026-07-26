@@ -27,6 +27,7 @@ import numpy as np
 FPS = 10.0
 POS_SCALE = 100.0    # meters, matches highway-env Kinematics feature range
 VEL_SCALE = 40.0     # m/s
+V_MAX = 60.0         # m/s; faster finite-difference = tracking glitch/teleport
 
 
 def _load_frame(path: Path) -> dict:
@@ -96,9 +97,14 @@ def load_clip(clip_dir: Path, n_neighbors: int = 6,
             dist = float(np.linalg.norm(rel))
             if dist > radius or dist < 1e-6:
                 continue
-            # finite-difference world velocity from the previous frame
+            # finite-difference world velocity from the previous frame;
+            # implausible speeds mean the actor teleported/respawned between
+            # frames — treat like a first appearance instead of feeding the
+            # world model a spurious ~100 m/s spike
             prev = tracks[t - 1].get(b["id"]) if t > 0 else None
             vel_w = (pos - prev) * FPS if prev is not None else np.zeros(2)
+            if np.linalg.norm(vel_w) > V_MAX:
+                vel_w = np.zeros(2)
             vel_rel = world_to_ego @ vel_w
             yaw_rel = _yaw_rad(b["rotation"]) - ego_yaw
             neighbors.append((dist, [

@@ -34,4 +34,4 @@ while read -r clip; do
     tar -tzf "$clip" > /dev/null   # integrity check
     touch "$clip.done"
 done < "$MANIFEST"
-echo "DOWNLOAD BATCH DONE: $(ls *.done | wc -l) clips verified"
+echo "DOWNLOAD BATCH DONE: $(grep -c . "$MANIFEST") manifest clips verified"

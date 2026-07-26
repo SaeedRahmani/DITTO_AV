@@ -124,10 +124,15 @@ def build_latent_bank(wm, data: TrajectoryData, action_dim: int, horizon: int,
     for s, e in data.episodes:
         T = e - s
         obs = torch.as_tensor(data.obs[s:e], device=device).unsqueeze(1)
-        prev = np.zeros((T,), dtype=np.int64)
-        prev[1:] = data.action[s:e - 1]
-        act = F.one_hot(torch.as_tensor(prev, device=device),
-                        action_dim).float().unsqueeze(1)
+        if data.discrete_actions:
+            prev = np.zeros((T,), dtype=np.int64)
+            prev[1:] = data.action[s:e - 1]
+            act = F.one_hot(torch.as_tensor(prev, device=device),
+                            action_dim).float().unsqueeze(1)
+        else:
+            prev = np.zeros((T, data.action.shape[1]), dtype=np.float32)
+            prev[1:] = data.action[s:e - 1]
+            act = torch.as_tensor(prev, device=device).unsqueeze(1)
         reset = torch.zeros((T, 1), dtype=torch.bool, device=device)
         reset[0, 0] = True
         act = act * (~reset).unsqueeze(-1)
