@@ -98,19 +98,25 @@ the earlier per-batch download gate for this work stream.
    login-node nohup (`outputs/b2d_download2.log`), with a detached chain
    (`outputs/b2d_chain.log`) that auto-submits `validate_b2d.sbatch` and
    then Phase-2 v2 when it finishes.
-3. **Phase-1 sweep** — SUBMITTED 2026-07-26: 15 jobs (10521411-25) via
-   `scripts/phase1_sweep.py generate` + `scripts/slurm/phase1.sbatch`:
-   3 seeds main, K∈{1,2,4,16}, negatives∈{0,4,32}, H∈{5,10} (reusing the
-   seed-0 world model via job dependency), data scale {75,150}, style 25/75.
-   Aggregate with `scripts/phase1_sweep.py aggregate` → commit
-   `runs/phase1/phase1_results.{md,json}`.
-4. **Phase-2 (Bench2Drive)** — pipeline IMPLEMENTED (`scripts/run_b2d.py`,
-   `configs/b2d.yaml`, `scripts/slurm/phase2.sbatch`): continuous Gaussian
-   actor, offline training, open-loop eval on held-out clips (WM prediction
-   error, action NLL/MAE, latent imitation score vs expert-replay ceiling).
-   v1 job on 60 clips: 10521595. v2 on ~297 clips auto-chains after the
-   download. Closed-loop CARLA eval remains a separate future task (needs
-   CARLA 0.9.15 setup — check module list / apptainer).
+3. **Phase-1 sweep** — DONE 2026-07-26 (21 runs, all committed to
+   `runs/phase1/`): 3-seed main + K/negatives/horizon/data/style ablations
+   + 3-seed validation of the improved config (K=16, H=5: DITTO-multi
+   near-expert, 0.10 collisions ID / 0.21 shifted) + 3-seed
+   trajectory-consistent `multi_traj` ablation (== multi; rules out
+   per-step reward relaxation). Headline tables in PAPER_PLAN.md.
+4. **Phase-2 (Bench2Drive)** — offline pipeline DONE and run twice:
+   v1 (60 clips, job 10521595) and v2 (297 clips, job 10521834; results in
+   `runs/b2d_v2/`, WM H-step MSE 0.093, policies at the expert-replay
+   latent ceiling). Open-loop only — NOT driving evidence (see PAPER_PLAN
+   framing). Closed-loop prerequisites: route/command conditioning +
+   CARLA agent adapter + CARLA 0.9.15 setup (module list / apptainer) —
+   all still TODO. Observation is privileged (GT boxes): position results
+   accordingly.
+5. **W&B monitoring** (added 2026-07-26): jobs log offline
+   (`WANDB_MODE=offline`, set in templates); keep
+   `scripts/wandb_sync.sh` running via nohup on a login node to stream to
+   wandb.ai project `ditto-av` (~2 min lag). Restart it after login-node
+   reboots.
 
 ## Conventions for the AI working on DelftBlue
 
