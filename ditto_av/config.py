@@ -20,10 +20,14 @@ class EnvConfig:
     # "continuous": e.g. Bench2Drive (throttle, steer, brake)
     action_space: str = "discrete_meta"
     continuous_dims: int = 3
+    # appended observation dims beyond the vehicle rows (e.g. Bench2Drive
+    # route conditioning: 16 = near/far command point + one-hot command)
+    extra_obs_dims: int = 0
 
     @property
     def obs_dim(self) -> int:
-        return self.observed_vehicles * len(self.obs_features)
+        return self.observed_vehicles * len(self.obs_features) \
+            + self.extra_obs_dims
 
     @property
     def continuous(self) -> bool:

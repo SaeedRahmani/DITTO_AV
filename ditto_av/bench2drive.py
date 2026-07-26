@@ -40,8 +40,29 @@ def _yaw_rad(rotation: List[float]) -> float:
     return float(np.deg2rad(rotation[2]))
 
 
+N_COMMANDS = 6   # CARLA: LEFT, RIGHT, STRAIGHT, LANEFOLLOW, CHANGELEFT/RIGHT
+ROUTE_DIMS = 2 * (2 + N_COMMANDS)  # near+far: rel position + one-hot command
+
+
+def _route_block(fr: dict, world_to_ego: np.ndarray,
+                 ego_xy: np.ndarray) -> np.ndarray:
+    """Ego-frame route conditioning from the annotation's command points."""
+    out = np.zeros(ROUTE_DIMS, dtype=np.float32)
+    for i, tag in enumerate(("near", "far")):
+        base = i * (2 + N_COMMANDS)
+        x, y = fr.get(f"x_command_{tag}"), fr.get(f"y_command_{tag}")
+        if x is not None and y is not None and np.isfinite([x, y]).all():
+            rel = world_to_ego @ (np.array([x, y], dtype=np.float64) - ego_xy)
+            out[base:base + 2] = rel / POS_SCALE
+        cmd = int(fr.get(f"command_{tag}", 4) or 4)  # default LANEFOLLOW
+        if 1 <= cmd <= N_COMMANDS:
+            out[base + 2 + cmd - 1] = 1.0
+    return out
+
+
 def load_clip(clip_dir: Path, n_neighbors: int = 6,
-              radius: float = 60.0) -> Dict[str, np.ndarray]:
+              radius: float = 60.0,
+              with_route: bool = False) -> Dict[str, np.ndarray]:
     """Parse one clip directory (containing `anno/*.json.gz`)."""
     clip_dir = Path(clip_dir)
     frames = sorted((clip_dir / "anno").glob("*.json.gz"))
@@ -72,7 +93,9 @@ def load_clip(clip_dir: Path, n_neighbors: int = 6,
         tracks.append(d)
 
     n_feat = 7
-    obs = np.zeros((len(raw), (1 + n_neighbors) * n_feat), dtype=np.float32)
+    core_dim = (1 + n_neighbors) * n_feat
+    obs_dim = core_dim + (ROUTE_DIMS if with_route else 0)
+    obs = np.zeros((len(raw), obs_dim), dtype=np.float32)
     action = np.zeros((len(raw), 3), dtype=np.float32)
     reset = np.zeros((len(raw),), dtype=bool)
     reset[0] = True
@@ -115,7 +138,10 @@ def load_clip(clip_dir: Path, n_neighbors: int = 6,
         for i, (_, row) in enumerate(neighbors[:n_neighbors]):
             rows[1 + i] = row
 
-        obs[t] = np.clip(rows, -2.0, 2.0).reshape(-1)
+        obs[t, :core_dim] = np.clip(rows, -2.0, 2.0).reshape(-1)
+        if with_route:
+            obs[t, core_dim:] = np.clip(
+                _route_block(fr, world_to_ego, ego_xy), -2.0, 2.0)
         action[t] = [float(fr["throttle"]), float(fr["steer"]),
                      float(fr["brake"])]
 
@@ -123,9 +149,11 @@ def load_clip(clip_dir: Path, n_neighbors: int = 6,
 
 
 def clips_to_npz(clip_dirs: List[Path], out_path: Path,
-                 n_neighbors: int = 6) -> Dict[str, np.ndarray]:
+                 n_neighbors: int = 6,
+                 with_route: bool = False) -> Dict[str, np.ndarray]:
     """Convert clips into one npz compatible with TrajectoryData."""
-    parts = [load_clip(d, n_neighbors=n_neighbors) for d in clip_dirs]
+    parts = [load_clip(d, n_neighbors=n_neighbors, with_route=with_route)
+             for d in clip_dirs]
     data = {
         "obs": np.concatenate([p["obs"] for p in parts]),
         "action": np.concatenate([p["action"] for p in parts]),

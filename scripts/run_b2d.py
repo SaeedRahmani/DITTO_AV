@@ -55,9 +55,11 @@ def split_clips(manifest: Path, extracted: Path):
 
 def stage_data(cfg, args):
     d = cfg.dirs()
+    with_route = cfg.env.extra_obs_dims > 0
     train, val = split_clips(Path(args.manifest), Path(args.extracted))
-    tr = clips_to_npz(train, d["data"] / "b2d_train.npz")
-    va = clips_to_npz(val, d["data"] / "b2d_val.npz")
+    tr = clips_to_npz(train, d["data"] / "b2d_train.npz",
+                      with_route=with_route)
+    va = clips_to_npz(val, d["data"] / "b2d_val.npz", with_route=with_route)
     print(f"train: {tr['obs'].shape[0]} frames / {int(tr['reset'].sum())} "
           f"clips | val: {va['obs'].shape[0]} frames / "
           f"{int(va['reset'].sum())} clips")

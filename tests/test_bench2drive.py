@@ -93,6 +93,40 @@ def test_nan_theta_frame_uses_last_finite_heading(tmp_path):
     assert np.allclose(rows[4], rows[5])
 
 
+def test_route_conditioning_block(tmp_path):
+    # route block: ego-frame command points + one-hot commands, appended
+    # after the 49 vehicle dims; tolerant of frames missing the fields
+    anno = tmp_path / "clip" / "anno"
+    anno.mkdir(parents=True)
+    for i in range(6):
+        write_frame(anno / f"{i:05d}.json.gz", t=i * 0.1)
+        # inject command fields into every second frame
+        if i % 2 == 0:
+            frame = json.load(gzip.open(anno / f"{i:05d}.json.gz", "rt"))
+            frame.update({"x_command_near": frame["x"] + 30.0,
+                          "y_command_near": frame["y"],
+                          "command_near": 3,      # STRAIGHT
+                          "x_command_far": frame["x"] + 80.0,
+                          "y_command_far": frame["y"] + 10.0,
+                          "command_far": 1})      # LEFT
+            with gzip.open(anno / f"{i:05d}.json.gz", "wt") as f:
+                json.dump(frame, f)
+    d = load_clip(tmp_path / "clip", n_neighbors=6, with_route=True)
+    assert d["obs"].shape == (6, 49 + 16)
+    route = d["obs"][:, 49:]
+    # frame 0: near point 30 m ahead => 0.3; STRAIGHT one-hot at index 2
+    assert np.isclose(route[0, 0], 0.3, atol=1e-5)
+    assert route[0, 2 + 2] == 1.0 and route[0].sum() > 0
+    # far block: LEFT one-hot at its index 0
+    assert route[0, 8 + 2 + 0] == 1.0
+    # frames without fields: zero offsets, LANEFOLLOW default (index 3)
+    assert np.allclose(route[1, :2], 0.0)
+    assert route[1, 2 + 3] == 1.0
+    # default path unchanged
+    d49 = load_clip(tmp_path / "clip", n_neighbors=6)
+    assert d49["obs"].shape == (6, 49)
+
+
 def test_teleport_velocity_rejected(tmp_path):
     # a tracked actor jumping 30 m between 10 Hz frames implies 300 m/s;
     # that finite-difference is a respawn artifact and must be zeroed,

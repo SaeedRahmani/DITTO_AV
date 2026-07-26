@@ -77,6 +77,13 @@ def runs_matrix():
                       "ac": {"k_modes": 16, "horizon": 5,
                              "train_multi_traj": True}},
                      f"main_seed{s}"))
+    # unimodal control: with a single expert style the multi-vs-single gap
+    # should vanish if (and only if) the gains come from multimodality
+    for s in SEEDS:
+        runs.append((f"unimodal_seed{s}",
+                     {"seed": s,
+                      "collect": {"seed": s, "aggressive_prob": 1.0}},
+                     None))
     return runs
 
 
@@ -123,9 +130,11 @@ def cmd_aggregate(args):
                  " baselines",
         "mt": "Trajectory-consistent matching (K=16, H=5;"
               " ditto_multi_traj commits to one mode per rollout)",
+        "uni": "Unimodal control (aggressive only — multi advantage"
+               " should vanish)",
     }
     for group, prefix in (("main", "main_seed"), ("k16h5", "k16h5_seed"),
-                          ("mt", "mt_seed")):
+                          ("mt", "mt_seed"), ("uni", "unimodal_seed")):
         mains = {s: _load(sweep, f"{prefix}{s}") for s in SEEDS}
         have = {s: r for s, r in mains.items() if r}
         if not have:
