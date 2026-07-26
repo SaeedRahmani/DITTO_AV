@@ -73,7 +73,13 @@ Templates live in `scripts/slurm/`. The user's SLURM accounts (verified
 - `scripts/slurm/test.sbatch` — 10-min CPU smoke: runs pytest + the smoke
   pipeline. Submit this FIRST after any fresh setup.
 - `scripts/slurm/download_b2d.sbatch` — Bench2Drive download into
-  `/scratch/$USER/ditto_av/data/bench2drive/` (NOT run yet; see next steps).
+  `/scratch/$USER/ditto_av/data/bench2drive/`. **Compute nodes have NO
+  outbound internet** (verified 2026-07-26, job 10521023; no proxy
+  configured) — run its body on a login node with `nohup` instead (see the
+  script header). First 60-clip batch downloaded + validated 2026-07-26.
+- `scripts/slurm/validate_b2d.sbatch` — extracts `anno/` from downloaded
+  tarballs and parses every manifest clip via `scripts/validate_b2d.py`;
+  run after every download batch.
 - `scripts/slurm/train.sbatch` — full pipeline run (CPU is fine for the
   highway-env phase; the model is tiny. GPU only pays off after scaling).
 
@@ -89,12 +95,14 @@ instruction).
 1. **Verify state**: ssh in, `git -C /scratch/$USER/ditto_av/DITTO_AV pull`,
    run pytest, submit `test.sbatch`, confirm it passes.
 2. **Data download (only when the user says go)**: Bench2Drive base split
-   (1000 clips × ~175 MB ≈ 200 GB) from HF `rethinklab/Bench2Drive` into
-   `data/bench2drive/`. Download via a CPU job or login-node `nohup` at low
-   parallelism (the docs allow transfers on login nodes); keep a manifest of
-   downloaded files in git. Start with ~50 clips and validate with
-   `ditto_av/bench2drive.py` (`clips_to_npz`) before committing to the full
-   split.
+   (1000 clips, avg ~335 MB, ≈ 335 GB total — measured from the HF listing
+   2026-07-26) from HF `rethinklab/Bench2Drive` into `data/bench2drive/`.
+   Download via login-node `nohup` (compute nodes have no internet); keep a
+   manifest of downloaded files in git. DONE 2026-07-26 for a stratified
+   60-clip batch (7.9 GB, all 43 scenario types, smallest clips per
+   scenario — see `manifests/b2d_clips.txt`): all 60 parse with
+   `ditto_av/bench2drive.py`, combined npz has 10,766 frames. Next batches
+   only on explicit user go-ahead.
 3. **Phase-1 scale-up on cluster (highway-env)**: 3 seeds × {bc,
    ditto_single, ditto_multi}, K/H/negatives ablations per `PAPER_PLAN.md`;
    `run_dir` under `/scratch/$USER/ditto_av/outputs/`. Commit result
