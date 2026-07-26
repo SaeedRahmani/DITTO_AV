@@ -86,7 +86,10 @@ class GaussianActorCritic(nn.Module):
     like throttle/steer/brake).
     """
 
-    LOG_STD_MIN, LOG_STD_MAX = -5.0, 1.0
+    # std floor 0.135 keeps Gaussian NLL bounded on near-binary controls
+    # (B2D throttle/brake): std collapse on one mode otherwise causes NLL
+    # spikes on the other and unstable BC training
+    LOG_STD_MIN, LOG_STD_MAX = -2.0, 1.0
 
     def __init__(self, feature_dim: int, action_dim: int,
                  hidden_dim: int = 256, layers: int = 2,

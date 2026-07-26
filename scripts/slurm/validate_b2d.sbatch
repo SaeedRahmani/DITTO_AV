@@ -15,6 +15,7 @@ set -euo pipefail
 module load 2024r1 python/3.10.12
 source /scratch/$USER/ditto_av/envs/ditto/bin/activate
 export OMP_NUM_THREADS=1
+export PYTHONUNBUFFERED=1
 
 cd /scratch/$USER/ditto_av/DITTO_AV
 python scripts/validate_b2d.py manifests/b2d_clips.txt \

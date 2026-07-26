@@ -86,31 +86,31 @@ Templates live in `scripts/slurm/`. The user's SLURM accounts (verified
 Submit with `sbatch scripts/slurm/<file>`; monitor with `squeue -u $USER`;
 logs land in `/scratch/$USER/ditto_av/outputs/slurm-%j.out`.
 
-## Agreed next steps (in order — do not skip ahead)
+## Status (updated 2026-07-26, evening)
 
-Status when this file was written: transfer + env DONE, tests passing on the
-cluster. **No data downloaded, no training run yet** (user's explicit
-instruction).
+On 2026-07-26 the user authorized full autonomous execution ("do all …
+without pause"): Phase-1 paper sweep + issue fixes + Phase 2. Superseded
+the earlier per-batch download gate for this work stream.
 
-1. **Verify state**: ssh in, `git -C /scratch/$USER/ditto_av/DITTO_AV pull`,
-   run pytest, submit `test.sbatch`, confirm it passes.
-2. **Data download (only when the user says go)**: Bench2Drive base split
-   (1000 clips, avg ~335 MB, ≈ 335 GB total — measured from the HF listing
-   2026-07-26) from HF `rethinklab/Bench2Drive` into `data/bench2drive/`.
-   Download via login-node `nohup` (compute nodes have no internet); keep a
-   manifest of downloaded files in git. DONE 2026-07-26 for a stratified
-   60-clip batch (7.9 GB, all 43 scenario types, smallest clips per
-   scenario — see `manifests/b2d_clips.txt`): all 60 parse with
-   `ditto_av/bench2drive.py`, combined npz has 10,766 frames. Next batches
-   only on explicit user go-ahead.
-3. **Phase-1 scale-up on cluster (highway-env)**: 3 seeds × {bc,
-   ditto_single, ditto_multi}, K/H/negatives ablations per `PAPER_PLAN.md`;
-   `run_dir` under `/scratch/$USER/ditto_av/outputs/`. Commit result
-   json/md files back to git.
-4. **Phase-2 (Bench2Drive)**: continuous-action Gaussian actor (see
-   PAPER_PLAN), world-model training on converted clips (GPU helps here),
-   closed-loop CARLA evaluation last (CARLA on DelftBlue needs its own
-   setup — check module list / apptainer; treat as a separate task).
+1. **Verify state** — DONE (pytest green, smoke passes on cluster).
+2. **Data**: 60-clip batch validated (see above). Manifest extended to
+   **297 stratified clips (~94 GB)**; extended download running via
+   login-node nohup (`outputs/b2d_download2.log`), with a detached chain
+   (`outputs/b2d_chain.log`) that auto-submits `validate_b2d.sbatch` and
+   then Phase-2 v2 when it finishes.
+3. **Phase-1 sweep** — SUBMITTED 2026-07-26: 15 jobs (10521411-25) via
+   `scripts/phase1_sweep.py generate` + `scripts/slurm/phase1.sbatch`:
+   3 seeds main, K∈{1,2,4,16}, negatives∈{0,4,32}, H∈{5,10} (reusing the
+   seed-0 world model via job dependency), data scale {75,150}, style 25/75.
+   Aggregate with `scripts/phase1_sweep.py aggregate` → commit
+   `runs/phase1/phase1_results.{md,json}`.
+4. **Phase-2 (Bench2Drive)** — pipeline IMPLEMENTED (`scripts/run_b2d.py`,
+   `configs/b2d.yaml`, `scripts/slurm/phase2.sbatch`): continuous Gaussian
+   actor, offline training, open-loop eval on held-out clips (WM prediction
+   error, action NLL/MAE, latent imitation score vs expert-replay ceiling).
+   v1 job on 60 clips: 10521595. v2 on ~297 clips auto-chains after the
+   download. Closed-loop CARLA eval remains a separate future task (needs
+   CARLA 0.9.15 setup — check module list / apptainer).
 
 ## Conventions for the AI working on DelftBlue
 

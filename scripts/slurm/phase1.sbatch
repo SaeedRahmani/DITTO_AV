@@ -17,6 +17,7 @@ set -euo pipefail
 module load 2024r1 python/3.10.12
 source /scratch/$USER/ditto_av/envs/ditto/bin/activate
 export OMP_NUM_THREADS=1
+export PYTHONUNBUFFERED=1
 
 CONFIG=$(readlink -f "${1:?usage: phase1.sbatch <config.yaml> [reuse_run_dir]}")
 REUSE=${2:-}
