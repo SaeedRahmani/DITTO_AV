@@ -6,7 +6,8 @@
 #SBATCH --cpus-per-task=2
 #SBATCH --mem=8G
 #SBATCH --output=/scratch/%u/ditto_av/outputs/slurm-%j.out
-# NOTE: add your account, e.g.:  #SBATCH --account=research-ceg-tp
+#SBATCH --account=research-ceg-tp
+# (alternative account: innovation)
 # Find it with: sacctmgr show user $USER withassoc format=account%30
 
 set -euo pipefail

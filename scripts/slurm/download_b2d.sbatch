@@ -6,7 +6,7 @@
 #SBATCH --cpus-per-task=2
 #SBATCH --mem=4G
 #SBATCH --output=/scratch/%u/ditto_av/outputs/slurm-%j.out
-# NOTE: add your account line (see test.sbatch).
+#SBATCH --account=research-ceg-tp
 # DO NOT SUBMIT until the user approves the download (~200 GB full base split).
 # Usage:
 #   sbatch scripts/slurm/download_b2d.sbatch manifests/b2d_clips.txt

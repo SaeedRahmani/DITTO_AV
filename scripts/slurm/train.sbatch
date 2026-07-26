@@ -6,7 +6,7 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
 #SBATCH --output=/scratch/%u/ditto_av/outputs/slurm-%j.out
-# NOTE: add your account line (see test.sbatch).
+#SBATCH --account=research-ceg-tp
 # Usage:
 #   sbatch scripts/slurm/train.sbatch [config] [run_dir_suffix]
 # Defaults: configs/av.yaml, run suffix = SLURM job id.

@@ -67,9 +67,8 @@ cd /scratch/$USER/ditto_av/DITTO_AV && python -m pytest tests/ -q
 
 Partitions (2026): `compute-p1/p2` (CPU), `gpu-a100` (4x A100 80GB/node),
 `gpu-v100`, `gpu-a100-small` (MIG slices — fine for our small models).
-Templates live in `scripts/slurm/` (account line: check `sacctmgr show user
-$USER withassoc format=account%30` and fill in; TU Delft accounts look like
-`research-<faculty>-<dept>` or `education-...`).
+Templates live in `scripts/slurm/`. The user's SLURM accounts (verified
+2026-07-26): `research-ceg-tp` (used in the templates) and `innovation`.
 
 - `scripts/slurm/test.sbatch` — 10-min CPU smoke: runs pytest + the smoke
   pipeline. Submit this FIRST after any fresh setup.
