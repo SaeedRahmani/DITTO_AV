@@ -107,8 +107,24 @@ cd /scratch/$USER/ditto_av/DITTO_AV && python -m pytest tests/ -q
 
 Partitions (2026): `compute-p1/p2` (CPU), `gpu-a100` (4x A100 80GB/node),
 `gpu-v100`, `gpu-a100-small` (MIG slices — fine for our small models).
+Walltime caps (sinfo, verified 2026-07-28): **48 h on gpu-a100 and
+gpu-v100**, 4 h on gpu-a100-small, 120 h on compute. Long GPU jobs are
+allowed; short (≤59 min) requests are merely a *tactic* to backfill in
+minutes when the queue is busy — not a limit.
 Templates live in `scripts/slurm/`. The user's SLURM accounts (verified
 2026-07-26): `research-ceg-tp` (used in the templates) and `innovation`.
+
+Python environments — which one where (important):
+
+| Env | Type | Torch | Works on | Use for |
+|---|---|---|---|---|
+| `/scratch/.../envs/ditto` | venv on module python | 2.13.0+cu130 | login + CPU nodes only (GPU nodes don't mount the module/spack tree) | CPU jobs, tests, tooling |
+| `/scratch/.../envs/carla_eval` | conda, self-contained | 2.13.0+**cpu** | all nodes | closed-loop CARLA eval (drives the agent; no CUDA training) |
+| `~/envs/ditto_gpu` | conda, self-contained (built 2026-07-28) | 2.13.0+cu130 | all nodes; CUDA only on **A100** (cu130 wheels dropped V100/sm_70) | GPU training (`phase2_gpu.sbatch`) |
+
+New packages can be installed from login nodes (outbound internet there)
+with conda/pip/uv; compute nodes have no internet. Self-contained conda
+envs are the only kind that run on GPU nodes.
 
 - `scripts/slurm/test.sbatch` — 10-min CPU smoke: runs pytest + the smoke
   pipeline. Submit this FIRST after any fresh setup.

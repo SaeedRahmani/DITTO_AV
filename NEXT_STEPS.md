@@ -82,11 +82,15 @@ PAPER_PLAN applies).
 ## Hard-won infrastructure facts (do not rediscover)
 
 - GPU nodes have NO python modules and don't mount the venv's spack tree
-  → use `/scratch/$USER/ditto_av/envs/carla_eval/bin/python` (conda,
-  self-contained) for anything on gpu-*. CPU jobs keep the ditto venv.
-- Queue: request ≤59 min on gpu partitions → backfill starts in minutes;
-  2 h requests can wait 12 h. `--gpus-per-task` is mandatory syntax.
-  innovation account blocks GPU jobs in practice; use research-ceg-tp.
+  → only self-contained conda envs run there: `carla_eval` (torch is
+  CPU-only — eval driving) and `~/envs/ditto_gpu` (torch cu130 — GPU
+  training; A100 partitions only, cu130 dropped V100/sm_70). CPU jobs
+  keep the ditto venv. See the env table in DELFTBLUE.md.
+- Queue: gpu-a100/gpu-v100 allow 48 h walltime (a100-small 4 h) — long
+  GPU jobs are fine. ≤59-min requests backfill in minutes, a useful
+  tactic for smokes when the queue is busy, NOT a limit.
+  `--gpus-per-task` is mandatory syntax. innovation account blocks GPU
+  jobs in practice; use research-ceg-tp.
 - CARLA: SIF at /scratch/$USER/ditto_av/carla_0915.sif; evaluator
   launches the server itself via $CARLA_ROOT shim (carla_root/). Town11-15
   need AdditionalMaps (tarball on scratch; extraction to
