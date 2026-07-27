@@ -35,7 +35,8 @@ export PYTHONPATH=$B2D/leaderboard:$B2D/scenario_runner:$BASE/carla_pythonapi:$B
 # on failure); point it at the apptainer shim
 export CARLA_ROOT=$BASE/carla_root
 
-cd $BASE/DITTO_AV
+# the evaluator opens 'leaderboard/data/weather.xml' relative to cwd
+cd $B2D
 $VENVPY $B2D/leaderboard/leaderboard/leaderboard_evaluator.py \
     --routes=$B2D/leaderboard/data/drivetransformer_bench2drive_dev10.xml \
     --routes-subset=25378 \
