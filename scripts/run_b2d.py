@@ -27,7 +27,7 @@ import torch  # noqa: E402
 
 torch.set_num_threads(1)
 
-from ditto_av.bench2drive import clips_to_npz  # noqa: E402
+from ditto_av.bench2drive import clips_to_npz, extra_obs_layout  # noqa: E402
 from ditto_av.config import load_config, save_config  # noqa: E402
 from ditto_av.data import TrajectoryData, build_latent_bank  # noqa: E402
 from ditto_av.models.nets import make_actor_critic  # noqa: E402
@@ -58,13 +58,17 @@ def stage_data(cfg, args):
     import shutil
 
     d = cfg.dirs()
-    with_route = cfg.env.extra_obs_dims > 0
+    with_route, with_lights = extra_obs_layout(cfg.env.extra_obs_dims,
+                                               cfg.env.light_obs)
     train, val = split_clips(Path(args.manifest), Path(args.extracted))
     # parsing ~60k small json.gz files can take >1 h when BeeGFS is under
     # load; cache the parsed npzs keyed on the exact clip split + layout
+    # (lights suffix only when on, so existing cache entries stay valid)
     key = hashlib.md5(("|".join(p.name for p in train) + "##"
                        + "|".join(p.name for p in val)
-                       + f"##route{with_route}").encode()).hexdigest()[:12]
+                       + f"##route{with_route}"
+                       + ("##lights1" if with_lights else "")
+                       ).encode()).hexdigest()[:12]
     cache = Path(args.extracted).parent / "npz_cache"
     cache.mkdir(exist_ok=True)
     ctr, cva = cache / f"{key}_train.npz", cache / f"{key}_val.npz"
@@ -76,11 +80,19 @@ def stage_data(cfg, args):
         va = dict(np.load(d["data"] / "b2d_val.npz"))
     else:
         tr = clips_to_npz(train, d["data"] / "b2d_train.npz",
-                          with_route=with_route)
+                          with_route=with_route, with_lights=with_lights)
         va = clips_to_npz(val, d["data"] / "b2d_val.npz",
-                          with_route=with_route)
-        shutil.copy(d["data"] / "b2d_train.npz", ctr)
-        shutil.copy(d["data"] / "b2d_val.npz", cva)
+                          with_route=with_route, with_lights=with_lights)
+        try:
+            shutil.copy(d["data"] / "b2d_train.npz", ctr)
+            shutil.copy(d["data"] / "b2d_val.npz", cva)
+        except OSError as e:  # cache is best-effort (scratch quota freezes)
+            print(f"npz cache write skipped: {e}")
+            for p in (ctr, cva):  # never leave a truncated cache entry
+                try:
+                    p.unlink(missing_ok=True)
+                except OSError:
+                    pass
     print(f"train: {tr['obs'].shape[0]} frames / {int(tr['reset'].sum())} "
           f"clips | val: {va['obs'].shape[0]} frames / "
           f"{int(va['reset'].sum())} clips")

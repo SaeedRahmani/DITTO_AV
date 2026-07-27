@@ -6,12 +6,13 @@ import numpy as np
 import torch
 
 from ditto_av.bench2drive import load_clip
-from ditto_av.carla_agent import ContinuousWMDriver, featurize_frame
+from ditto_av.carla_agent import (ContinuousWMDriver, StuckRecovery,
+                                  featurize_frame, route_hits_box)
 from ditto_av.config import load_config
 from ditto_av.models.nets import make_actor_critic
 from ditto_av.models.world_model import VectorWorldModel
 
-from test_bench2drive import write_frame
+from test_bench2drive import add_light, write_frame
 
 
 def _scene(t):
@@ -51,6 +52,66 @@ def test_online_featurizer_matches_offline_adapter(tmp_path):
                                         route=route)
             np.testing.assert_allclose(obs, offline[i], atol=1e-6,
                                        err_msg=f"frame {i} route={with_route}")
+
+
+def test_online_light_block_matches_offline_adapter(tmp_path):
+    anno = tmp_path / "clip" / "anno"
+    anno.mkdir(parents=True)
+    states = [0, 1, 2]
+    for i in range(6):
+        p = anno / f"{i:05d}.json.gz"
+        write_frame(p, t=i * 0.1)
+        if i < 3:
+            add_light(p, dx=18.0, dy=-1.5, state=states[i], affects=True)
+    offline = load_clip(tmp_path / "clip", n_neighbors=6,
+                        with_lights=True)["obs"]
+    assert offline.shape[1] == 49 + 6
+    prev = {}
+    for i in range(6):
+        ego_xy, actors = _scene(i * 0.1)
+        light = ({"xy": ego_xy + [18.0, -1.5], "state": states[i]}
+                 if i < 3 else {"xy": None, "state": -1})
+        obs, prev = featurize_frame(ego_xy, 0.0, 5.0, actors, prev,
+                                    light=light)
+        np.testing.assert_allclose(obs, offline[i], atol=1e-6,
+                                   err_msg=f"frame {i}")
+
+
+def test_route_hits_box():
+    # 1 m-spaced route through the box center: hit
+    pts = np.stack([np.arange(0.0, 30.0), np.zeros(30)], axis=1)
+    assert route_hits_box(pts, [10.0, 0.0], [1.5, 0.7])
+    # laterally offset beyond 1.5x extent: miss (strict inequality)
+    assert not route_hits_box(pts, [10.0, 1.05], [1.5, 0.7])
+    assert not route_hits_box(pts[:0], [10.0, 0.0], [1.5, 0.7])
+
+
+def test_stuck_recovery():
+    r = StuckRecovery(stuck_ticks=5, recover_ticks=3)
+    # driving normally: never triggers
+    for _ in range(20):
+        assert r.update(2.0, 0.6, 0.0, 0.1) is None
+    # braking at a red light at standstill: never triggers
+    for _ in range(20):
+        assert r.update(0.0, 0.0, 1.0, 0.0) is None
+    # wedged at commanded throttle: triggers on tick stuck_ticks+1
+    for _ in range(5):
+        assert r.update(0.05, 0.8, 0.0, 0.2) is None
+    outs = [r.update(0.05, 0.8, 0.0, 0.2) for _ in range(4)]
+    # exactly recover_ticks reverse overrides, steer mirrored, then done
+    assert [o is not None for o in outs] == [True, True, True, False]
+    for o in outs[:3]:
+        throttle, steer, reverse = o
+        assert reverse and throttle > 0 and steer < 0
+    assert r.events == 1
+    # counter restarts cleanly after recovery: reset by movement, then a
+    # full stuck_ticks streak is needed again
+    assert r.update(2.0, 0.6, 0.0, -0.2) is None
+    for _ in range(5):
+        assert r.update(0.05, 0.8, 0.0, -0.2) is None
+    out = r.update(0.05, 0.8, 0.0, -0.2)
+    assert out is not None and out[1] > 0  # mirrors the negative steer
+    assert r.events == 2
 
 
 def test_continuous_wm_driver_smoke():

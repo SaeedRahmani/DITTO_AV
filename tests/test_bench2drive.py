@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from ditto_av.bench2drive import clips_to_npz, load_clip
+from ditto_av.bench2drive import (clips_to_npz, extra_obs_layout, load_clip)
 from ditto_av.data import TrajectoryData
 
 # real-clip test: set B2D_CLIP_DIR to an extracted clip directory, or rely on
@@ -125,6 +125,64 @@ def test_route_conditioning_block(tmp_path):
     # default path unchanged
     d49 = load_clip(tmp_path / "clip", n_neighbors=6)
     assert d49["obs"].shape == (6, 49)
+
+
+def add_light(path: Path, dx: float = 15.0, dy: float = 2.0,
+              state: int = 0, affects: bool = True):
+    """Append a traffic_light bounding box to a written frame."""
+    frame = json.load(gzip.open(path, "rt"))
+    frame["bounding_boxes"].append({
+        "class": "traffic_light", "id": f"tl{int(affects)}",
+        "location": [frame["x"] + dx + 12.0, frame["y"] - 6.0, 3.0],
+        "rotation": [0, 0, 90.0],
+        "distance": float(np.hypot(dx + 12.0, 6.0)),
+        "state": state, "affects_ego": affects,
+        "trigger_volume_location": [frame["x"] + dx, frame["y"] + dy, 0.0],
+    })
+    with gzip.open(path, "wt") as f:
+        json.dump(frame, f)
+
+
+def test_light_block(tmp_path):
+    # light block: presence + ego-frame trigger volume + red/yellow/green
+    # one-hot, appended after the route block; non-affecting lights and
+    # Off/Unknown states must not leak in
+    anno = tmp_path / "clip" / "anno"
+    anno.mkdir(parents=True)
+    states = [0, 1, 2, 3, 0, 0]
+    for i in range(6):
+        p = anno / f"{i:05d}.json.gz"
+        write_frame(p, t=i * 0.1)
+        add_light(p, dx=40.0, dy=-3.0, state=2, affects=False)  # decoy
+        if i < 4:
+            add_light(p, dx=15.0, dy=2.0, state=states[i], affects=True)
+    d = load_clip(tmp_path / "clip", n_neighbors=6, with_route=True,
+                  with_lights=True)
+    assert d["obs"].shape == (6, 49 + 16 + 6)
+    light = d["obs"][:, 65:]
+    # frames 0-2: presence, trigger volume 15 m ahead / 2 m left, one-hot
+    for i, st in enumerate(states[:3]):
+        assert light[i, 0] == 1.0
+        assert np.allclose(light[i, 1:3], [0.15, 0.02], atol=1e-5)
+        expect = np.zeros(3)
+        expect[st] = 1.0
+        assert np.allclose(light[i, 3:], expect)
+    # frame 3: light present but Off (state 3) -> presence only
+    assert light[3, 0] == 1.0 and np.allclose(light[3, 3:], 0.0)
+    # frames 4-5: no affecting light (decoy ignored) -> all zero
+    assert np.allclose(light[4:], 0.0)
+    # route-only and default layouts unchanged
+    assert load_clip(tmp_path / "clip", with_route=True)["obs"].shape[1] == 65
+    assert load_clip(tmp_path / "clip")["obs"].shape[1] == 49
+
+
+def test_extra_obs_layout():
+    assert extra_obs_layout(0, False) == (False, False)
+    assert extra_obs_layout(16, False) == (True, False)
+    assert extra_obs_layout(22, True) == (True, True)
+    for dims, lights in ((22, False), (16, True), (6, True), (5, False)):
+        with pytest.raises(ValueError):
+            extra_obs_layout(dims, lights)
 
 
 def test_teleport_velocity_rejected(tmp_path):

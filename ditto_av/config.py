@@ -23,6 +23,9 @@ class EnvConfig:
     # appended observation dims beyond the vehicle rows (e.g. Bench2Drive
     # route conditioning: 16 = near/far command point + one-hot command)
     extra_obs_dims: int = 0
+    # also append the nearest relevant traffic light (presence, ego-frame
+    # trigger volume, red/yellow/green one-hot): +6 dims -> extra_obs_dims 22
+    light_obs: bool = False
 
     @property
     def obs_dim(self) -> int:

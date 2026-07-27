@@ -5,3 +5,9 @@ run_config: /scratch/srahmani/ditto_av/outputs/b2d_v3_route_config.yaml
 policy: ditto_multi
 stochastic: false
 action_repeat: 2   # leaderboard ticks at 20 Hz; the world model at 10 Hz
+# unwedge from obstacles (the universal failure in runs/carla_smoke):
+# after >40 model ticks (~4 s) stuck at commanded throttle, reverse with
+# mirrored steer for 15 ticks (~1.5 s), then hand control back
+stuck_recovery: true
+stuck_ticks: 40
+recover_ticks: 15

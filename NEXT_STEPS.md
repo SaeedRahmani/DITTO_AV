@@ -1,8 +1,53 @@
-# NEXT_STEPS.md — state + plan (written 2026-07-27, after closed-loop round 1)
+# NEXT_STEPS.md — state + plan (updated 2026-07-28, Round-2 code session)
 
 Read DELFTBLUE.md first (cluster rules). This file: where the project
-stands, what we learned, and the prioritized plan. Everything below is
-committed through `1634abf`.
+stands, what we learned, and the prioritized plan.
+
+## 2026-07-28 session: Round-2 code done + CRITICAL bug found
+
+Scratch write-freeze returned (1-byte group quotas on the pool backing
+/scratch; home writable). Workaround in place: writable clone at
+`~/ditto_work/DITTO_AV` (origin = github), scratch stays readable
+(venv, data, Bench2Drive clone all usable read-only).
+
+**CRITICAL FIX — closed-loop obs were rotated 90°.** Bench2Drive's anno
+`theta` is the IMU compass = CARLA yaw + pi/2 (data_collect.py converts
+back with `rad2deg(compass) - 90`; verified exact on 233 frames / 20
+clips, max dev 1e-4 rad). Training obs therefore live in the compass
+frame, but DittoCarlaAgent featurized with the raw yaw — every relative
+feature (neighbors, velocities, headings, route points) was rotated 90°
+vs training in ALL closed-loop rounds so far. Fixed deployment-side
+(`ego_yaw = deg2rad(yaw) + pi/2` in run_step), which keeps every
+trained checkpoint valid. Consequences:
+- All prior closed-loop numbers (v3 12.6±11.3, v4 6.7±3.9; wedging;
+  huge variance) were measured WITH the bug → the v3-vs-v4 ranking and
+  the tuning conclusions must be re-established after the fix.
+- Re-run the cheap 3-route × 3-rep smoke FIRST (expect a large jump);
+  only then the 10-route evals.
+
+**Round-2 code (44 tests green):**
+1. Traffic-light obs block: offline `_light_block` (presence + ego-frame
+   trigger volume + red/yellow/green one-hot, 6 dims after the route
+   block; `env.light_obs`, extra_obs_dims 22, `configs/b2d_v5.yaml`).
+   Online: exact port of data_collect's most_affect_light (dense-plan
+   override of set_global_plan — the leaderboard downsamples to ~50 m,
+   too sparse for the ~4x2 m trigger boxes; waypoint walk cached per
+   light). Verified on real clips: expert brake-rate 46% on red frames
+   vs 5% on green.
+2. StuckRecovery (config-gated, enabled in configs/carla_agent.yaml):
+   >40 model ticks under 0.3 m/s at commanded throttle → 15 ticks
+   reverse with mirrored steer; braking at red never counts as stuck.
+   Logged per tick (`rec` field; also `light`).
+3. npz cache: key extended for lights; cache writes best-effort
+   (survive scratch freezes).
+
+Not done (blocked by freeze / next session): retrain v5, closed-loop
+re-eval of v3 post-fix, v3-vs-v5 comparison. Stop signs deliberately
+NOT in the obs (6-dim light block per spec; the anno has
+`traffic_sign`/`traffic.stop` with affects_ego if wanted later).
+
+Everything below is the pre-session state (through `1634abf`) with the
+plan; read it with the bug fix in mind.
 
 ## Where we stand
 
@@ -55,7 +100,10 @@ PAPER_PLAN applies).
 
 ## Plan (in order)
 
-### Round 2: driving quality (next session, ~1 day, CPU + few GPU-h)
+### Round 2: driving quality (code DONE 2026-07-28; runs remain)
+0. **Re-baseline v3 with the theta fix** (do FIRST when jobs can run):
+   3 base-town routes × 3 reps, ROUTES_SUBSET=25381,25378,27494,
+   carla_smoke.sbatch. Prior numbers are invalid (90° obs rotation).
 1. **Traffic-light/stop observation**: anno `bounding_boxes` contain
    traffic_light/stop entries (check `state` field names on a real
    frame). Append compact block (nearest relevant light: presence, rel

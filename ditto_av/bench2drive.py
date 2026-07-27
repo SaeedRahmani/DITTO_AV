@@ -43,6 +43,26 @@ def _yaw_rad(rotation: List[float]) -> float:
 N_COMMANDS = 6   # CARLA: LEFT, RIGHT, STRAIGHT, LANEFOLLOW, CHANGELEFT/RIGHT
 ROUTE_DIMS = 2 * (2 + N_COMMANDS)  # near+far: rel position + one-hot command
 
+LIGHT_STATES = 3   # CARLA TrafficLightState ints: 0 red, 1 yellow, 2 green
+LIGHT_DIMS = 1 + 2 + LIGHT_STATES  # presence, rel trigger volume, one-hot
+
+
+def extra_obs_layout(extra_obs_dims: int, light_obs: bool):
+    """Map config to (with_route, with_lights), validating the dim count.
+
+    Appended block order is fixed: route (16), then lights (6). Lights
+    require the route block (the privileged planner always has a route).
+    """
+    with_route = extra_obs_dims > 0
+    expected = ((ROUTE_DIMS if with_route else 0)
+                + (LIGHT_DIMS if light_obs else 0))
+    if extra_obs_dims != expected:
+        raise ValueError(
+            f"env.extra_obs_dims={extra_obs_dims} inconsistent with "
+            f"light_obs={light_obs}: expected {expected} "
+            f"(route {ROUTE_DIMS} + lights {LIGHT_DIMS})")
+    return with_route, light_obs
+
 
 def _route_block(fr: dict, world_to_ego: np.ndarray,
                  ego_xy: np.ndarray) -> np.ndarray:
@@ -60,9 +80,37 @@ def _route_block(fr: dict, world_to_ego: np.ndarray,
     return out
 
 
+def _light_block(fr: dict, world_to_ego: np.ndarray,
+                 ego_xy: np.ndarray) -> np.ndarray:
+    """Nearest traffic light affecting the ego, from the annotation.
+
+    `affects_ego` marks at most one light per frame (Bench2Drive's
+    most_affect_light: the light whose trigger volume the next ~50 m of
+    the ego route passes through, ahead of the ego, nearest first). The
+    position is the trigger volume — the stop line, not the light pole
+    across the junction. Off/Unknown states leave the one-hot zero.
+    """
+    out = np.zeros(LIGHT_DIMS, dtype=np.float32)
+    lights = [b for b in fr.get("bounding_boxes", [])
+              if b.get("class") == "traffic_light" and b.get("affects_ego")]
+    if not lights:
+        return out
+    b = min(lights, key=lambda b: b.get("distance", 0.0))
+    out[0] = 1.0
+    tv = b.get("trigger_volume_location")
+    if tv is not None and np.isfinite(tv[:2]).all():
+        rel = world_to_ego @ (np.asarray(tv[:2], dtype=np.float64) - ego_xy)
+        out[1:3] = rel / POS_SCALE
+    state = int(b.get("state", -1))
+    if 0 <= state < LIGHT_STATES:
+        out[3 + state] = 1.0
+    return out
+
+
 def load_clip(clip_dir: Path, n_neighbors: int = 6,
               radius: float = 60.0,
-              with_route: bool = False) -> Dict[str, np.ndarray]:
+              with_route: bool = False,
+              with_lights: bool = False) -> Dict[str, np.ndarray]:
     """Parse one clip directory (containing `anno/*.json.gz`)."""
     clip_dir = Path(clip_dir)
     frames = sorted((clip_dir / "anno").glob("*.json.gz"))
@@ -94,7 +142,8 @@ def load_clip(clip_dir: Path, n_neighbors: int = 6,
 
     n_feat = 7
     core_dim = (1 + n_neighbors) * n_feat
-    obs_dim = core_dim + (ROUTE_DIMS if with_route else 0)
+    obs_dim = core_dim + (ROUTE_DIMS if with_route else 0) \
+        + (LIGHT_DIMS if with_lights else 0)
     obs = np.zeros((len(raw), obs_dim), dtype=np.float32)
     action = np.zeros((len(raw), 3), dtype=np.float32)
     reset = np.zeros((len(raw),), dtype=bool)
@@ -139,9 +188,14 @@ def load_clip(clip_dir: Path, n_neighbors: int = 6,
             rows[1 + i] = row
 
         obs[t, :core_dim] = np.clip(rows, -2.0, 2.0).reshape(-1)
+        off = core_dim
         if with_route:
-            obs[t, core_dim:] = np.clip(
+            obs[t, off:off + ROUTE_DIMS] = np.clip(
                 _route_block(fr, world_to_ego, ego_xy), -2.0, 2.0)
+            off += ROUTE_DIMS
+        if with_lights:
+            obs[t, off:off + LIGHT_DIMS] = np.clip(
+                _light_block(fr, world_to_ego, ego_xy), -2.0, 2.0)
         action[t] = [float(fr["throttle"]), float(fr["steer"]),
                      float(fr["brake"])]
 
@@ -150,9 +204,11 @@ def load_clip(clip_dir: Path, n_neighbors: int = 6,
 
 def clips_to_npz(clip_dirs: List[Path], out_path: Path,
                  n_neighbors: int = 6,
-                 with_route: bool = False) -> Dict[str, np.ndarray]:
+                 with_route: bool = False,
+                 with_lights: bool = False) -> Dict[str, np.ndarray]:
     """Convert clips into one npz compatible with TrajectoryData."""
-    parts = [load_clip(d, n_neighbors=n_neighbors, with_route=with_route)
+    parts = [load_clip(d, n_neighbors=n_neighbors, with_route=with_route,
+                       with_lights=with_lights)
              for d in clip_dirs]
     data = {
         "obs": np.concatenate([p["obs"] for p in parts]),
