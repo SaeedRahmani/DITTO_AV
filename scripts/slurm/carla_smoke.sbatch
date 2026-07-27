@@ -38,7 +38,7 @@ export CARLA_ROOT=$BASE/carla_root
 cd $BASE/DITTO_AV
 $VENVPY $B2D/leaderboard/leaderboard/leaderboard_evaluator.py \
     --routes=$B2D/leaderboard/data/drivetransformer_bench2drive_dev10.xml \
-    --routes-subset=0 \
+    --routes-subset=25378 \
     --repetitions=1 \
     --track=MAP \
     --agent=$BASE/DITTO_AV/scripts/carla_team_agent.py \
