@@ -100,9 +100,10 @@ PAPER_PLAN applies).
   done in carla_agent (brake_threshold).
 - run_b2d data stage uses an npz cache (npz_cache/) — key = clip split +
   route flag; extend the key if obs layout changes again.
-- 2026-07-27 scratch freeze (1-byte group quotas) was an admin-side
-  incident, resolved same day. If writes fail again: check
-  `beegfs-ctl --getquota --gid <each group>`, outputs can go to $HOME.
+- Scratch write-freezes (1-byte group quotas; hit 2026-07-27 AND
+  2026-07-28) are admin-side incidents. Full workflow for working
+  through them: DELFTBLUE.md "Scratch write-freezes: the dual-clone
+  workflow". Diagnose: `beegfs-ctl --getquota --gid <each group>`.
 
 ## Plan (in order)
 

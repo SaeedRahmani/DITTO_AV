@@ -17,7 +17,7 @@ DelftBlue docs: <https://doc.dhpc.tudelft.nl/delftblue/>
 
 | Location | Path | Properties | Use for |
 |---|---|---|---|
-| Home | `/home/srahmani` | ~30 GB quota, small, was nearly full (cleaned to ~7.6 GB on 2026-07-26 by purging pip/uv caches) | dotfiles only. **Install nothing here.** |
+| Home | `/home/srahmani` | ~30 GB quota, small, was nearly full (cleaned to ~7.6 GB on 2026-07-26 by purging pip/uv caches) | dotfiles + the freeze-fallback clone/outputs (see the dual-clone section). **Install nothing here.** |
 | Scratch | `/scratch/srahmani` | Huge, fast (BeeGFS), **NOT backed up, cleaned at regular intervals** | everything: code clone, venv, data, outputs |
 
 Because scratch can be wiped:
@@ -42,7 +42,47 @@ Because scratch can be wiped:
   data/         datasets go here (empty until download step)
   outputs/      SLURM run outputs / checkpoints (set run_dir here)
   cache/pip/    pip cache (PIP_CACHE_DIR) — keeps home quota safe
+
+/home/srahmani/            (freeze fallback only — see next section)
+  ditto_work/DITTO_AV/     second git clone, origin = github
+  ditto_out/               job outputs while scratch is write-frozen
 ```
+
+## Scratch write-freezes: the dual-clone workflow
+
+Twice so far (2026-07-27, again 2026-07-28) DHPC set 1-byte hard group
+quotas on the pool backing /scratch: every WRITE fails ("Disk quota
+exceeded") while reads/execution keep working. Admin-side incident —
+nothing on our side causes or can prevent it. Probe at session start:
+
+```sh
+echo t > /scratch/$USER/ditto_av/outputs/t && rm $_ || echo FROZEN
+```
+
+Rules while frozen (and for keeping the two clones sane in general):
+
+- **GitHub is the only sync channel between the clones.** Never copy
+  files between them; commit + push from the clone you edited, pull in
+  the other before using it. Both clones commit as the user (identity is
+  set repo-locally in each).
+- **Normal times: the scratch clone is the working copy** (fast, big
+  data next to it). The home clone may lag — pull it when needed.
+- **While frozen: work only in `~/ditto_work/DITTO_AV`** (the scratch
+  clone can't even commit). Job outputs go to `~/ditto_out/` — home is
+  ~30 GB, so small outputs only (checkpoints/results/logs, never
+  datasets). Scratch stays usable read-only: venv, data, CARLA SIF,
+  Bench2Drive clone.
+- `scripts/slurm/phase2_home.sbatch` = freeze-safe Phase-2 job: cwd is
+  the home clone, reads data/venv from scratch, writes run_dir, wandb
+  and the SLURM log to $HOME.
+- The pipeline tolerates a mid-run freeze: npz-cache writes in
+  `run_b2d.py` are best-effort (skipped with a warning, truncated
+  entries removed).
+- **At unfreeze, in order:** (1) `git -C /scratch/$USER/ditto_av/DITTO_AV
+  pull` BEFORE any job that runs from the scratch clone (closed-loop
+  eval does); (2) commit small results from `~/ditto_out/` into `runs/`;
+  (3) resume the normal scratch layout. Check NEXT_STEPS.md for
+  anything else the freeze interrupted.
 
 ## Environment activation (every session / inside every job script)
 
