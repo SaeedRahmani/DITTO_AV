@@ -1,0 +1,25 @@
+# Phase 2 with route/command conditioning (16 extra obs dims):
+# ego-frame near/far command points + one-hot CARLA commands.
+run_dir: runs/b2d_v4
+seed: 0
+device: cpu
+
+env:
+  action_space: continuous
+  extra_obs_dims: 16
+
+wm:
+  train_steps: 6000
+  batch_size: 32
+  seq_len: 16
+
+ac:
+  train_steps: 3000
+  horizon: 5
+  batch_size: 64
+  k_modes: 16
+  n_negatives: 16
+
+bc:
+  train_steps: 5000
+  lr: 3.0e-4
