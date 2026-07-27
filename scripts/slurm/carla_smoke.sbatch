@@ -41,7 +41,7 @@ rm -f $DITTO_AGENT_LOG
 cd $B2D
 $VENVPY $B2D/leaderboard/leaderboard/leaderboard_evaluator.py \
     --routes=$B2D/leaderboard/data/drivetransformer_bench2drive_dev10.xml \
-    --routes-subset=25378 \
+    --routes-subset=${ROUTES_SUBSET:-25378} \
     --repetitions=1 \
     --track=MAP \
     --agent=$BASE/DITTO_AV/scripts/carla_team_agent.py \
