@@ -191,7 +191,10 @@ try:  # pragma: no cover - requires the carla package + leaderboard on path
             from .trainers.wm_trainer import load_world_model
 
             self.track = Track.MAP
-            conf = yaml.safe_load(open(path_to_conf_file))
+            # Bench2Drive's evaluator appends '+<save_name>' to the config
+            # path before calling setup(); strip it
+            conf_path = str(path_to_conf_file).split("+")[0]
+            conf = yaml.safe_load(open(conf_path))
             run_cfg = load_config(conf["run_config"])
             self._cfg = run_cfg
             wm = load_world_model(run_cfg, run_cfg.env.obs_dim)
