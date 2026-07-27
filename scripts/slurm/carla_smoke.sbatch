@@ -13,7 +13,11 @@
 # driven by DittoCarlaAgent. ~2 GPU-h worst case.
 
 set -euo pipefail
-module load 2024r1 python/3.10.12
+# GPU nodes have a different module hierarchy than compute-p1 and may not
+# expose python/3.10.12; the venv's spack python carries its own rpaths
+# and runs fine without the module (verified).
+module load 2024r1 python/3.10.12 2>/dev/null || \
+    echo "module load failed on $(hostname); using venv python directly"
 source /scratch/$USER/ditto_av/envs/ditto/bin/activate
 export OMP_NUM_THREADS=1
 export PYTHONUNBUFFERED=1
