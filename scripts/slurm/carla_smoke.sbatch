@@ -18,7 +18,9 @@ set -euo pipefail
 # and runs fine without the module (verified).
 module load 2024r1 python/3.10.12 2>/dev/null || \
     echo "module load failed on $(hostname); using venv python directly"
-source /scratch/$USER/ditto_av/envs/ditto/bin/activate
+source /scratch/$USER/ditto_av/envs/ditto/bin/activate || true
+VENVPY=/scratch/$USER/ditto_av/envs/ditto/bin/python
+$VENVPY -c "import carla, torch" || { echo "venv python broken on node"; exit 1; }
 export OMP_NUM_THREADS=1
 export PYTHONUNBUFFERED=1
 
@@ -36,7 +38,7 @@ apptainer exec --nv "$SIF" /home/carla/CarlaUE4.sh \
 SERVER_PID=$!
 trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
 
-python - "$PORT" <<'EOF'
+$VENVPY - "$PORT" <<'EOF'
 import socket, sys, time
 port = int(sys.argv[1])
 for _ in range(60):
@@ -51,7 +53,7 @@ echo "CARLA server ready on port $PORT"
 sleep 15
 
 cd $BASE/DITTO_AV
-python $B2D/leaderboard/leaderboard/leaderboard_evaluator.py \
+$VENVPY $B2D/leaderboard/leaderboard/leaderboard_evaluator.py \
     --routes=$B2D/leaderboard/data/drivetransformer_bench2drive_dev10.xml \
     --routes-subset=0 \
     --repetitions=1 \
@@ -62,7 +64,7 @@ python $B2D/leaderboard/leaderboard/leaderboard_evaluator.py \
     --port=$PORT --traffic-manager-port=$TMPORT \
     --timeout=120
 echo "SMOKE EVAL DONE"
-python - <<'EOF'
+$VENVPY - <<'EOF'
 import json
 d = json.load(open("/scratch/srahmani/ditto_av/outputs/carla_smoke_results.json"))
 rec = d.get("_checkpoint", {}).get("records", [])
