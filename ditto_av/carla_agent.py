@@ -214,6 +214,9 @@ try:  # pragma: no cover - requires the carla package + leaderboard on path
             self._prev_xy: Dict[object, np.ndarray] = {}
             self._step = -1
             self._last = carla.VehicleControl()
+            # per-model-tick behavior log (jsonl) for debugging closed-loop
+            import os as _os
+            self._log_path = _os.environ.get("DITTO_AGENT_LOG")
 
         def sensors(self):
             return [{"type": "sensor.speedometer", "id": "speed",
@@ -256,6 +259,17 @@ try:  # pragma: no cover - requires the carla package + leaderboard on path
                 throttle=float(np.clip(a[0], 0.0, 1.0)),
                 steer=float(np.clip(a[1], -1.0, 1.0)),
                 brake=float(np.clip(a[2], 0.0, 1.0)))
+            if self._log_path:
+                import json as _json
+                with open(self._log_path, "a") as f:
+                    f.write(_json.dumps({
+                        "step": self._step, "speed": round(ego_speed, 3),
+                        "throttle": round(self._last.throttle, 3),
+                        "steer": round(self._last.steer, 3),
+                        "brake": round(self._last.brake, 3),
+                        "n_actors": len(actors),
+                        "near_cmd": (route or {}).get("near_cmd"),
+                    }) + "\n")
             return self._last
 
         def destroy(self):
