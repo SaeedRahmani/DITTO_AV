@@ -86,11 +86,17 @@ PAPER_PLAN applies).
   CPU-only — eval driving) and `~/envs/ditto_gpu` (torch cu130 — GPU
   training; A100 partitions only, cu130 dropped V100/sm_70). CPU jobs
   keep the ditto venv. See the env table in DELFTBLUE.md.
-- Queue: gpu-a100/gpu-v100 allow 48 h walltime (a100-small 4 h) — long
-  GPU jobs are fine. ≤59-min requests backfill in minutes, a useful
-  tactic for smokes when the queue is busy, NOT a limit.
-  `--gpus-per-task` is mandatory syntax. innovation account blocks GPU
-  jobs in practice; use research-ceg-tp.
+- GPU access (verified via sinfo/sacctmgr 2026-07-28 — the user HAS
+  strong A100 access; never claim otherwise):
+  * partition walltime caps: gpu-a100 & gpu-v100 **48 h**, gpu-a100-small
+    4 h, compute-p1 120 h.
+  * account `research-ceg-tp`: up to **8 GPUs/job**, 64 concurrent jobs
+    → default choice for GPU work (up to 48 h A100).
+  * account `innovation`: up to 2 GPUs/job, **24 h**, 1 job at a time —
+    a valid fallback when research-ceg-tp queues badly.
+  * `--gpus-per-task=N` is the required syntax (`--gres` is rejected).
+  * ≤59-min requests backfill within minutes on busy days — an OPTIONAL
+    queue tactic for short smokes only, NOT any kind of limit.
 - CARLA: SIF at /scratch/$USER/ditto_av/carla_0915.sif; evaluator
   launches the server itself via $CARLA_ROOT shim (carla_root/). Town11-15
   need AdditionalMaps (tarball on scratch; extraction to
@@ -126,8 +132,8 @@ PAPER_PLAN applies).
    model ticks while commanding throttle → brief reverse+steer sequence,
    then resume. Deployment-side, config-gated, log events.
 3. **Evaluate properly**: v3 vs v5 on all 10 dev routes × 3 reps (needs
-   AdditionalMaps bound into shim). ~6-8 GPU-h total on gpu-v100 with
-   59-min-per-chunk jobs (split subsets). Keep results in runs/.
+   AdditionalMaps bound into shim). ~6-8 GPU-h total on gpu-v100 (single 48 h-capable job is fine; split into
+   59-min chunks only if the queue is congested). Keep results in runs/.
 4. Optional cheap wins to test in the same eval: stochastic=true;
    action_repeat=1; brake_threshold sweep {0.3,0.5,0.7}.
 
