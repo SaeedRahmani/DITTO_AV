@@ -31,25 +31,9 @@ PORT=$((20000 + RANDOM % 10000))
 TMPORT=$((PORT + 50))
 
 export PYTHONPATH=$B2D/leaderboard:$B2D/scenario_runner:$BASE/carla_pythonapi:$BASE/DITTO_AV
-
-apptainer exec --nv "$SIF" /home/carla/CarlaUE4.sh \
-    -RenderOffScreen -nosound -carla-rpc-port=$PORT &
-SERVER_PID=$!
-trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
-
-$VENVPY - "$PORT" <<'EOF'
-import socket, sys, time
-port = int(sys.argv[1])
-for _ in range(60):
-    try:
-        socket.create_connection(("localhost", port), 2).close()
-        sys.exit(0)
-    except OSError:
-        time.sleep(5)
-sys.exit("CARLA server did not come up within 5 min")
-EOF
-echo "CARLA server ready on port $PORT"
-sleep 15
+# the evaluator launches $CARLA_ROOT/CarlaUE4.sh itself (and restarts it
+# on failure); point it at the apptainer shim
+export CARLA_ROOT=$BASE/carla_root
 
 cd $BASE/DITTO_AV
 $VENVPY $B2D/leaderboard/leaderboard/leaderboard_evaluator.py \
