@@ -211,6 +211,12 @@ try:  # pragma: no cover - requires the carla package + leaderboard on path
                 stochastic=bool(conf.get("stochastic", False)))
             self._with_route = run_cfg.env.extra_obs_dims > 0
             self._repeat = int(conf.get("action_repeat", 2))
+            # expert brake is near-binary (0 almost always, 1 sometimes);
+            # the Gaussian mean outputs a constant ~0.15 which in CARLA
+            # drags enough brake torque to hold the car against full
+            # throttle (verified: run 10522236 never exceeded 0.24 m/s at
+            # 0.8 throttle / 0.15 brake). Binarize at deployment.
+            self._brake_threshold = float(conf.get("brake_threshold", 0.5))
             self._prev_xy: Dict[object, np.ndarray] = {}
             self._step = -1
             self._last = carla.VehicleControl()
@@ -255,10 +261,15 @@ try:  # pragma: no cover - requires the carla package + leaderboard on path
                 ego_xy, ego_yaw, ego_speed, actors, self._prev_xy,
                 route=route)
             a = self._driver.act(obs)
+            brake = float(np.clip(a[2], 0.0, 1.0))
+            if brake >= self._brake_threshold:
+                throttle, brake = 0.0, 1.0
+            else:
+                throttle, brake = float(np.clip(a[0], 0.0, 1.0)), 0.0
             self._last = carla.VehicleControl(
-                throttle=float(np.clip(a[0], 0.0, 1.0)),
+                throttle=throttle,
                 steer=float(np.clip(a[1], -1.0, 1.0)),
-                brake=float(np.clip(a[2], 0.0, 1.0)))
+                brake=brake)
             if self._log_path:
                 import json as _json
                 with open(self._log_path, "a") as f:
