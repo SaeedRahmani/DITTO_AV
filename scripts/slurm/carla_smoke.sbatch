@@ -13,14 +13,13 @@
 # driven by DittoCarlaAgent. ~2 GPU-h worst case.
 
 set -euo pipefail
-# GPU nodes have a different module hierarchy than compute-p1 and may not
-# expose python/3.10.12; the venv's spack python carries its own rpaths
-# and runs fine without the module (verified).
-module load 2024r1 python/3.10.12 2>/dev/null || \
-    echo "module load failed on $(hostname); using venv python directly"
-source /scratch/$USER/ditto_av/envs/ditto/bin/activate || true
-VENVPY=/scratch/$USER/ditto_av/envs/ditto/bin/python
-$VENVPY -c "import carla, torch" || { echo "venv python broken on node"; exit 1; }
+# GPU nodes have NO python modules and do not mount the spack tree the
+# main venv's python links against (verified, diag job 10522194: the venv
+# python symlink resolves to nothing there and PATH falls through to a
+# bare miniconda 3.9). Use the self-contained conda env on scratch: own
+# python + libs + CPU torch (the policy is tiny; the GPU runs CARLA).
+VENVPY=/scratch/$USER/ditto_av/envs/carla_eval/bin/python
+$VENVPY -c "import carla, torch" || { echo "carla_eval env broken"; exit 1; }
 export OMP_NUM_THREADS=1
 export PYTHONUNBUFFERED=1
 
