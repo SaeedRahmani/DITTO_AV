@@ -25,7 +25,7 @@ trained checkpoint valid. Consequences:
 - Re-run the cheap 3-route × 3-rep smoke FIRST (expect a large jump);
   only then the 10-route evals.
 
-**Round-2 code (44 tests green):**
+**Round-2 code (41 tests green):**
 1. Traffic-light obs block: offline `_light_block` (presence + ego-frame
    trigger volume + red/yellow/green one-hot, 6 dims after the route
    block; `env.light_obs`, extra_obs_dims 22, `configs/b2d_v5.yaml`).
