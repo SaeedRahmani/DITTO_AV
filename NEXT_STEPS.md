@@ -41,10 +41,16 @@ trained checkpoint valid. Consequences:
 3. npz cache: key extended for lights; cache writes best-effort
    (survive scratch freezes).
 
-Not done (blocked by freeze / next session): retrain v5, closed-loop
-re-eval of v3 post-fix, v3-vs-v5 comparison. Stop signs deliberately
-NOT in the obs (6-dim light block per spec; the anno has
-`traffic_sign`/`traffic.stop` with affects_ego if wanted later).
+v5 training SUBMITTED freeze-safe (job 10527119,
+scripts/slurm/phase2_home.sbatch -> ~/ditto_out/b2d_v5; commit results
+to runs/b2d_v5 once done). Still blocked by the freeze: closed-loop
+re-eval of v3 post-fix, v3-vs-v5 comparison. When the freeze lifts:
+`git -C /scratch/$USER/ditto_av/DITTO_AV pull` FIRST (the scratch clone
+predates the theta fix — closed-loop jobs run from it), re-extract
+AdditionalMaps, re-baseline v3 (plan item 0), restart wandb sync.
+Stop signs deliberately NOT in the obs (6-dim light block per spec; the
+anno has `traffic_sign`/`traffic.stop` with affects_ego if wanted
+later).
 
 Everything below is the pre-session state (through `1634abf`) with the
 plan; read it with the bug fix in mind.
