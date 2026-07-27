@@ -54,12 +54,33 @@ def split_clips(manifest: Path, extracted: Path):
 
 
 def stage_data(cfg, args):
+    import hashlib
+    import shutil
+
     d = cfg.dirs()
     with_route = cfg.env.extra_obs_dims > 0
     train, val = split_clips(Path(args.manifest), Path(args.extracted))
-    tr = clips_to_npz(train, d["data"] / "b2d_train.npz",
-                      with_route=with_route)
-    va = clips_to_npz(val, d["data"] / "b2d_val.npz", with_route=with_route)
+    # parsing ~60k small json.gz files can take >1 h when BeeGFS is under
+    # load; cache the parsed npzs keyed on the exact clip split + layout
+    key = hashlib.md5(("|".join(p.name for p in train) + "##"
+                       + "|".join(p.name for p in val)
+                       + f"##route{with_route}").encode()).hexdigest()[:12]
+    cache = Path(args.extracted).parent / "npz_cache"
+    cache.mkdir(exist_ok=True)
+    ctr, cva = cache / f"{key}_train.npz", cache / f"{key}_val.npz"
+    if ctr.exists() and cva.exists():
+        print(f"npz cache hit ({key})")
+        shutil.copy(ctr, d["data"] / "b2d_train.npz")
+        shutil.copy(cva, d["data"] / "b2d_val.npz")
+        tr = dict(np.load(d["data"] / "b2d_train.npz"))
+        va = dict(np.load(d["data"] / "b2d_val.npz"))
+    else:
+        tr = clips_to_npz(train, d["data"] / "b2d_train.npz",
+                          with_route=with_route)
+        va = clips_to_npz(val, d["data"] / "b2d_val.npz",
+                          with_route=with_route)
+        shutil.copy(d["data"] / "b2d_train.npz", ctr)
+        shutil.copy(d["data"] / "b2d_val.npz", cva)
     print(f"train: {tr['obs'].shape[0]} frames / {int(tr['reset'].sum())} "
           f"clips | val: {va['obs'].shape[0]} frames / "
           f"{int(va['reset'].sum())} clips")
