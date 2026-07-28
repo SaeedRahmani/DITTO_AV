@@ -15,6 +15,40 @@ DelftBlue docs: <https://doc.dhpc.tudelft.nl/delftblue/>
 
 ## Storage rules (critical)
 
+### THE FILE-COUNT QUOTA — the #1 operational hazard (learned 2026-07-28)
+
+/scratch has TWO per-user quotas: **5 TiB of bytes AND 1,000,000 chunk
+files (inodes)**. The file-count limit is **FIXED — DHPC will not raise
+it** (confirmed). Exceeding it makes EVERY write fail with "Disk quota
+exceeded" even with terabytes free; this looked like a cluster outage
+for two days (2026-07-27/28) and it was not. Facts:
+
+- Authoritative live view (refreshed each logon):
+  `bash /etc/profile.d/ZZ_motd-info.sh` — read the **chunk files**
+  column. `beegfs-ctl --getquota --gid ...` "1 Byte" group rows are a
+  RED HERRING; per-uid accounting can also read stale/zero. Trust the
+  motd table.
+- Known costs: a conda env or venv = 30–100k files; an extracted
+  Bench2Drive anno set = ~60k; git clones = 1–5k each; caches
+  (pip/conda/apptainer layers) = tens of thousands.
+
+Mandatory practices for every AI session:
+1. Check the motd chunk-files number at session start AND before/after
+   any extraction, env creation, or big download. Keep **≥100k
+   headroom**.
+2. Never leave both an archive's extraction and other bulk trees
+   growing at once; extract → consume (build npz/pack) → delete the
+   extraction (tarballs stay, they're 1 file each).
+3. Prefer packed formats everywhere (npz, tar, zip — python reads zip
+   directly). Never generate per-frame/per-sample small files.
+4. Reuse existing envs; never create a new env when one fits.
+5. Periodically: `du --inodes -d1 /scratch/$USER` to see who's eating
+   the budget. Delete caches (pip/conda/apptainer) freely — they
+   rebuild.
+6. If writes fail with quota errors and bytes are fine: it IS the file
+   count. Free ~10k files (caches, __pycache__, synced wandb dirs) and
+   writes resume instantly.
+
 | Location | Path | Properties | Use for |
 |---|---|---|---|
 | Home | `/home/srahmani` | ~30 GB quota, small, was nearly full (cleaned to ~7.6 GB on 2026-07-26 by purging pip/uv caches) | dotfiles + the freeze-fallback clone/outputs (see the dual-clone section). **Install nothing here.** |
