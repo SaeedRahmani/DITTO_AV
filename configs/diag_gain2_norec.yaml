@@ -1,0 +1,14 @@
+# Diagnostic arm: correct frame + deployment action-gain calibration.
+# Offline probe (2026-07-28, runs/carla_smoke/ACTION_SHRINKAGE.md): the
+# Gaussian mean under-scales controls (turn-frame |steer| mu 0.098 vs
+# expert 0.355 at corr +0.56; throttle std 0.13 vs 0.33) -> too timid
+# to make junctions or bypass obstacles. steer_gain 2 rescales the
+# command toward expert magnitude; throttle_gain 1.5 against the
+# slow-driving tick cap. Recovery off, deterministic.
+run_config: /scratch/srahmani/ditto_av/outputs/b2d_v3_route_config.yaml
+policy: ditto_multi
+stochastic: false
+action_repeat: 2
+stuck_recovery: false
+steer_gain: 2.0
+throttle_gain: 1.5

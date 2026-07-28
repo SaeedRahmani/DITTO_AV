@@ -329,6 +329,15 @@ try:  # pragma: no cover - requires the carla package + leaderboard on path
             # throttle (verified: run 10522236 never exceeded 0.24 m/s at
             # 0.8 throttle / 0.15 brake). Binarize at deployment.
             self._brake_threshold = float(conf.get("brake_threshold", 0.5))
+            # deployment-side action calibration: the Gaussian mean is
+            # shrunken vs the expert (offline probe 2026-07-28: on turn
+            # frames policy |steer| mu 0.098 vs expert 0.355, corr +0.56;
+            # throttle std 0.13 vs 0.33) — too timid to make junctions in
+            # closed loop. Gains rescale the commanded control (the raw
+            # action still feeds the world model, same precedent as the
+            # brake binarization above). 1.0 = off.
+            self._steer_gain = float(conf.get("steer_gain", 1.0))
+            self._throttle_gain = float(conf.get("throttle_gain", 1.0))
             self._prev_xy: Dict[object, np.ndarray] = {}
             self._step = -1
             self._last = carla.VehicleControl()
@@ -469,10 +478,12 @@ try:  # pragma: no cover - requires the carla package + leaderboard on path
             if brake >= self._brake_threshold:
                 throttle, brake = 0.0, 1.0
             else:
-                throttle, brake = float(np.clip(a[0], 0.0, 1.0)), 0.0
+                throttle = float(np.clip(a[0] * self._throttle_gain,
+                                          0.0, 1.0))
+                brake = 0.0
             self._last = carla.VehicleControl(
                 throttle=throttle,
-                steer=float(np.clip(a[1], -1.0, 1.0)),
+                steer=float(np.clip(a[1] * self._steer_gain, -1.0, 1.0)),
                 brake=brake)
             rec = None
             if self._recovery is not None:
