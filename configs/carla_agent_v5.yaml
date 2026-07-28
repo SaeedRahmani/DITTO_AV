@@ -1,0 +1,13 @@
+# DittoCarlaAgent config for v5 (v3 + traffic-light obs, trained on GPU
+# 2026-07-28, job 10527146; open-loop beats v3 on every metric).
+# run_config is the training config with device flipped to cpu — the
+# carla_eval env ships CPU-only torch and load_world_model maps the
+# checkpoint to cfg.device.
+# steer/throttle gains: set from the diag_gain sweep outcome before use.
+run_config: /home/srahmani/ditto_out/b2d_v5_deploy_config.yaml
+policy: ditto_multi
+stochastic: false
+action_repeat: 2
+stuck_recovery: false
+steer_gain: 1.0
+throttle_gain: 1.0
