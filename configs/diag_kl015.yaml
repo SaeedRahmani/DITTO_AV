@@ -1,0 +1,8 @@
+# 3x3 confirmation of kl015 (bc_kl_coef 0.15): rank inside the 0.1-0.2
+# anchor plateau (3x1 rankings there are noise — kl01 3x1 was 47.7%,
+# its 3x3 64.6%).
+run_config: /home/srahmani/ditto_out/b2d_kl015_cpu.yaml
+policy: ditto_multi
+stochastic: false
+action_repeat: 2
+stuck_recovery: false

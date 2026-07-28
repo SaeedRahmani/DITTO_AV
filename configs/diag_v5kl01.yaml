@@ -1,0 +1,8 @@
+# 3x3 confirmation of v5kl01 (lights + bc_kl_coef 0.1): cleanest driver
+# at 3x1 (penalty 0.48, composed 10.99) but lowest completion (24.7%) —
+# confirm the anchor x lights interaction before ruling it out.
+run_config: /home/srahmani/ditto_out/b2d_v5kl01_cpu.yaml
+policy: ditto_multi
+stochastic: false
+action_repeat: 2
+stuck_recovery: false
