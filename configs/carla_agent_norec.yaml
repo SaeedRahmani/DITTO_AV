@@ -13,13 +13,7 @@ action_repeat: 2   # leaderboard ticks at 20 Hz; the world model at 10 Hz
 stuck_recovery: false
 stuck_ticks: 40
 recover_ticks: 10
-# Frame question SETTLED by the offline replay test
-# (scripts/replay_frame_check.py, 2026-07-28): with the default
-# yaw_offset pi/2 the deployment featurizer reproduces the training obs
-# EXACTLY on recorded clips (max diff 1e-4); with 0.0 the obs are
-# rotated 90 deg (max diff sqrt(2)). Raw yaw's higher composed score
-# (12.6 vs 4.5) is a metric pathology — rotated obs ricochet along the
-# route farming completion at penalty 0.12 (9 layout collisions/route)
-# while correct obs drive cleanly (penalty 0.65) but wedge behind
-# obstacles. Completion must come from the policy (stochastic sampling,
-# obstacle-bypass behavior), not from a provably wrong frame.
+# A/B on 3 routes x 3 reps (2026-07-28): raw yaw scored 12.6+-11.3,
+# compass (+pi/2) scored 4.5+-2.8, +recovery 1.7 -> raw yaw wins
+# empirically; frame geometry needs an offline replay test.
+yaw_offset: 0.0

@@ -1,0 +1,8 @@
+# Completion lever: correct frame (default yaw_offset pi/2) + stochastic
+# action sampling — the deterministic policy freezes in a fixed point
+# behind obstacles; sampling can break the wedge (plan item 4).
+run_config: /scratch/srahmani/ditto_av/outputs/b2d_v3_route_config.yaml
+policy: ditto_multi
+stochastic: true
+action_repeat: 2
+stuck_recovery: false

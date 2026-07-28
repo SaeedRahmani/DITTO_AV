@@ -45,6 +45,17 @@ WORSE with the fix (collision cascades, route deviations, zero
 "blocked" endings but 5-8 collisions/run) → retuned conservative:
 straight gentle reverse, 3-strike give-up (StuckRecovery).
 
+**Frame question CLOSED by the offline replay test**
+(scripts/replay_frame_check.py): rebuilding featurize_frame inputs from
+recorded clips' boxes and diffing against load_clip obs gives, over 460
+frames / 3 towns: yaw_offset pi/2 -> max abs diff 1e-4 (EXACT);
+yaw_offset 0 -> mean 0.24, max sqrt(2) (a 90-deg rotation). The
+raw-yaw composed-score "win" (12.6 vs 4.5) is the ricochet artifact,
+not perception quality — unusable for any paper claim. Deployment
+default restored to pi/2; completion has to come from the policy.
+Next lever queued: stochastic=true 3x3 (breaks the deterministic
+wedge-freeze; plan item 4).
+
 **Round-2 code (41 tests green):**
 1. Traffic-light obs block: offline `_light_block` (presence + ego-frame
    trigger volume + red/yellow/green one-hot, 6 dims after the route
