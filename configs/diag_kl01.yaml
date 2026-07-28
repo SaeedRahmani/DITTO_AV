@@ -1,0 +1,7 @@
+# Closed-loop test of the weaker BC anchor (v3kl01): does mode commitment
+# unfreeze the obstacle bypass? Honest stack, no recovery.
+run_config: /home/srahmani/ditto_out/b2d_v3kl01_cpu.yaml
+policy: ditto_multi
+stochastic: false
+action_repeat: 2
+stuck_recovery: false
