@@ -1,0 +1,26 @@
+# Commitment-precision frontier: bc_kl_coef 0.1, with lights
+run_dir: runs/b2d_v5kl01
+seed: 0
+device: cpu
+
+env:
+  action_space: continuous
+  extra_obs_dims: 22
+  light_obs: true
+
+wm:
+  train_steps: 6000
+  batch_size: 32
+  seq_len: 16
+
+ac:
+  train_steps: 3000
+  horizon: 15
+  batch_size: 64
+  k_modes: 8
+  n_negatives: 16
+  bc_kl_coef: 0.1
+
+bc:
+  train_steps: 5000
+  lr: 3.0e-4
