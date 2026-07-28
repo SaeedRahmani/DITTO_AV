@@ -1,0 +1,29 @@
+# Anchor x k_modes grid: winning anchor (bc_kl 0.1) + Phase-1's best
+# retrieval breadth K=16 (H stays 15 — one axis at a time; v4's K16
+# closed-loop failure was measured with the rotated-obs bug and is
+# void).
+run_dir: runs/b2d_kl01k16
+seed: 0
+device: cpu
+
+env:
+  action_space: continuous
+  extra_obs_dims: 16
+  light_obs: false
+
+wm:
+  train_steps: 6000
+  batch_size: 32
+  seq_len: 16
+
+ac:
+  train_steps: 3000
+  horizon: 15
+  batch_size: 64
+  k_modes: 16
+  n_negatives: 16
+  bc_kl_coef: 0.1
+
+bc:
+  train_steps: 5000
+  lr: 3.0e-4
