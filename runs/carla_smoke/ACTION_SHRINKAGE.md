@@ -73,3 +73,22 @@ gain2 or a state-dependent gain is next.
 Training-side fix for v5+ (if gains confirm): address shrinkage at the
 source — e.g. temperature/scale calibration on the actor head or a
 non-Gaussian action head; deployment gain is the honest short-term knob.
+
+## Sweep outcome (2026-07-28, 3 routes x 3 reps, compass, no recovery)
+
+| arm | score | completion | failures |
+|---|---|---|---|
+| deterministic, gain 1.0 | 4.54 +- 2.63 | 15.5% | blocked x9 |
+| stochastic sampling     | 3.42 +- 2.42 |  8.8% | blocked 5, tick-cap 3, deviation 1 |
+| steer x2, throttle x1.5 | 2.80         | ~4.8% | blocked 8 (early wall contact), deviation 1 |
+| steer x3, throttle x1.5 | 1.81         | lower | blocked + three 0.0 routes |
+
+Monotonic degradation with gain, and sampling does not rescue either —
+exactly the sigma-analysis prediction. Amplifying a weak noisy steering
+signal amplifies its errors; closed-loop compounding turns that into
+earlier wall contact. CONCLUSION: no deployment-side lever beats plain
+deterministic compass (4.54). v3's closed-loop ceiling is set by the
+policy itself; the shrinkage and the geometric weakness must be fixed
+at training time (actor-head scale calibration / non-Gaussian head /
+closed-loop-aware objectives). v3-vs-v5 comparisons run at gain 1.0,
+deterministic, no recovery.
