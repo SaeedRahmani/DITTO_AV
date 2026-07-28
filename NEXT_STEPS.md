@@ -61,6 +61,21 @@ exactly. Route conditioning was off-distribution in EVERY closed-loop
 run to date — including everything above; the routefix 3x3
 (job 10527378) is the first honest closed-loop measurement.
 
+**BC anchor = the freeze (closed-loop KL sweep, 3x1 each).**
+With the honest stack, bc_kl_coef 0.1 (default 0.3) breaks the obstacle
+wedge no deployment lever touched: 54% completion on 25381 (v3: never
+past ~10%, 5 runs), mean completion 47.7% vs 22.5% baseline; kl003
+intermediate (26.4%). Cost: freed steering is sloppy (7 layout
+collisions on 25381) — commitment-vs-precision tradeoff. Open-loop
+NLL/MAE ordering (v3 < kl01 < kl003) ANTI-predicts closed-loop
+completion — second clean instance of the open-loop != closed-loop
+finding. Deployment levers all measured dead: stochastic (worse),
+aggressive recovery (collision cascades), conservative recovery
+(score-neutral, completion down; deterministic re-approach re-wedges).
+kl01 3x3 confirmation running (job 10527512-ish); next: anchor/k_modes
+grid + precision recovery (maybe pair with lower steer authority), and
+v3-vs-v5 on the winner.
+
 **Frame question CLOSED by the offline replay test**
 (scripts/replay_frame_check.py): rebuilding featurize_frame inputs from
 recorded clips' boxes and diffing against load_clip obs gives, over 460
