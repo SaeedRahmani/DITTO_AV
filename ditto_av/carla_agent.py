@@ -472,6 +472,15 @@ try:  # pragma: no cover - requires the carla package + leaderboard on path
                         "brake": round(self._last.brake, 3),
                         "n_actors": len(actors),
                         "near_cmd": (route or {}).get("near_cmd"),
+                        # ego-frame route points as the policy sees them
+                        # (obs dims 49:51 / 57:59) — for comparing the
+                        # deployed distribution against training stats
+                        "near": ([round(float(obs[49]), 4),
+                                  round(float(obs[50]), 4)]
+                                 if self._with_route else None),
+                        "far": ([round(float(obs[57]), 4),
+                                 round(float(obs[58]), 4)]
+                                if self._with_route else None),
                         "light": (None if light is None
                                   or light["xy"] is None
                                   else light["state"]),
