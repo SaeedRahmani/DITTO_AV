@@ -229,8 +229,20 @@ the earlier per-batch download gate for this work stream.
 
 - All commits under the user's identity only — **never add Claude
   attribution/co-author trailers** (explicit user requirement).
-- Ask before: deleting anything outside `/scratch/$USER/ditto_av/`,
-  downloading >10 GB, or submitting jobs requesting >8 GPUs·h.
+- **Compute needs no approval** (user instruction, 2026-07-28). Submit
+  large and long runs whenever the science needs them — the full
+  220-route eval (~36 GPU·h), multi-day trainings, big downloads, all
+  of it. Do NOT pause to ask. `research-ceg-tp` allows 48 h walltime,
+  8 GPUs/job and 64 concurrent jobs; parallelise across jobs rather
+  than trimming an experiment to look cheap. The only compute-side
+  duty is to spend it well: run an expensive eval once, on the config
+  the cheap experiments already selected.
+- **Ask before REMOVING**: deleting or overwriting files, datasets,
+  checkpoints or any large/important data — anywhere, including inside
+  `/scratch/$USER/ditto_av/`. This is the ONLY standing approval gate.
+  Exception (pre-approved, they rebuild): pip/conda/apptainer caches,
+  `__pycache__`, already-synced wandb dirs, and extraction dirs whose
+  packed output is confirmed written.
 - Long-running work: always `sbatch`, never foreground SSH; poll `squeue`.
 - If home quota errors appear (`Disk quota exceeded`), the culprit is almost
   always a cache writing to `$HOME/.cache` — redirect it to scratch
