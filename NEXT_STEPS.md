@@ -1,4 +1,45 @@
-# NEXT_STEPS.md — state + plan (updated 2026-07-28, Round-2 code session)
+# NEXT_STEPS.md — state + plan
+
+## >>> HANDOFF 2026-07-28 late — READ THIS FIRST, it corrects everything below <<<
+
+1. **Storage saga RESOLVED — root cause was the 1M chunk-file (inode)
+   quota on /scratch, NOT group quotas and NOT an admin freeze.** The
+   "1-byte group quota" theory below and in older notes is WRONG (red
+   herring in beegfs-ctl output). Confirmed by DHPC: limit is fixed;
+   check `bash /etc/profile.d/ZZ_motd-info.sh` (chunk files column) at
+   session start; keep >=100k headroom. Full rules + adopted DHPC
+   node-local-/tmp I/O pattern: DELFTBLUE.md storage section. Writes
+   work now (789k/1M). The dual-clone workflow remains as an emergency
+   pattern only.
+2. **Frame question SETTLED**: anno theta = CARLA yaw + pi/2 (compass);
+   box rotations = true headings. Deployment MUST use yaw_offset pi/2
+   (configs/carla_agent.yaml, default). PROOF: scripts/
+   replay_frame_check.py reproduces training obs exactly (diff ~1e-4);
+   road-test A/Bs are too noisy to rank frame conventions — never
+   revert geometry from road tests. ALL closed-loop scores measured
+   before this fix (v3 12.6, v4 6.7, the 24.2 single run) are void.
+3. **All three clones synced at this commit** (scratch /scratch/$USER/
+   ditto_av/DITTO_AV = primary again; home ~/ditto_work/DITTO_AV =
+   backup; GitHub = truth). Stuck-recovery exists but is OFF (its road
+   A/B regression was real); brake binarization ON; lights code ready.
+4. **Immediate next actions (in order):**
+   a. Locate v5 (+lights) GPU training outputs — job 10527146
+      COMPLETED, run suffix v5_gpu, under ~/ditto_out/ — commit its
+      results to runs/b2d_v5, move checkpoints to scratch outputs.
+   b. Re-baseline v3 closed-loop with correct frame: 3 routes x 3 reps
+      (ROUTES_SUBSET=25381,25378,27494, carla_smoke.sbatch from the
+      scratch clone, which is now current). Then same for v5. Compare.
+   c. AdditionalMaps: tarball on scratch; extract via the node-local
+      /tmp pattern (DELFTBLUE) or bind from a re-extraction, then all
+      10 dev routes x 3 reps for the winner.
+   d. Then: full 220-route eval decision (user sign-off, ~36 GPU-h),
+      data scale-up, paper (PAPER_PLAN.md is current and accurate).
+5. Cleanup approvals PENDING from user (do not touch without OK):
+   test/PufferDrive_hetero (71k files), pufferdrive archives (~400k) —
+   these are the user's other projects.
+6. wandb sync loop is stopped; restart after next training if live
+   dashboards wanted.
+
 
 Read DELFTBLUE.md first (cluster rules). This file: where the project
 stands, what we learned, and the prioritized plan.
