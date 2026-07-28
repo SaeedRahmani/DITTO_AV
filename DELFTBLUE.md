@@ -49,6 +49,23 @@ Mandatory practices for every AI session:
    count. Free ~10k files (caches, __pycache__, synced wandb dirs) and
    writes resume instantly.
 
+### Official DHPC I/O guidance we adopt
+(<https://doc.dhpc.tudelft.nl/delftblue/Optimize-Your-IO/>, section iii)
+
+- **Many-small-file work belongs on node-local `/tmp`, not scratch.**
+  In any job that unpacks/parses many files: copy the tarball to
+  `/tmp/${SLURM_JOB_ID}/`, extract + process THERE (node-local SSD:
+  fast random I/O, zero scratch inodes, no BeeGFS metadata storms),
+  write only packed results (npz/tar) back to scratch, and `rm -rf
+  /tmp/${SLURM_JOB_ID}` at script end (a trap on EXIT). /tmp is shared
+  with other jobs on the node — always clean up.
+  This applies to validate_b2d-style extraction and any future data
+  prep; it would have prevented both 2026-07 storage incidents.
+- **At larger data scale** (e.g. the full 1000-clip split), prefer
+  sharded packed loaders (WebDataset/DataDings-style tar shards) over
+  loose files; batches over whole-dataset passes.
+
+
 | Location | Path | Properties | Use for |
 |---|---|---|---|
 | Home | `/home/srahmani` | ~30 GB quota, small, was nearly full (cleaned to ~7.6 GB on 2026-07-26 by purging pip/uv caches) | dotfiles + the freeze-fallback clone/outputs (see the dual-clone section). **Install nothing here.** |
