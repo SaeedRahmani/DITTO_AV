@@ -45,6 +45,22 @@ WORSE with the fix (collision cascades, route deviations, zero
 "blocked" endings but 5-8 collisions/run) → retuned conservative:
 straight gentle reverse, 3-strike give-up (StuckRecovery).
 
+**stochastic=true is a dead lever** (3x3, runs job 10527197):
+3.42 / 8.8% — worse than deterministic (4.5); sampling adds collisions
+without unlocking the obstacle wedge.
+
+**SECOND deployment bug found+fixed: route conditioning semantics**
+(commit 1b2ed7c). The tick log showed deployed near points at median
+rel (+0.24, -0.02), |x| p90 0.48, some BEHIND the ego — training has
+them hovering ~5 m ahead at (0.000, -0.046). plan_to_command_points'
+change-point heuristics over the 50 m-downsampled plan were invented
+semantics. Measured the collector's real ones from 2.6k anno frames:
+near = dense-plan node (1-2 m spacing) popped at ~4 m; far =
+downsampled command node popped at ~7.5 m. RouteCursor now ports this
+exactly. Route conditioning was off-distribution in EVERY closed-loop
+run to date — including everything above; the routefix 3x3
+(job 10527378) is the first honest closed-loop measurement.
+
 **Frame question CLOSED by the offline replay test**
 (scripts/replay_frame_check.py): rebuilding featurize_frame inputs from
 recorded clips' boxes and diffing against load_clip obs gives, over 460
