@@ -1,7 +1,9 @@
 # DittoCarlaAgent config: which trained run to drive with.
 # best closed-loop driver so far: v3 (K=8,H=15). v4 (K=16,H=5) scored
 # net sizes, and run_dir with checkpoints).
-run_config: /scratch/srahmani/ditto_av/outputs/b2d_v3_route_config.yaml
+# v5 promoted 2026-07-28: doubles v3's closed-loop completion (33.2%
+# vs 15.5%, runs/carla_smoke/ROUND2_RESULTS.md) and wins open-loop.
+run_config: /home/srahmani/ditto_out/b2d_v5_deploy_config.yaml
 policy: ditto_multi
 stochastic: false
 action_repeat: 2   # leaderboard ticks at 20 Hz; the world model at 10 Hz
