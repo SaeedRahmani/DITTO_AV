@@ -1,0 +1,7 @@
+# Diagnostic A: theta fix ON (default yaw_offset pi/2), stuck recovery
+# OFF. Isolates the frame fix from the recovery behavior.
+run_config: /scratch/srahmani/ditto_av/outputs/b2d_v3_route_config.yaml
+policy: ditto_multi
+stochastic: false
+action_repeat: 2
+stuck_recovery: false

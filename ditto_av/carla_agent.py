@@ -297,6 +297,11 @@ try:  # pragma: no cover - requires the carla package + leaderboard on path
                 self._recovery = StuckRecovery(
                     stuck_ticks=int(conf.get("stuck_ticks", 40)),
                     recover_ticks=int(conf.get("recover_ticks", 15)))
+            # heading offset added to CARLA yaw when featurizing; the
+            # annotation frame is the IMU compass = yaw + pi/2, so pi/2
+            # matches training. Overridable for frame-convention A/B
+            # diagnostics only.
+            self._yaw_off = float(conf.get("yaw_offset", np.pi / 2))
             self._repeat = int(conf.get("action_repeat", 2))
             # expert brake is near-binary (0 almost always, 1 sometimes);
             # the Gaussian mean outputs a constant ~0.15 which in CARLA
@@ -404,11 +409,12 @@ try:  # pragma: no cover - requires the carla package + leaderboard on path
             # + pi/2 (data_collect.py builds rotations as
             # rad2deg(compass) - 90; verified exact on 20 clips). All
             # training obs are expressed in that rotated frame, so the
-            # online featurizer must reproduce it: without the +pi/2
-            # every relative feature (neighbors, route, lights) is
-            # rotated 90 deg against what the policy was trained on —
-            # this exact bug shipped in the first closed-loop rounds.
-            ego_yaw = float(np.deg2rad(tr.rotation.yaw)) + np.pi / 2
+            # online featurizer must reproduce it (yaw_offset, pi/2 by
+            # default): without it every relative feature (neighbors,
+            # route, lights) is rotated 90 deg against what the policy
+            # was trained on — this bug shipped in the first
+            # closed-loop rounds.
+            ego_yaw = float(np.deg2rad(tr.rotation.yaw)) + self._yaw_off
             v = ego.get_velocity()
             ego_speed = float(np.linalg.norm([v.x, v.y, v.z]))
 

@@ -1,0 +1,10 @@
+# Diagnostic B (control): pre-fix frame (yaw_offset 0), stuck recovery
+# OFF — should reproduce the 2026-07-27 tuning-round behavior (~40%
+# completion on route 25381). Validates the harness/node before blaming
+# the frame fix.
+run_config: /scratch/srahmani/ditto_av/outputs/b2d_v3_route_config.yaml
+policy: ditto_multi
+stochastic: false
+action_repeat: 2
+stuck_recovery: false
+yaw_offset: 0.0
