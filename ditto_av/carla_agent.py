@@ -163,10 +163,21 @@ class RouteCursor:
         """Advance past reached nodes; return (node_xy, command)."""
         if not len(self.xy):
             return None, 4
-        while (self.i < len(self.xy) - 1
-               and np.linalg.norm(self.xy[self.i] - ego_xy)
-               < self.pop_radius):
-            self.i += 1
+        while self.i < len(self.xy) - 1:
+            node = self.xy[self.i]
+            if np.linalg.norm(node - ego_xy) < self.pop_radius:
+                self.i += 1
+                continue
+            # the expert always passes within pop_radius of every node,
+            # but our policy can run laterally offset (routefix 3x3: the
+            # cursor stalled and near pointed 14 m BACKWARDS). Also pop
+            # nodes the ego has passed along the local route direction;
+            # on-plan this never fires — the radius pop wins first.
+            seg = self.xy[self.i + 1] - node
+            if seg @ (ego_xy - node) > 0:
+                self.i += 1
+                continue
+            break
         return self.xy[self.i], self.cmds[self.i]
 
 

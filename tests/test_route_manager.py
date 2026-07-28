@@ -71,3 +71,14 @@ def test_empty_plan():
     cur = RouteCursor(np.zeros((0, 2)), [], pop_radius=4.0)
     node, cmd = cur.step(np.array([0.0, 0.0]))
     assert node is None and cmd == 4
+
+
+def test_laterally_offset_ego_does_not_stall_cursor():
+    # ego drives parallel to the plan, 6 m off (beyond the 4 m pop
+    # radius): nodes it passes must still pop, or the near point ends up
+    # behind the ego (observed in the routefix 3x3 tick log)
+    xy, cmds = _dense()
+    cur = RouteCursor(xy, cmds, pop_radius=4.0)
+    for x in np.arange(0.0, 100.0, 0.5):
+        node, _ = cur.step(np.array([x, 6.0]))
+        assert node[0] >= x, (x, node)  # never behind the ego
