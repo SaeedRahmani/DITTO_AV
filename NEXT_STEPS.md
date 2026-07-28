@@ -22,18 +22,17 @@
    ditto_av/DITTO_AV = primary again; home ~/ditto_work/DITTO_AV =
    backup; GitHub = truth). Stuck-recovery exists but is OFF (its road
    A/B regression was real); brake binarization ON; lights code ready.
-4. **Immediate next actions (in order):**
-   a. Locate v5 (+lights) GPU training outputs — job 10527146
-      COMPLETED, run suffix v5_gpu, under ~/ditto_out/ — commit its
-      results to runs/b2d_v5, move checkpoints to scratch outputs.
-   b. Re-baseline v3 closed-loop with correct frame: 3 routes x 3 reps
-      (ROUTES_SUBSET=25381,25378,27494, carla_smoke.sbatch from the
-      scratch clone, which is now current). Then same for v5. Compare.
-   c. AdditionalMaps: tarball on scratch; extract via the node-local
-      /tmp pattern (DELFTBLUE) or bind from a re-extraction, then all
-      10 dev routes x 3 reps for the winner.
-   d. Then: full 220-route eval decision (user sign-off, ~36 GPU-h),
-      data scale-up, paper (PAPER_PLAN.md is current and accurate).
+4. **Where the work actually is — read the session log below for the
+   live thread.** Already DONE (do not redo): post-fix re-baselines,
+   stochastic sweep (dead), recovery tuning (dead), route-semantics fix
+   (RouteCursor, second deployment bug), KL-anchor sweep — bc_kl_coef
+   0.1 doubles completion (47.7% vs 22.5%), kl01 3x3 confirmation was
+   running at handoff. **Next (in order):** (a) collect kl01
+   confirmation + v5 GPU outputs (job 10527146, ~/ditto_out/) and
+   commit results; (b) anchor/k_modes grid + v3-vs-v5 on the winner;
+   (c) AdditionalMaps via node-local /tmp -> all 10 dev routes x 3
+   reps; (d) 220-route eval decision (user sign-off ~36 GPU-h), data
+   scale-up, paper (PAPER_PLAN.md).
 5. Cleanup approvals PENDING from user (do not touch without OK):
    test/PufferDrive_hetero (71k files), pufferdrive archives (~400k) —
    these are the user's other projects.
