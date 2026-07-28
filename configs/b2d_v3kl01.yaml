@@ -1,0 +1,27 @@
+# v3 (K8/H15/route) with a weaker BC anchor (bc_kl_coef 0.1, default
+# 0.3): closed-loop wedge = policy never commits bypass steer; test
+# whether mode commitment improves when the anchor loosens.
+run_dir: runs/b2d_v3kl01
+seed: 0
+device: cpu
+
+env:
+  action_space: continuous
+  extra_obs_dims: 16
+
+wm:
+  train_steps: 6000
+  batch_size: 32
+  seq_len: 16
+
+ac:
+  train_steps: 3000
+  horizon: 15
+  batch_size: 64
+  k_modes: 8
+  n_negatives: 16
+  bc_kl_coef: 0.1
+
+bc:
+  train_steps: 5000
+  lr: 3.0e-4

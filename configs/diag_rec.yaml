@@ -1,0 +1,10 @@
+# Honest stack (frame pi/2 + RouteCursor) + conservative StuckRecovery:
+# routefix2 showed 99% of wedged ticks command throttle>0.3 into the
+# obstacle — backing off and retrying is the right primitive.
+run_config: /scratch/srahmani/ditto_av/outputs/b2d_v3_route_config.yaml
+policy: ditto_multi
+stochastic: false
+action_repeat: 2
+stuck_recovery: true
+stuck_ticks: 40
+recover_ticks: 10
