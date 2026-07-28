@@ -139,49 +139,35 @@ class ContinuousWMDriver:
         return a.cpu().numpy()
 
 
-def plan_to_command_points(plan: Sequence[Tuple[float, float, int]],
-                           ego_xy: np.ndarray,
-                           min_ahead: float = 5.0,
-                           near_fallback: float = 20.0,
-                           far_fallback: float = 50.0) -> dict:
-    """Compress a route plan into the near/far command signal.
+class RouteCursor:
+    """Stateful pop-radius route follower for the near/far conditioning.
 
-    plan: [(x, y, command_int)] in world coords, ordered along the route
-        (leaderboard `_global_plan_world_coord` with RoadOption -> int).
-    Command points are where the command changes (junction decisions,
-    matching Bench2Drive's sparse command annotations). near = first
-    change point at least `min_ahead` beyond the closest plan index;
-    far = the next one. Fallback: lane-follow points ~20/50 m ahead.
-    Returns the `route` dict for featurize_frame.
+    Reproduces the data collector's two command planners, whose
+    semantics were measured from 2.6k annotation frames (2026-07-28):
+    near = dense-plan node (spacing 1-2 m) popped at ~4 m, hovering
+    4-6 m ahead; far = downsampled command-plan node (spacing 20-50 m)
+    popped at ~7.5 m. The previous `plan_to_command_points`
+    (change-point + arc-length fallbacks over the sparse plan) produced
+    near points tens of meters lateral/behind the ego — nothing like
+    the training distribution. The index only moves forward, so
+    self-crossing routes cannot teleport the target backwards.
     """
-    if len(plan) == 0:
-        return {"near_xy": None, "near_cmd": 4,
-                "far_xy": None, "far_cmd": 4}
-    xy = np.asarray([(p[0], p[1]) for p in plan], dtype=np.float64)
-    cmds = [int(p[2]) for p in plan]
-    dist_to_ego = np.linalg.norm(xy - ego_xy, axis=1)
-    cur = int(np.argmin(dist_to_ego))
 
-    # arc-length ahead of the current index
-    seg = np.linalg.norm(np.diff(xy[cur:], axis=0), axis=1)
-    s = np.concatenate([[0.0], np.cumsum(seg)])  # s[j] = dist to plan[cur+j]
+    def __init__(self, xy, cmds: Sequence[int], pop_radius: float):
+        self.xy = np.asarray(xy, dtype=np.float64).reshape(-1, 2)
+        self.cmds = [int(c) for c in cmds]
+        self.pop_radius = float(pop_radius)
+        self.i = 0
 
-    changes = [cur + j for j in range(1, len(s))
-               if cmds[cur + j] != cmds[cur + j - 1] and s[j] >= min_ahead]
-
-    def fallback(dist):
-        j = int(np.searchsorted(s, dist))
-        j = min(j, len(s) - 1)
-        return {"xy": xy[cur + j], "cmd": cmds[cur + j]}
-
-    if len(changes) >= 1:
-        near = {"xy": xy[changes[0]], "cmd": cmds[changes[0]]}
-        far = ({"xy": xy[changes[1]], "cmd": cmds[changes[1]]}
-               if len(changes) >= 2 else fallback(far_fallback))
-    else:
-        near, far = fallback(near_fallback), fallback(far_fallback)
-    return {"near_xy": near["xy"], "near_cmd": near["cmd"],
-            "far_xy": far["xy"], "far_cmd": far["cmd"]}
+    def step(self, ego_xy: np.ndarray) -> Tuple[Optional[np.ndarray], int]:
+        """Advance past reached nodes; return (node_xy, command)."""
+        if not len(self.xy):
+            return None, 4
+        while (self.i < len(self.xy) - 1
+               and np.linalg.norm(self.xy[self.i] - ego_xy)
+               < self.pop_radius):
+            self.i += 1
+        return self.xy[self.i], self.cmds[self.i]
 
 
 def route_hits_box(points_xy: np.ndarray, center_xy: np.ndarray,
@@ -309,8 +295,10 @@ try:  # pragma: no cover - requires the carla package + leaderboard on path
                 stochastic=bool(conf.get("stochastic", False)))
             self._with_route, self._with_lights = extra_obs_layout(
                 run_cfg.env.extra_obs_dims, run_cfg.env.light_obs)
-            # set_global_plan can run before setup(); keep its dense plan
+            # set_global_plan can run before setup(); keep its state
             self._dense_plan_xy = getattr(self, "_dense_plan_xy", None)
+            self._near_cursor = getattr(self, "_near_cursor", None)
+            self._far_cursor = getattr(self, "_far_cursor", None)
             self._light_boxes: Dict[int, Optional[tuple]] = {}
             self._recovery = None
             if bool(conf.get("stuck_recovery", False)):
@@ -358,6 +346,17 @@ try:  # pragma: no cover - requires the carla package + leaderboard on path
             self._dense_plan_xy = np.asarray(
                 [[t.location.x, t.location.y]
                  for t, _ in global_plan_world_coord])
+            # near/far command cursors: pop radii measured from the
+            # annotations (4.0 m dense / 7.5 m sparse)
+            self._near_cursor = RouteCursor(
+                self._dense_plan_xy,
+                [int(opt.value) for _, opt in global_plan_world_coord],
+                4.0)
+            self._far_cursor = RouteCursor(
+                [[t.location.x, t.location.y]
+                 for t, _ in self._global_plan_world_coord],
+                [int(opt.value) for _, opt in self._global_plan_world_coord],
+                7.5)
 
         def _trigger_box(self, cmap, lt):
             """Trigger volume walked forward to its junction.
@@ -461,9 +460,14 @@ try:  # pragma: no cover - requires the carla package + leaderboard on path
 
             route = None
             if self._with_route:
-                plan = [(t.location.x, t.location.y, int(opt.value))
-                        for t, opt in self._global_plan_world_coord]
-                route = plan_to_command_points(plan, ego_xy)
+                if self._near_cursor is not None:
+                    near_xy, near_cmd = self._near_cursor.step(ego_xy)
+                    far_xy, far_cmd = self._far_cursor.step(ego_xy)
+                else:  # set_global_plan never ran (defensive)
+                    near_xy = far_xy = None
+                    near_cmd = far_cmd = 4
+                route = {"near_xy": near_xy, "near_cmd": near_cmd,
+                         "far_xy": far_xy, "far_cmd": far_cmd}
             light = None
             if self._with_lights:
                 light = (self._relevant_light(
