@@ -86,8 +86,23 @@ def test_route_hits_box():
     assert not route_hits_box(pts[:0], [10.0, 0.0], [1.5, 0.7])
 
 
+def test_stuck_recovery_gives_up_without_progress():
+    # after max_consecutive recoveries with no free movement in between,
+    # recovery stops overriding (leaderboard blocked-detection takes over)
+    r = StuckRecovery(stuck_ticks=2, recover_ticks=2, max_consecutive=2)
+    outs = [r.update(0.05, 0.8, 0.0, 0.0) for _ in range(40)]
+    assert r.events == 2
+    assert all(o is None for o in outs[-20:])
+    # real movement resets the cap
+    assert r.update(2.0, 0.6, 0.0, 0.0) is None
+    for _ in range(2):
+        assert r.update(0.05, 0.8, 0.0, 0.0) is None
+    assert r.update(0.05, 0.8, 0.0, 0.0) is not None
+    assert r.events == 3
+
+
 def test_stuck_recovery():
-    r = StuckRecovery(stuck_ticks=5, recover_ticks=3)
+    r = StuckRecovery(stuck_ticks=5, recover_ticks=3, steer=0.5)
     # driving normally: never triggers
     for _ in range(20):
         assert r.update(2.0, 0.6, 0.0, 0.1) is None

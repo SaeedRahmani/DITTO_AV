@@ -207,34 +207,54 @@ class StuckRecovery:
     wedging against an obstacle with the policy commanding full throttle
     forever. If ego speed stays below `speed` for more than `stuck_ticks`
     ticks while throttle (not brake) is commanded, take over for
-    `recover_ticks` of reverse with mirrored steer, then hand control
-    back. Braking at a red light never counts as stuck.
+    `recover_ticks` of straight, gentle reverse, then hand control back.
+    Braking at a red light never counts as stuck.
+
+    Conservative by design (the 2026-07-28 re-baseline showed aggressive
+    reverse+steer loops rack up layout collisions and route deviations):
+    reverse straight rather than steering blind, and after
+    `max_consecutive` recoveries with no real movement in between
+    (never exceeding `free_speed`), give up and let the leaderboard's
+    blocked-detection end the route cleanly.
     """
 
     def __init__(self, speed: float = 0.3, stuck_ticks: int = 40,
-                 recover_ticks: int = 15, throttle: float = 0.4,
-                 steer: float = 0.5):
+                 recover_ticks: int = 10, throttle: float = 0.3,
+                 steer: float = 0.0, free_speed: float = 1.0,
+                 max_consecutive: int = 3):
         self.speed, self.stuck_ticks = speed, stuck_ticks
         self.recover_ticks = recover_ticks
         self.throttle, self.steer = throttle, steer
+        self.free_speed = free_speed
+        self.max_consecutive = max_consecutive
         self.low_ticks = 0
         self.left = 0
         self.events = 0
+        self.consecutive = 0
+        self._moved_free = True
         self._steer_sign = 1.0
 
     def update(self, ego_speed: float, throttle: float, brake: float,
                steer: float) -> Optional[Tuple[float, float, bool]]:
         """One model tick: returns None to keep the policy's control, or
         a (throttle, steer, reverse) override while recovering."""
+        if ego_speed > self.free_speed:
+            self._moved_free = True
+            self.consecutive = 0
         if self.left == 0:
             if ego_speed < self.speed and throttle > 0.0 and brake == 0.0:
                 self.low_ticks += 1
             else:
                 self.low_ticks = 0
             if self.low_ticks > self.stuck_ticks:
+                self.low_ticks = 0
+                self.consecutive = 1 if self._moved_free \
+                    else self.consecutive + 1
+                if self.consecutive > self.max_consecutive:
+                    return None  # give up: let blocked-detection end it
                 self.left = self.recover_ticks
                 self._steer_sign = 1.0 if steer >= 0.0 else -1.0
-                self.low_ticks = 0
+                self._moved_free = False
                 self.events += 1
         if self.left > 0:
             self.left -= 1

@@ -22,8 +22,28 @@ trained checkpoint valid. Consequences:
 - All prior closed-loop numbers (v3 12.6±11.3, v4 6.7±3.9; wedging;
   huge variance) were measured WITH the bug → the v3-vs-v4 ranking and
   the tuning conclusions must be re-established after the fix.
-- Re-run the cheap 3-route × 3-rep smoke FIRST (expect a large jump);
-  only then the 10-route evals.
+
+**Re-baseline VERDICT (2026-07-28, runs/carla_smoke/ diag files).**
+The 3×3 re-baseline with fix+recovery scored LOWER than the buggy
+baseline (1.72 / 17.3% vs 12.6 / 42.8%) — but the A/B on route 25381
+(recovery OFF both arms) shows why, and it vindicates the fix:
+- fix: 16.5% completion, ONE layout collision, penalty 0.65, ends
+  "blocked" behind a scenario obstacle — clean driving, then wedges.
+- old frame (control): 100% completion but NINE layout collisions +
+  1 vehicle, penalty 0.12, score 0.39 — the rotated obs act as a
+  90°-rotated feedback loop that RICOCHETS along the route corridor.
+  Yesterday's 43% completion was this artifact. Training-npz stats
+  independently confirm the compass frame (near point median (0,-.046),
+  neighbor heading sin=-0.999).
+Implications: (1) keep the fix — per-meter driving quality is far
+better; report completion AND penalty, composed score alone is
+misleading here. (2) The completion blocker is the policy wedging
+behind obstacles (lane-change commitment) — a policy/data question
+(try stochastic=true; multimodal capture is our method's whole point).
+(3) First recovery tuning (reverse+mirrored steer, 4 s) made things
+WORSE with the fix (collision cascades, route deviations, zero
+"blocked" endings but 5-8 collisions/run) → retuned conservative:
+straight gentle reverse, 3-strike give-up (StuckRecovery).
 
 **Round-2 code (41 tests green):**
 1. Traffic-light obs block: offline `_light_block` (presence + ego-frame
