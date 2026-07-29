@@ -56,8 +56,13 @@ the training loop. Two evidence pillars:
 3. 1000-clip download; training-length pilots 5x/20x.
 
 ### Gen-2: scale for performance (start when download lands)
-4. Extract new clips via node-local /tmp -> validate (validate_b2d
-   pattern; watch the inode budget, DELFTBLUE storage rules).
+4. Extract new clips via node-local /tmp ONLY — measured 2026-07-29:
+   826k/1M inodes used; a persistent scratch extraction of 703 clips
+   (~140k files) would breach the >=100k-headroom rule. Required shape:
+   job copies tarballs to /tmp/$SLURM_JOB_ID, extracts anno there,
+   validates, builds the packed npz cache to scratch, rm -rf /tmp dir
+   (trap EXIT). validate_b2d.sbatch as-is extracts to scratch — do NOT
+   run it unmodified on the new clips.
 5. Retrain kl01-config on 1000 clips; steps per pilot verdict; if 5x/
    20x helps, fold in. GPU lanes per live audit (MIG fine for training).
 6. Closed-loop selection at gen-2: 3-route 3x3 smoke for {anchor 0.1
