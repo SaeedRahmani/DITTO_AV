@@ -1,0 +1,8 @@
+# 3x3 of the 20x-training-length pilot: 5x already tripled composed
+# score (17.11 vs 6.38) at slightly lower completion — probe the
+# length axis further before locking the gen-2 recipe.
+run_config: /home/srahmani/ditto_out/b2d_kl01_20x_cpu.yaml
+policy: ditto_multi
+stochastic: false
+action_repeat: 2
+stuck_recovery: false
