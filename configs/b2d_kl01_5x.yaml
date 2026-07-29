@@ -1,0 +1,23 @@
+# Training-length pilot: kl01 (winning anchor) at 5x steps.
+# All runs so far used smoke-scale steps (wm 6000) — length is an
+# untapped performance lever; one axis at a time.
+run_dir: runs/b2d_kl01_5x
+seed: 0
+device: cpu
+env:
+  action_space: continuous
+  extra_obs_dims: 16
+wm:
+  train_steps: 30000
+  batch_size: 32
+  seq_len: 16
+ac:
+  train_steps: 15000
+  horizon: 15
+  batch_size: 64
+  k_modes: 8
+  n_negatives: 16
+  bc_kl_coef: 0.1
+bc:
+  train_steps: 25000
+  lr: 0.0003
