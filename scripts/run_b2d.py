@@ -40,12 +40,21 @@ from ditto_av.trainers.wm_trainer import (load_world_model,  # noqa: E402
 VAL_EVERY = 6  # every 6th manifest clip is held out (~17%)
 
 
-def split_clips(manifest: Path, extracted: Path):
+def split_clips(manifest: Path, extracted: Path, trust_manifest=False):
     names = sorted(ln.strip().removesuffix(".tar.gz")
                    for ln in manifest.read_text().splitlines() if ln.strip())
     dirs = [extracted / n for n in names]
-    have = [d for d in dirs if (d / "anno").is_dir()]
-    missing = len(dirs) - len(have)
+    if trust_manifest:
+        # Split (and therefore the npz-cache key) from the manifest
+        # alone, without requiring the extraction on disk. Lets training
+        # jobs hit the cache built by the /tmp extraction job (gen-2:
+        # scratch cannot hold a 1000-clip extraction, 826k/1M inodes).
+        # On a cache MISS clips_to_npz fails loudly on the missing files
+        # -> rerun scripts/slurm/extract_cache_b2d.sbatch.
+        have, missing = dirs, 0
+    else:
+        have = [d for d in dirs if (d / "anno").is_dir()]
+        missing = len(dirs) - len(have)
     train = [d for i, d in enumerate(have) if i % VAL_EVERY != VAL_EVERY - 1]
     val = [d for i, d in enumerate(have) if i % VAL_EVERY == VAL_EVERY - 1]
     print(f"clips: {len(have)} extracted ({missing} missing), "
@@ -60,7 +69,8 @@ def stage_data(cfg, args):
     d = cfg.dirs()
     with_route, with_lights = extra_obs_layout(cfg.env.extra_obs_dims,
                                                cfg.env.light_obs)
-    train, val = split_clips(Path(args.manifest), Path(args.extracted))
+    train, val = split_clips(Path(args.manifest), Path(args.extracted),
+                             trust_manifest=args.trust_manifest)
     # parsing ~60k small json.gz files can take >1 h when BeeGFS is under
     # load; cache the parsed npzs keyed on the exact clip split + layout
     # (lights suffix only when on, so existing cache entries stay valid)
@@ -233,6 +243,9 @@ def main():
     ap.add_argument("--stage", default="all",
                     choices=list(STAGES) + ["all"])
     ap.add_argument("--manifest", default="manifests/b2d_clips.txt")
+    ap.add_argument("--trust-manifest", action="store_true",
+                    help="derive the clip split from the manifest without "
+                    "requiring the extraction on disk (npz-cache workflow)")
     ap.add_argument("--extracted",
                     default="/scratch/srahmani/ditto_av/data/bench2drive/"
                             "extracted")

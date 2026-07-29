@@ -1,0 +1,30 @@
+# Gen-2: winning recipe at full data scale — kl01 anchor (bc_kl 0.1,
+# K=8, H=15) x 1000 clips x 5x training steps (the length-curve peak:
+# 5x tripled composed score 17.11 vs 6.38; 20x regressed to 12.94).
+# Data via npz cache from extract_cache_b2d.sbatch (--trust-manifest;
+# manifest b2d_full.txt).
+run_dir: runs/b2d_gen2
+seed: 0
+device: cpu
+
+env:
+  action_space: continuous
+  extra_obs_dims: 16
+  light_obs: false
+
+wm:
+  train_steps: 30000
+  batch_size: 32
+  seq_len: 16
+
+ac:
+  train_steps: 15000
+  horizon: 15
+  batch_size: 64
+  k_modes: 8
+  n_negatives: 16
+  bc_kl_coef: 0.1
+
+bc:
+  train_steps: 25000
+  lr: 3.0e-4

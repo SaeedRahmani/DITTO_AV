@@ -50,5 +50,6 @@ yaml.safe_dump(cfg, open(run_dir + "_config.yaml", "w"), sort_keys=False)
 EOF
 $PY scripts/run_b2d.py --config ${RUN_DIR}_config.yaml --stage all \
     --manifest $MANIFEST \
-    --extracted /scratch/$USER/ditto_av/data/bench2drive/extracted
+    --extracted /scratch/$USER/ditto_av/data/bench2drive/extracted \
+    ${TRUST:+--trust-manifest}
 echo "PHASE2 GPU RUN DONE -> $RUN_DIR"

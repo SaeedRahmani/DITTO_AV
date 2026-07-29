@@ -1,0 +1,6 @@
+# Gen-2 first closed-loop look: kl01 anchor x 1000 clips x 5x steps.
+run_config: /home/srahmani/ditto_out/b2d_gen2_cpu.yaml
+policy: ditto_multi
+stochastic: false
+action_repeat: 2
+stuck_recovery: false
