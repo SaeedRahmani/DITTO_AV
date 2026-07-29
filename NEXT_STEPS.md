@@ -188,17 +188,18 @@ PAPER_PLAN applies).
   CPU-only — eval driving) and `~/envs/ditto_gpu` (torch cu130 — GPU
   training; A100 partitions only, cu130 dropped V100/sm_70). CPU jobs
   keep the ditto venv. See the env table in DELFTBLUE.md.
-- GPU access (verified via sinfo/sacctmgr 2026-07-28 — the user HAS
-  strong A100 access; never claim otherwise):
-  * partition walltime caps: gpu-a100 & gpu-v100 **48 h**, gpu-a100-small
-    4 h, compute-p1 120 h.
-  * account `research-ceg-tp`: up to **8 GPUs/job**, 64 concurrent jobs
-    → default choice for GPU work (up to 48 h A100).
-  * account `innovation`: up to 2 GPUs/job, **24 h**, 1 job at a time —
-    a valid fallback when research-ceg-tp queues badly.
+- GPU access — see the **lane truth table in DELFTBLUE.md** (verified by
+  real submissions 2026-07-29; supersedes all older notes here):
+  * `research-ceg-tp` on gpu-a100/gpu-v100: fine until saturated —
+    2026-07-29 even 59-min jobs pended >14 h (other users' jobs are
+    HIDDEN by PrivateData; judge via node AllocTRES, never via squeue).
+  * Fast verified lanes: `participation` (H100, --gpus-per-task=1) and
+    `visual` (Quadro, NO gpu flag) — instant start, 4 h cap, CARLA
+    boots on both. gpu-a100-small (MIG): training only, no graphics.
+  * `innovation` CANNOT get full GPUs (AssocMaxGRESPerJob) — the old
+    "valid fallback" claim was wrong. `-nullrhi` CPU CARLA: dead end.
   * `--gpus-per-task=N` is the required syntax (`--gres` is rejected).
-  * ≤59-min requests backfill within minutes on busy days — an OPTIONAL
-    queue tactic for short smokes only, NOT any kind of limit.
+  * Escalation rule: pending >30 min → probe lanes, move the work.
 - CARLA: SIF at /scratch/$USER/ditto_av/carla_0915.sif; evaluator
   launches the server itself via $CARLA_ROOT shim (carla_root/). Town11-15
   need AdditionalMaps (tarball on scratch; extraction to

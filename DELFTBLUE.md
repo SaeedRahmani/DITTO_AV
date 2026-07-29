@@ -157,13 +157,29 @@ cd /scratch/$USER/ditto_av/DITTO_AV && python -m pytest tests/ -q
 ## SLURM basics for this project
 
 Partitions (2026): `compute-p1/p2` (CPU), `gpu-a100` (4x A100 80GB/node),
-`gpu-v100`, `gpu-a100-small` (MIG slices — fine for our small models).
-Walltime caps (sinfo, verified 2026-07-28): **48 h on gpu-a100 and
-gpu-v100**, 4 h on gpu-a100-small, 120 h on compute. Long GPU jobs are
-allowed; short (≤59 min) requests are merely a *tactic* to backfill in
-minutes when the queue is busy — not a limit.
+`gpu-v100`, `gpu-a100-small` (MIG slices — fine for our small models),
+plus the probe-verified extra lanes below (2026-07-29). Walltime caps:
+48 h on gpu-a100/gpu-v100, 4 h on gpu-a100-small/participation/visual,
+120 h on compute.
 Templates live in `scripts/slurm/`. The user's SLURM accounts (verified
 2026-07-26): `research-ceg-tp` (used in the templates) and `innovation`.
+
+**GPU lane truth table (ALL verified by real submissions 2026-07-29 —
+trust nothing else; re-probe with tiny --wrap jobs when in doubt):**
+
+| lane | GPU | verdict |
+|---|---|---|
+| gpu-a100 / gpu-v100 (ceg-tp) | A100 / V100 | works, but can saturate for >14 h with *hidden* long jobs (`PrivateData` hides other users in squeue — check node `AllocTRES`, not the queue) |
+| `participation` (ceg-tp) | H100 NVL | **instant start**, CARLA_BOOT_OK (Town03+Town12), 4 h cap, `--gpus-per-task=1` |
+| `visual` (ceg-tp) | Quadro RTX 4000 | **instant start**, CARLA_BOOT_OK, 4 h cap, GPU is unmanaged — NO `--gpus-per-task` flag |
+| gpu-a100-small (BOTH accounts) | A100 MIG 1g.10gb | instant start; CUDA training only — MIG has NO graphics, CARLA cannot boot |
+| innovation → any full-GPU partition | — | **REJECTED** (`AssocMaxGRESPerJob`, even 1 GPU); the old "valid fallback" note here was wrong — verified only on paper, never by submission |
+| CPU + `-nullrhi` shim knob | none | CARLA server never binds the RPC port — dead end, do not retry |
+| as-rst-*, participants, participation-gpu | H100 | submission rejected: "Invalid account/partition combination" |
+
+Escalation rule: if a job pends >30 min, probe alternative lanes with a
+5-min `--wrap="hostname; nvidia-smi -L"` job and MOVE — never let work
+sit overnight in a queue while any lane is idle.
 
 Python environments — which one where (important):
 
