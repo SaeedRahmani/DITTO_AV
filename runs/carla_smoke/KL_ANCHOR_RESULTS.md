@@ -1,19 +1,30 @@
-# BC-anchor (bc_kl_coef) sweep — closed-loop verdict (2026-07-28)
+# BC-anchor (bc_kl_coef) sweep — closed-loop verdict (final, 2026-07-29)
 
 Setting: honest stack (theta fix + RouteCursor route semantics),
 3 base-town routes (25381/Town05, 25378/Town03, 27494/Town04),
 deterministic, no recovery. Training: v3 config (K=8, H=15) with only
-bc_kl_coef varied, except v5kl01 = v5 (lights) + kl 0.1. Baseline
-bc_kl_coef is 0.3.
+bc_kl_coef varied, except v5kl01 = v5 (lights) + kl 0.1 and kl01k16 =
+kl 0.1 + K=16. Baseline bc_kl_coef is 0.3. All at 3x3 (2026-07-29
+confirmations ran on the participation/H100 + visual/Quadro lanes).
 
-| config | reps | score | completion | penalty | raw json |
+| config | score | completion | penalty | 100% routes | raw json |
 |---|---|---|---|---|---|
-| v3 baseline (kl 0.3) | 3x3 | 5.91 | 22.5% | 0.387 | routefix2_3x3.json |
-| kl003 | 3x1 | 7.05 | 26.4% | 0.387 | kl003_3x1.json |
-| **kl01** | **3x3** | **6.38** | **64.6%** | 0.110 | kl01_3x3.json |
-| kl015 | 3x1 | 4.93 | 52.4% | 0.175 | kl015_3x1.json |
-| kl02 | 3x1 | 6.48 | 52.6% | 0.144 | kl02_3x1.json |
-| v5kl01 (lights + kl 0.1) | 3x1 | **10.99** | 24.7% | **0.480** | v5kl01_3x1.json |
+| v3 baseline (kl 0.3) | 5.91 | 22.5% | 0.387 | 0 | routefix2_3x3.json |
+| kl003 (3x1 only) | 7.05 | 26.4% | 0.387 | 0 | kl003_3x1.json |
+| **kl01** | **6.38** | **64.6%** | 0.110 | 1 | kl01_3x3.json |
+| kl015 | 6.93 | 54.2% | 0.176 | 2 | kl015_3x3.json |
+| kl02 | 4.45 | 46.9% | 0.134 | 0 | kl02_3x3.json |
+| kl01k16 (K=16) | 3.81 | 39.4% | 0.124 | 0 | kl01k16_3x3.json |
+| v5kl01 (lights + kl 0.1) | 9.19 | 27.5% | 0.404 | 0 | v5kl01_3x3.json |
+
+**Anchor dose-response (mean completion, 3-route set):**
+0.03 -> 26.4% | **0.1 -> 64.6%** | 0.15 -> 54.2% | 0.2 -> 46.9% |
+0.3 -> 22.5%. Clean single peak at 0.1; tripling over baseline.
+
+**K=16 does NOT transfer** (39.4% vs K=8's 64.6% at the same anchor):
+Phase-1's strong K=16 preference is highway-env-specific — retrieval
+breadth, like the anchor, must be tuned closed-loop (5th instance of
+offline/proxy orderings failing to predict closed-loop driving).
 
 ## Findings
 

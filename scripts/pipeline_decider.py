@@ -14,8 +14,13 @@ Stages:
               220-route benchmark in <=4h chunks
   bench220    aggregate benchmark chunks into the final table
 
-Lanes (verified 2026-07-29, DELFTBLUE.md truth table): participation
-(H100, --gpus-per-task=1) and visual (Quadro, no gpu flag, --exclusive).
+Lane choice is DYNAMIC (user rule 2026-07-29: never hardcode which
+node/partition is best — audit at submission time). pick_lanes() counts
+actually-free GPUs per candidate partition via sinfo Gres/GresUsed and
+orders lanes by free capacity; outputs/fast_lanes.txt (one partition
+per line) overrides when a human/audit knows better. Only the
+*capability map* (how to request a GPU on each partition, which is
+graphics-capable) is static knowledge.
 """
 import datetime
 import glob
@@ -86,15 +91,66 @@ def sbatch(args, env_extra=None):
     return out.stdout.strip().split(";")[0]
 
 
+# capability map (semi-static): graphics-capable partitions usable for
+# CARLA and how a GPU must be requested there. MIG partitions are
+# deliberately absent (no graphics). Statuses/queues are NOT encoded
+# here — pick_lanes() measures those live.
+LANE_FLAGS = {
+    "participation": ["--gpus-per-task=1"],
+    # unmanaged GPU, no GRES flag. De-facto node exclusivity via CPU
+    # pressure (>half of the 32 cores): --exclusive needs --mem=0 which
+    # clashes with the chain script's --mem-per-cpu directive.
+    "visual": ["--cpus-per-task=17"],
+    "gpu-a100": ["--gpus-per-task=1"],
+    "gpu-v100": ["--gpus-per-task=1"],
+}
+
+
+def free_gpus(part):
+    """Actually-free GPUs right now (squeue lies under PrivateData)."""
+    out = subprocess.run(
+        ["sinfo", "-h", "-N", "-p", part, "-O", "Gres:40,GresUsed:40"],
+        capture_output=True, text=True).stdout
+    total = used = idle_nodes = 0
+    for line in out.splitlines():
+        m = re.findall(r"gpu[:\w.]*:(\d+)", line)
+        if len(m) >= 2:
+            total += int(m[0])
+            used += int(m[1])
+        elif "null" in line:
+            idle_nodes += 1  # no GRES (visual): usable if node not busy
+    if total:
+        return total - used
+    st = subprocess.run(["sinfo", "-h", "-p", part, "-t", "idle", "-o", "%D"],
+                        capture_output=True, text=True).stdout.split()
+    return sum(int(x) for x in st)
+
+
+def pick_lanes():
+    override = os.path.join(OUT, "fast_lanes.txt")
+    if os.path.exists(override):
+        lanes = [l.strip() for l in open(override) if l.strip() in LANE_FLAGS]
+        if lanes:
+            log(f"lanes from override file: {lanes}")
+            return lanes
+    scored = []
+    for p in LANE_FLAGS:
+        try:
+            scored.append((free_gpus(p), p))
+        except Exception as e:
+            log(f"lane audit: {p} unreadable ({e})")
+    scored.sort(reverse=True)
+    log(f"lane audit (free GPUs now): {scored}")
+    lanes = [p for n, p in scored if n > 0]
+    return lanes[:2] if lanes else ["participation", "visual"]
+
+
 def submit_chain(lane, name, variants, routes_xml=None):
     extra = {"VARIANTS": variants}
     if routes_xml:
         extra["ROUTES_XML"] = routes_xml
-    if lane == "participation":
-        args = ["-p", "participation", "--gpus-per-task=1"]
-    else:
-        args = ["-p", "visual", "--exclusive"]
-    args += ["--job-name", name, "--export=ALL", CHAIN]
+    args = ["-p", lane] + LANE_FLAGS[lane] + \
+        ["--job-name", name, "--export=ALL", CHAIN]
     jid = sbatch(args, extra)
     log(f"submitted {name} -> {lane} job {jid}")
     return jid
@@ -158,16 +214,13 @@ def stage_confirm3x3():
                + ", ".join(f"{k} {v['completion']:.1f}%" for k, v in live.items()))
 
     wconf = CANDIDATES[winner][1]
-    jobs = [
-        submit_chain("participation", "d10-win-A",
-                     f"d10_{winner}_A:{wconf}:{DEV10_A}:3"),
-        submit_chain("visual", "d10-win-B",
-                     f"d10_{winner}_B:{wconf}:{DEV10_B}:3"),
-        submit_chain("participation", "d10-v3-A",
-                     f"d10_v3_A:{V3_CONF}:{DEV10_A}:3"),
-        submit_chain("visual", "d10-v3-B",
-                     f"d10_v3_B:{V3_CONF}:{DEV10_B}:3"),
-    ]
+    lanes = pick_lanes()
+    specs = [("d10-win-A", f"d10_{winner}_A:{wconf}:{DEV10_A}:3"),
+             ("d10-win-B", f"d10_{winner}_B:{wconf}:{DEV10_B}:3"),
+             ("d10-v3-A", f"d10_v3_A:{V3_CONF}:{DEV10_A}:3"),
+             ("d10-v3-B", f"d10_v3_B:{V3_CONF}:{DEV10_B}:3")]
+    jobs = [submit_chain(lanes[i % len(lanes)], name, var)
+            for i, (name, var) in enumerate(specs)]
     with open(os.path.join(OUT, "dev10_winner.txt"), "w") as f:
         f.write(f"{winner}\n{wconf}\n")
     submit_next_stage("dev10", jobs)
@@ -217,11 +270,11 @@ def stage_dev10():
                      open(os.path.join(B2D, "leaderboard/data/bench2drive220.xml")).read())
     log(f"benchmark: {len(ids)} routes, 1 rep, chunks of 12")
     jobs = []
-    lanes = ["participation", "visual"]
+    lanes = pick_lanes()
     for i in range(0, len(ids), 12):
         chunk = ",".join(ids[i:i + 12])
         tag = f"b220_{i // 12:02d}"
-        jobs.append(submit_chain(lanes[(i // 12) % 2], tag,
+        jobs.append(submit_chain(lanes[(i // 12) % len(lanes)], tag,
                                  f"{tag}:{oconf}:{chunk}:1",
                                  routes_xml="bench2drive220.xml"))
     with open(os.path.join(OUT, "bench220_config.txt"), "w") as f:

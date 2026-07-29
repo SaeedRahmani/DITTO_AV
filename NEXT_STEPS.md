@@ -1,258 +1,114 @@
-# NEXT_STEPS.md — state + plan
+# NEXT_STEPS.md — live status + plan (single source of truth)
 
-## >>> HANDOFF 2026-07-28 late — READ THIS FIRST, it corrects everything below <<<
+Read DELFTBLUE.md for cluster rules (lane audit protocol, storage,
+conventions). PAPER_PLAN.md is the paper-side plan and evidence log.
+This file: where the project stands, the plan, what not to redo.
+History: git log of this file — old session narratives were compressed
+out on 2026-07-29 (C2 cleanup); nothing scientific was lost, the
+verdicts live in runs/ and the settled-facts list below.
 
-1. **Storage saga RESOLVED — root cause was the 1M chunk-file (inode)
-   quota on /scratch, NOT group quotas and NOT an admin freeze.** The
-   "1-byte group quota" theory below and in older notes is WRONG (red
-   herring in beegfs-ctl output). Confirmed by DHPC: limit is fixed;
-   check `bash /etc/profile.d/ZZ_motd-info.sh` (chunk files column) at
-   session start; keep >=100k headroom. Full rules + adopted DHPC
-   node-local-/tmp I/O pattern: DELFTBLUE.md storage section. Writes
-   work now (789k/1M). The dual-clone workflow remains as an emergency
-   pattern only.
-2. **Frame question SETTLED**: anno theta = CARLA yaw + pi/2 (compass);
-   box rotations = true headings. Deployment MUST use yaw_offset pi/2
-   (configs/carla_agent.yaml, default). PROOF: scripts/
-   replay_frame_check.py reproduces training obs exactly (diff ~1e-4);
-   road-test A/Bs are too noisy to rank frame conventions — never
-   revert geometry from road tests. ALL closed-loop scores measured
-   before this fix (v3 12.6, v4 6.7, the 24.2 single run) are void.
-3. **All three clones synced at this commit** (scratch /scratch/$USER/
-   ditto_av/DITTO_AV = primary again; home ~/ditto_work/DITTO_AV =
-   backup; GitHub = truth). Stuck-recovery exists but is OFF (its road
-   A/B regression was real); brake binarization ON; lights code ready.
-4. **Where the work actually is — read the session log below for the
-   live thread.** Already DONE (do not redo): post-fix re-baselines,
-   stochastic sweep (dead), recovery tuning (dead), route-semantics fix
-   (RouteCursor, second deployment bug), KL-anchor sweep — bc_kl_coef
-   0.1 doubles completion (47.7% vs 22.5%), kl01 3x3 confirmation was
-   running at handoff. **Next (in order):** (a) collect kl01
-   confirmation + v5 GPU outputs (job 10527146, ~/ditto_out/) and
-   commit results; (b) anchor/k_modes grid + v3-vs-v5 on the winner;
-   (c) AdditionalMaps via node-local /tmp -> all 10 dev routes x 3
-   reps; (d) 220-route eval decision (user sign-off ~36 GPU-h), data
-   scale-up, paper (PAPER_PLAN.md).
-5. Cleanup approvals PENDING from user (do not touch without OK):
-   test/PufferDrive_hetero (71k files), pufferdrive archives (~400k) —
-   these are the user's other projects.
-6. wandb sync loop is stopped; restart after next training if live
-   dashboards wanted.
+## >>> HANDOFF 2026-07-29 — what is true right now <<<
 
+**The pipeline drives itself on the cluster** (survives SSH/session
+death): eval chains -> decider jobs chained with `--dependency`
+(scripts/pipeline_decider.py) -> dev-10 -> full 220-route benchmark,
+each stage aggregating results, committing to the repo (push manually
+from a login session), appending to `outputs/PIPELINE_STATUS.md`
+(**check that file + `squeue -u $USER` first, every session**), and
+submitting the next stage on lanes chosen by a LIVE free-GPU audit
+(pick_lanes(); never assume yesterday's fastest lane).
 
-Read DELFTBLUE.md first (cluster rules). This file: where the project
-stands, what we learned, and the prioritized plan.
+In flight at handoff:
+- **Anchor/K grid DONE** (runs/carla_smoke/KL_ANCHOR_RESULTS.md):
+  kl01 (bc_kl 0.1, K=8, H=15) wins at **64.6%** completion, clean
+  dose-response peak, K=16 negative transfer, lights non-additive.
+- **Town12-via-overlay proven in the leaderboard** (53% on route 2091).
+- **dev-10 (kl01 vs v3, 10 routes x 3 reps)** auto-launched by the
+  confirm3x3 decider; then the **220-route benchmark auto-fires** on
+  the dev-10 winner (user-authorized). This gen-1 220 run doubles as
+  benchmark-pipeline dress rehearsal AND the small-data ablation row —
+  the FINAL 220 number must come from the scaled gen-2 winner.
+- **Full-data download running** (login nohup, `outputs/
+  b2d_download_full.log`): 703 new clips -> 1000 total (~335 GB).
+  Tarballs only; extraction happens per the node-local /tmp pattern.
+- **Training-length pilots** on gpu-a100-small (serialize, 1-job QOS):
+  kl01 at 5x and 20x steps (`runs/b2d_kl01_{5,20}x` when done) — all
+  runs so far were smoke-scale (wm 6000 steps, ~5 min on MIG).
 
-## 2026-07-28 session: Round-2 code done + CRITICAL bug found
+## Goal (do not lose sight of this)
 
-Scratch write-freeze returned (1-byte group quotas on the pool backing
-/scratch; home writable). Workaround in place: writable clone at
-`~/ditto_work/DITTO_AV` (origin = github), scratch stays readable
-(venv, data, Bench2Drive clone all usable read-only).
+A strong paper for a top ML venue (CoRL/ICRA or NeurIPS/ICLR):
+multimodal latent-matching imitation, fully offline, no simulator in
+the training loop. Two evidence pillars:
+1. Phase-1 controlled study — DONE, paper-grade (PAPER_PLAN.md).
+2. Bench2Drive closed-loop — make the numbers as strong as possible
+   (no compromises), positioned honestly: privileged-input planner
+   trained offline; SOTA target is the fully-offline/no-simulator
+   class, NOT sensor-based UniAD/VAD parity. The methodological
+   findings (anchor dose-response, open-loop != closed-loop x5,
+   K-transfer failure) are first-class contributions.
 
-**CRITICAL FIX — closed-loop obs were rotated 90°.** Bench2Drive's anno
-`theta` is the IMU compass = CARLA yaw + pi/2 (data_collect.py converts
-back with `rad2deg(compass) - 90`; verified exact on 233 frames / 20
-clips, max dev 1e-4 rad). Training obs therefore live in the compass
-frame, but DittoCarlaAgent featurized with the raw yaw — every relative
-feature (neighbors, velocities, headings, route points) was rotated 90°
-vs training in ALL closed-loop rounds so far. Fixed deployment-side
-(`ego_yaw = deg2rad(yaw) + pi/2` in run_step), which keeps every
-trained checkpoint valid. Consequences:
-- All prior closed-loop numbers (v3 12.6±11.3, v4 6.7±3.9; wedging;
-  huge variance) were measured WITH the bug → the v3-vs-v4 ranking and
-  the tuning conclusions must be re-established after the fix.
+## Plan
 
-**Re-baseline VERDICT (2026-07-28, runs/carla_smoke/ diag files).**
-The 3×3 re-baseline with fix+recovery scored LOWER than the buggy
-baseline (1.72 / 17.3% vs 12.6 / 42.8%) — but the A/B on route 25381
-(recovery OFF both arms) shows why, and it vindicates the fix:
-- fix: 16.5% completion, ONE layout collision, penalty 0.65, ends
-  "blocked" behind a scenario obstacle — clean driving, then wedges.
-- old frame (control): 100% completion but NINE layout collisions +
-  1 vehicle, penalty 0.12, score 0.39 — the rotated obs act as a
-  90°-rotated feedback loop that RICOCHETS along the route corridor.
-  Yesterday's 43% completion was this artifact. Training-npz stats
-  independently confirm the compass frame (near point median (0,-.046),
-  neighbor heading sin=-0.999).
-Implications: (1) keep the fix — per-meter driving quality is far
-better; report completion AND penalty, composed score alone is
-misleading here. (2) The completion blocker is the policy wedging
-behind obstacles (lane-change commitment) — a policy/data question
-(try stochastic=true; multimodal capture is our method's whole point).
-(3) First recovery tuning (reverse+mirrored steer, 4 s) made things
-WORSE with the fix (collision cascades, route deviations, zero
-"blocked" endings but 5-8 collisions/run) → retuned conservative:
-straight gentle reverse, 3-strike give-up (StuckRecovery).
+### Running now (automated — just verify, don't relaunch)
+1. dev-10: kl01 vs v3 -> `runs/carla_smoke/dev10_results.json`.
+2. 220-route gen-1 benchmark (auto after dev-10) -> `runs/bench220/`.
+3. 1000-clip download; training-length pilots 5x/20x.
 
-**stochastic=true is a dead lever** (3x3, runs job 10527197):
-3.42 / 8.8% — worse than deterministic (4.5); sampling adds collisions
-without unlocking the obstacle wedge.
+### Gen-2: scale for performance (start when download lands)
+4. Extract new clips via node-local /tmp -> validate (validate_b2d
+   pattern; watch the inode budget, DELFTBLUE storage rules).
+5. Retrain kl01-config on 1000 clips; steps per pilot verdict; if 5x/
+   20x helps, fold in. GPU lanes per live audit (MIG fine for training).
+6. Closed-loop selection at gen-2: 3-route 3x3 smoke for {anchor 0.1
+   +-0.05 re-check, lights on/off at the new scale}; then dev-10 on the
+   winner; **3 seeds** on the final config (paper needs error bars).
+7. Attack the residual wedge if it survives scale (obstacle-blocked is
+   still the terminal state everywhere): recovery-data augmentation or
+   steer-authority pairing — closed-loop-selected, one axis at a time.
+8. FINAL 220-route benchmark on the gen-2 winner (+ the gen-1 row as
+   the data-scale ablation).
 
-**SECOND deployment bug found+fixed: route conditioning semantics**
-(commit 1b2ed7c). The tick log showed deployed near points at median
-rel (+0.24, -0.02), |x| p90 0.48, some BEHIND the ego — training has
-them hovering ~5 m ahead at (0.000, -0.046). plan_to_command_points'
-change-point heuristics over the 50 m-downsampled plan were invented
-semantics. Measured the collector's real ones from 2.6k anno frames:
-near = dense-plan node (1-2 m spacing) popped at ~4 m; far =
-downsampled command node popped at ~7.5 m. RouteCursor now ports this
-exactly. Route conditioning was off-distribution in EVERY closed-loop
-run to date — including everything above; the routefix 3x3
-(job 10527378) is the first honest closed-loop measurement.
+### Paper (start in parallel, now)
+9. Method + Phase-1 sections are fully evidenced — draft them.
+   Closed-loop section: honest privileged-offline framing; the
+   dose-response figure; open!=closed as a finding. Theory sketch in
+   PAPER_PLAN. The paper/ dir holds the original DITTO paper (TMLR) as
+   reference only — our draft is greenfield.
 
-**BC anchor = the freeze (closed-loop KL sweep, 3x1 each).**
-With the honest stack, bc_kl_coef 0.1 (default 0.3) breaks the obstacle
-wedge no deployment lever touched: 54% completion on 25381 (v3: never
-past ~10%, 5 runs), mean completion 47.7% vs 22.5% baseline; kl003
-intermediate (26.4%). Cost: freed steering is sloppy (7 layout
-collisions on 25381) — commitment-vs-precision tradeoff. Open-loop
-NLL/MAE ordering (v3 < kl01 < kl003) ANTI-predicts closed-loop
-completion — second clean instance of the open-loop != closed-loop
-finding. Deployment levers all measured dead: stochastic (worse),
-aggressive recovery (collision cascades), conservative recovery
-(score-neutral, completion down; deterministic re-approach re-wedges).
-kl01 3x3 confirmation running (job 10527512-ish); next: anchor/k_modes
-grid + precision recovery (maybe pair with lower steer authority), and
-v3-vs-v5 on the winner.
+## Settled facts — do NOT redo or re-litigate
+- **Frame**: anno theta = CARLA yaw + pi/2 (compass). Deployment MUST
+  use yaw_offset pi/2. Proven by offline replay (scripts/
+  replay_frame_check.py, diff ~1e-4). Road A/Bs can NEVER rank frame
+  conventions. All pre-fix closed-loop numbers are void.
+- **Route conditioning**: RouteCursor ports the collector's exact
+  near/far semantics (dense-plan pop ~4 m / command-node pop ~7.5 m).
+- **Deployment levers are dead**: stochastic sampling, action gains,
+  aggressive AND conservative stuck-recovery all measured worse or
+  neutral. Progress comes from training-side changes only.
+- **Anchor**: bc_kl 0.1 is the peak (64.6% vs 22.5% baseline). K=16
+  hurts closed-loop despite Phase-1 (39.4%). v5 lights + weak anchor
+  re-freezes (27.5%) — interactions are non-additive; select closed-loop.
+- **Open-loop != closed-loop, 5 instances** — never select a model on
+  open-loop metrics; 3-route 3x3 smoke is the cheapest honest signal;
+  >=3 reps always (run variance is huge).
+- **Brake binarized** at deployment (Gaussian mean rides the brake).
+- **AdditionalMaps**: apptainer dir-overlay (maps_overlay/), conditional
+  in the CarlaUE4.sh shim (mirror: scripts/patches/CarlaUE4_shim.sh);
+  rebuild via scripts/slurm/extract_maps.sbatch. Bind CANNOT merge into
+  existing SIF dirs.
+- **npz cache** keys on clip split + obs layout — extend the key if the
+  obs change again.
+- Bench2Drive harness quirks (patched clone on scratch; archive in
+  scripts/patches/): py3.10 getchildren fix; '+save_name' appended to
+  agent-config (agent strips it); cwd must be Bench2Drive/;
+  routes-subset takes route IDs.
 
-**Frame question CLOSED by the offline replay test**
-(scripts/replay_frame_check.py): rebuilding featurize_frame inputs from
-recorded clips' boxes and diffing against load_clip obs gives, over 460
-frames / 3 towns: yaw_offset pi/2 -> max abs diff 1e-4 (EXACT);
-yaw_offset 0 -> mean 0.24, max sqrt(2) (a 90-deg rotation). The
-raw-yaw composed-score "win" (12.6 vs 4.5) is the ricochet artifact,
-not perception quality — unusable for any paper claim. Deployment
-default restored to pi/2; completion has to come from the policy.
-Next lever queued: stochastic=true 3x3 (breaks the deterministic
-wedge-freeze; plan item 4).
-
-**Round-2 code (41 tests green):**
-1. Traffic-light obs block: offline `_light_block` (presence + ego-frame
-   trigger volume + red/yellow/green one-hot, 6 dims after the route
-   block; `env.light_obs`, extra_obs_dims 22, `configs/b2d_v5.yaml`).
-   Online: exact port of data_collect's most_affect_light (dense-plan
-   override of set_global_plan — the leaderboard downsamples to ~50 m,
-   too sparse for the ~4x2 m trigger boxes; waypoint walk cached per
-   light). Verified on real clips: expert brake-rate 46% on red frames
-   vs 5% on green.
-2. StuckRecovery (config-gated, enabled in configs/carla_agent.yaml):
-   >40 model ticks under 0.3 m/s at commanded throttle → 15 ticks
-   reverse with mirrored steer; braking at red never counts as stuck.
-   Logged per tick (`rec` field; also `light`).
-3. npz cache: key extended for lights; cache writes best-effort
-   (survive scratch freezes).
-
-v5 training SUBMITTED freeze-safe (job 10527119,
-scripts/slurm/phase2_home.sbatch -> ~/ditto_out/b2d_v5; commit results
-to runs/b2d_v5 once done). Still blocked by the freeze: closed-loop
-re-eval of v3 post-fix, v3-vs-v5 comparison. When the freeze lifts:
-`git -C /scratch/$USER/ditto_av/DITTO_AV pull` FIRST (the scratch clone
-predates the theta fix — closed-loop jobs run from it), re-extract
-AdditionalMaps, re-baseline v3 (plan item 0), restart wandb sync.
-Stop signs deliberately NOT in the obs (6-dim light block per spec; the
-anno has `traffic_sign`/`traffic.stop` with affects_ego if wanted
-later).
-
-Everything below is the pre-session state (through `1634abf`) with the
-plan; read it with the bug fix in mind.
-
-## Where we stand
-
-**Phase 1 (highway-env) — DONE, paper-grade.** 24 sweep runs in
-`runs/phase1/`. Headline (K=16,H=5, 3 seeds): DITTO-multi 20.1±0.9 return
-/ 0.10±0.06 collisions ID; 18.3±1.5 / 0.21±0.11 shifted — near-expert,
-large gap over single/BC. Evidence trio against reviewer objections:
-paired same-seed rollouts (57% diverge), trajectory-consistent multi_traj
-(== multi), unimodal control (gap vanishes). All in PAPER_PLAN.md.
-
-**Phase 2 (Bench2Drive offline) — DONE.** 297 clips (94 GB) validated;
-route-conditioned obs (49+16 dims); v3 = K8/H15 (best driver), v4 =
-K16/H5. Open-loop results `runs/b2d_v*`. Key: open-loop metrics did NOT
-predict closed-loop ranking.
-
-**Closed-loop CARLA — WORKING, needs driving-quality work.**
-Full pipeline proven (apptainer CARLA 0.9.15 + Bench2Drive leaderboard +
-DittoCarlaAgent). Tuning round (3 base-town routes × 3 reps,
-`runs/carla_smoke/`): v3 12.6±11.3 score / 43%±34 completion; v4 6.7±3.9
-/ 17%±11 → **v3 stays deployed** (configs/carla_agent.yaml). Run-to-run
-variance is huge → any claim needs ≥3 reps. Universal failure: agent
-wedges against obstacles/walls and never recovers. Second gap: no
-traffic-light/stop-sign in obs (privileged planner framing in
-PAPER_PLAN applies).
-
-## Hard-won infrastructure facts (do not rediscover)
-
-- GPU nodes have NO python modules and don't mount the venv's spack tree
-  → only self-contained conda envs run there: `carla_eval` (torch is
-  CPU-only — eval driving) and `~/envs/ditto_gpu` (torch cu130 — GPU
-  training; A100 partitions only, cu130 dropped V100/sm_70). CPU jobs
-  keep the ditto venv. See the env table in DELFTBLUE.md.
-- GPU access — see the **lane truth table in DELFTBLUE.md** (verified by
-  real submissions 2026-07-29; supersedes all older notes here):
-  * `research-ceg-tp` on gpu-a100/gpu-v100: fine until saturated —
-    2026-07-29 even 59-min jobs pended >14 h (other users' jobs are
-    HIDDEN by PrivateData; judge via node AllocTRES, never via squeue).
-  * Fast verified lanes: `participation` (H100, --gpus-per-task=1) and
-    `visual` (Quadro, NO gpu flag) — instant start, 4 h cap, CARLA
-    boots on both. gpu-a100-small (MIG): training only, no graphics.
-  * `innovation` CANNOT get full GPUs (AssocMaxGRESPerJob) — the old
-    "valid fallback" claim was wrong. `-nullrhi` CPU CARLA: dead end.
-  * `--gpus-per-task=N` is the required syntax (`--gres` is rejected).
-  * Escalation rule: pending >30 min → probe lanes, move the work.
-- CARLA: SIF at /scratch/$USER/ditto_av/carla_0915.sif; evaluator
-  launches the server itself via $CARLA_ROOT shim (carla_root/). Town11-15
-  need AdditionalMaps (tarball on scratch; extraction to
-  additional_maps_extract/ — verify complete, was re-launched 2026-07-27;
-  then bind dirs into the shim's apptainer call with --bind).
-- Bench2Drive harness quirks (patched clone on scratch; patch archived in
-  scripts/patches/): py3.10 getchildren fix; evaluator appends
-  '+save_name' to agent-config (agent strips it); cwd must be
-  Bench2Drive/ (relative weather.xml); routes-subset takes route IDs.
-- Brake must be binarized at deployment (Gaussian mean rides the brake);
-  done in carla_agent (brake_threshold).
-- run_b2d data stage uses an npz cache (npz_cache/) — key = clip split +
-  route flag; extend the key if obs layout changes again.
-- Scratch write-freezes (1-byte group quotas; hit 2026-07-27 AND
-  2026-07-28) are admin-side incidents. Full workflow for working
-  through them: DELFTBLUE.md "Scratch write-freezes: the dual-clone
-  workflow". Diagnose: `beegfs-ctl --getquota --gid <each group>`.
-
-## Plan (in order)
-
-### Round 2: driving quality (code DONE 2026-07-28; runs remain)
-0. **Re-baseline v3 with the theta fix** (do FIRST when jobs can run):
-   3 base-town routes × 3 reps, ROUTES_SUBSET=25381,25378,27494,
-   carla_smoke.sbatch. Prior numbers are invalid (90° obs rotation).
-1. **Traffic-light/stop observation**: anno `bounding_boxes` contain
-   traffic_light/stop entries (check `state` field names on a real
-   frame). Append compact block (nearest relevant light: presence, rel
-   x/y, red/yellow/green one-hot ≈ 6 dims → extra_obs_dims 22). Extend
-   `_route_block`-style code + featurize_frame + tests (mirror the route
-   block pattern exactly, keep off by default). New cache key follows
-   automatically. Retrain v5 (= v3 config + lights); phase2.sbatch.
-2. **Stuck recovery** in DittoCarlaAgent: if speed < 0.3 m/s for > 40
-   model ticks while commanding throttle → brief reverse+steer sequence,
-   then resume. Deployment-side, config-gated, log events.
-3. **Evaluate properly**: v3 vs v5 on all 10 dev routes × 3 reps (needs
-   AdditionalMaps bound into shim). ~6-8 GPU-h total on gpu-v100 (single 48 h-capable job is fine; split into
-   59-min chunks only if the queue is congested). Keep results in runs/.
-4. Optional cheap wins to test in the same eval: stochastic=true;
-   action_repeat=1; brake_threshold sweep {0.3,0.5,0.7}.
-
-### Round 3: scale + benchmark (needs user sign-off on budget)
-5. Full Bench2Drive base split (703 more clips, ~240 GB, login-node
-   nohup) + retrain on ~1000 clips (GPU training now worthwhile —
-   wm.device cuda path untested; verify).
-6. **Full official 220-route eval** ×(≥1 rep): ~36+ GPU-h — get explicit
-   user OK (DELFTBLUE rule). Position vs privileged baselines only.
-
-### Round 4: paper
-7. Write: method + Phase-1 evidence are complete; closed-loop section
-   honest framing (privileged planner; open-loop ≠ closed-loop finding
-   is a contribution). Theory sketch in PAPER_PLAN. Venue: CoRL/ICRA.
-
-## Live loose ends (check on session start)
-- AdditionalMaps extraction complete? (`ls additional_maps_extract/CarlaUE4/Content/Carla/Maps` then wire --bind into carla_root/CarlaUE4.sh shim and test route 2091/Town12.)
-- wandb sync loop running? (restart via scripts/wandb_sync.sh nohup.)
-- W&B project `ditto-av` has all training curves.
+## Session-start checklist
+1. `cat /scratch/$USER/ditto_av/outputs/PIPELINE_STATUS.md`
+2. `squeue -u $USER`; DELFTBLUE motd inode check.
+3. `git -C /scratch/$USER/ditto_av/DITTO_AV status` — push anything the
+   deciders committed; pull the home clone if training will run there.
+4. Download log tail; pilot results in ~/ditto_out/b2d_kl01_{5,20}x.
+5. wandb sync loop: restart after login-node reboots if dashboards
+   wanted (scripts/wandb_sync.sh).

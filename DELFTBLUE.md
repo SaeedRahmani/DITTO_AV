@@ -164,18 +164,26 @@ plus the probe-verified extra lanes below (2026-07-29). Walltime caps:
 Templates live in `scripts/slurm/`. The user's SLURM accounts (verified
 2026-07-26): `research-ceg-tp` (used in the templates) and `innovation`.
 
-**GPU lane truth table (ALL verified by real submissions 2026-07-29 —
-trust nothing else; re-probe with tiny --wrap jobs when in doubt):**
+**GPU lane findings — SNAPSHOT of 2026-07-29, will drift.** Which lane
+is fastest changes day to day; NEVER treat a row below as current
+truth — the durable part is the *audit protocol* after the table and
+the capability facts (which partitions exist, how to request a GPU
+there, which GPUs can render). Occupancy/queue claims must be
+re-measured every time:
 
-| lane | GPU | verdict |
+| lane | GPU | 2026-07-29 finding |
 |---|---|---|
-| gpu-a100 / gpu-v100 (ceg-tp) | A100 / V100 | works, but can saturate for >14 h with *hidden* long jobs (`PrivateData` hides other users in squeue — check node `AllocTRES`, not the queue) |
-| `participation` (ceg-tp) | H100 NVL | **instant start**, CARLA_BOOT_OK (Town03+Town12), 4 h cap, `--gpus-per-task=1` |
-| `visual` (ceg-tp) | Quadro RTX 4000 | **instant start**, CARLA_BOOT_OK, 4 h cap, GPU is unmanaged — NO `--gpus-per-task` flag |
-| gpu-a100-small (BOTH accounts) | A100 MIG 1g.10gb | instant start; CUDA training only — MIG has NO graphics, CARLA cannot boot |
-| innovation → any full-GPU partition | — | **REJECTED** (`AssocMaxGRESPerJob`, even 1 GPU); the old "valid fallback" note here was wrong — verified only on paper, never by submission |
-| CPU + `-nullrhi` shim knob | none | CARLA server never binds the RPC port — dead end, do not retry |
-| as-rst-*, participants, participation-gpu | H100 | submission rejected: "Invalid account/partition combination" |
+| gpu-a100 / gpu-v100 (ceg-tp) | A100 / V100 | CARLA-capable (proven earlier); that day: saturated >14 h by *hidden* long jobs (`PrivateData` hides other users in squeue — check node `Gres/GresUsed` or `AllocTRES`, not the queue) |
+| `participation` (ceg-tp) | H100 NVL | CARLA_BOOT_OK (Town03+Town12), 4 h cap, `--gpus-per-task=1`; that day: instant |
+| `visual` (ceg-tp) | Quadro RTX 4000 | CARLA_BOOT_OK, 4 h cap, GPU unmanaged — NO `--gpus-per-task` flag; that day: instant |
+| gpu-a100-small (BOTH accounts) | A100 MIG 1g.10gb | CUDA training only — MIG has NO graphics, CARLA cannot boot; QOS caps at **1 job/user** so training jobs serialize (capability facts, durable) |
+| innovation → any full-GPU partition | — | REJECTED that day (`AssocMaxGRESPerJob`, even 1 GPU) — re-probe periodically; if it persists the user should raise it with DHPC |
+| CPU + `-nullrhi` shim knob | none | CARLA server never binds the RPC port — dead end (durable) |
+| as-rst-*, participants, participation-gpu | H100 | rejected: "Invalid account/partition combination" — re-probe occasionally, access lists change |
+
+`scripts/pipeline_decider.py::pick_lanes()` implements the live audit
+(free-GPU count per partition via `sinfo -O Gres,GresUsed`;
+`outputs/fast_lanes.txt` overrides). Reuse it rather than re-deriving.
 
 **MANDATORY pre-run GPU audit (user instruction 2026-07-29 — do this
 EVERY time a run is needed, no exceptions):**
@@ -239,37 +247,16 @@ envs are the only kind that run on GPU nodes.
 Submit with `sbatch scripts/slurm/<file>`; monitor with `squeue -u $USER`;
 logs land in `/scratch/$USER/ditto_av/outputs/slurm-%j.out`.
 
-## Status (updated 2026-07-26, evening)
+## Status
 
-On 2026-07-26 the user authorized full autonomous execution ("do all …
-without pause"): Phase-1 paper sweep + issue fixes + Phase 2. Superseded
-the earlier per-batch download gate for this work stream.
-
-1. **Verify state** — DONE (pytest green, smoke passes on cluster).
-2. **Data**: 60-clip batch validated (see above). Manifest extended to
-   **297 stratified clips (~94 GB)**; extended download running via
-   login-node nohup (`outputs/b2d_download2.log`), with a detached chain
-   (`outputs/b2d_chain.log`) that auto-submits `validate_b2d.sbatch` and
-   then Phase-2 v2 when it finishes.
-3. **Phase-1 sweep** — DONE 2026-07-26 (21 runs, all committed to
-   `runs/phase1/`): 3-seed main + K/negatives/horizon/data/style ablations
-   + 3-seed validation of the improved config (K=16, H=5: DITTO-multi
-   near-expert, 0.10 collisions ID / 0.21 shifted) + 3-seed
-   trajectory-consistent `multi_traj` ablation (== multi; rules out
-   per-step reward relaxation). Headline tables in PAPER_PLAN.md.
-4. **Phase-2 (Bench2Drive)** — offline pipeline DONE and run twice:
-   v1 (60 clips, job 10521595) and v2 (297 clips, job 10521834; results in
-   `runs/b2d_v2/`, WM H-step MSE 0.093, policies at the expert-replay
-   latent ceiling). Open-loop only — NOT driving evidence (see PAPER_PLAN
-   framing). Closed-loop prerequisites: route/command conditioning +
-   CARLA agent adapter + CARLA 0.9.15 setup (module list / apptainer) —
-   all still TODO. Observation is privileged (GT boxes): position results
-   accordingly.
-5. **W&B monitoring** (added 2026-07-26): jobs log offline
-   (`WANDB_MODE=offline`, set in templates); keep
-   `scripts/wandb_sync.sh` running via nohup on a login node to stream to
-   wandb.ai project `ditto-av` (~2 min lag). Restart it after login-node
-   reboots.
+This file carries only durable cluster knowledge. **Live project
+status, the current plan, and do-not-redo lists live in NEXT_STEPS.md**
+(single source of truth); running-pipeline state is in
+`outputs/PIPELINE_STATUS.md`. Standing authorizations: full autonomous
+execution (2026-07-26) and compute-without-approval (2026-07-28) — see
+Conventions below. W&B: jobs log offline (`WANDB_MODE=offline` in
+templates); `scripts/wandb_sync.sh` via login-node nohup streams to
+wandb.ai project `ditto-av`; restart it after login-node reboots.
 
 ## Conventions for the AI working on DelftBlue
 

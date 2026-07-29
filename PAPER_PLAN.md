@@ -125,6 +125,46 @@ mode-averaging).
   retrieval on h vs full features; expert style ratio (25/75, 50/50);
   data scale (75/150/300 episodes); seed x3.
 
+### Phase-2 closed-loop findings (2026-07-28/29 — paper material)
+
+All at 3 base-town dev routes x 3 reps, honest deployment stack
+(compass-frame fix + RouteCursor route semantics; both prior deployment
+bugs and their void numbers documented in NEXT_STEPS/git history).
+Full table: runs/carla_smoke/KL_ANCHOR_RESULTS.md.
+
+- **BC-anchor dose-response** (bc_kl_coef, K=8/H=15 fixed): completion
+  26.4% (0.03) -> **64.6% (0.1)** -> 54.2% (0.15) -> 46.9% (0.2) ->
+  22.5% (0.3 baseline). Clean single peak; relaxing the trust region to
+  the BC policy is what unlocks obstacle-bypass commitment. Completion
+  triples with penalty cost 0.39 -> 0.11 (commitment-vs-precision
+  tradeoff) — report completion AND penalty, composed score alone
+  misleads at short-route scale.
+- **Phase-1 K=16 does NOT transfer**: K=16 at the winning anchor drops
+  to 39.4% (vs 64.6% at K=8). Retrieval breadth is environment-specific.
+- **Traffic-light obs x anchor is non-additive**: lights+0.3 doubled
+  completion over v3, but lights+0.1 re-freezes (27.5%, cleanest
+  driving penalty 0.40). Component interactions must be selected
+  closed-loop, per config.
+- **Open-loop != closed-loop, five independent instances** (v3/v4
+  ranking, KL sweep NLL ordering anti-predicts, flat MAE across 3x
+  completion spread, K16, lights): a core paper claim — offline
+  policy-selection metrics cannot rank closed-loop drivers.
+- Residual universal failure: "agent blocked" (obstacle wedge) — the
+  target of the gen-2 scale-up.
+
+### SOTA positioning (honest, decided 2026-07-29)
+
+The user's goal is maximum achievable performance for a top-venue
+paper. The claim class is **fully-offline (no simulator in the
+training loop), privileged-input planning** on Bench2Drive: compare to
+privileged baselines (AD-MLP-style state input; Think2Drive as the
+online-RL upper reference), NOT sensor-based UniAD/VAD without the
+explicit caveat. Performance program (no compromises): 1000-clip data
+scale, training-length scaling (all runs so far were smoke-scale:
+wm 6000 steps), closed-loop-selected hyperparameters, >=3 seeds on the
+final config, wedge-directed fixes; 220-route benchmark run twice —
+gen-1 (small-data, dress rehearsal + ablation row) and gen-2 final.
+
 ### Phase 2 — Bench2Drive (paper benchmark)
 
 - Data: Bench2Drive base split (1000 clips, Apache-2.0, HF). Adapter
