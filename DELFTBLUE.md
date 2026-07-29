@@ -177,9 +177,39 @@ trust nothing else; re-probe with tiny --wrap jobs when in doubt):**
 | CPU + `-nullrhi` shim knob | none | CARLA server never binds the RPC port — dead end, do not retry |
 | as-rst-*, participants, participation-gpu | H100 | submission rejected: "Invalid account/partition combination" |
 
-Escalation rule: if a job pends >30 min, probe alternative lanes with a
-5-min `--wrap="hostname; nvidia-smi -L"` job and MOVE — never let work
-sit overnight in a queue while any lane is idle.
+**MANDATORY pre-run GPU audit (user instruction 2026-07-29 — do this
+EVERY time a run is needed, no exceptions):**
+
+1. Before submitting ANY job, audit ALL lanes across BOTH accounts
+   (`research-ceg-tp` AND `innovation`): `sinfo -a` for partition/node
+   states, `scontrol show node` AllocTRES on candidate GPU nodes
+   (squeue LIES — PrivateData hides other users' jobs), and when in
+   doubt fire 5-min `--wrap="hostname; nvidia-smi -L"` probes at every
+   plausible lane x account combo. Probes cost nothing; assumptions
+   cost nights.
+2. Pick the FASTEST-STARTING lane whose hardware fits the run's need
+   (CARLA eval needs a graphics-capable GPU: A100/V100/H100/Quadro all
+   verified; training needs CUDA: MIG slices fine; never downgrade the
+   experiment itself to fit a lane — no smaller models, fewer reps, or
+   CPU fallbacks to dodge a queue).
+3. **Any wait measured in hours means WE made a mistake** — the user is
+   certain a GPU is reachable within a very short time on one of the
+   two accounts. If a job pends >30 min: stop, re-audit everything,
+   move the work. Never let jobs sit overnight in a queue.
+4. Re-verify this table each session (limits/permissions change; the
+   innovation full-GPU rejection deserves a periodic re-probe, and if
+   it persists ask the user to raise it with DHPC).
+
+**Disconnect-resilient orchestration (learned 2026-07-29 the hard
+way):** anything watching or sequencing jobs from inside an interactive
+AI session DIES when the user's SSH drops — the user then sees "no
+checks happened". Multi-stage pipelines MUST be self-driving on the
+cluster: chain stages with `sbatch --dependency=afterany:...` decider
+jobs (scripts/pipeline_decider.py + scripts/slurm/decider.sbatch) that
+aggregate results, append to `outputs/PIPELINE_STATUS.md` (the
+user-readable truth — check it at every session start), commit results
+into the repo, and submit the next stage. In-session monitors are a
+convenience layer ONLY, never the mechanism of record.
 
 Python environments — which one where (important):
 

@@ -17,6 +17,8 @@
 # does not boot). No gpu directive here so the visual lane works;
 # pass --gpus-per-task=1 for GRES-managed partitions.
 # VARIANTS: "<tag>:<agent_conf>:<routes>:<reps>" space-separated.
+# ROUTES_XML: routes file under leaderboard/data (default dev10; use
+#             bench2drive220.xml for the full benchmark).
 # Default: the four 3x3 plateau/grid confirmations + Town12 overlay
 # smoke. Results: outputs/carla_results_<tag>.json (same names the
 # research-ceg-tp twins would write — cancel one lane when the other
@@ -55,7 +57,7 @@ for spec in $VARIANTS; do
     rm -f $DITTO_AGENT_LOG $RESULTS
     # one variant failing must not kill the chain
     $VENVPY $B2D/leaderboard/leaderboard/leaderboard_evaluator.py \
-        --routes=$B2D/leaderboard/data/drivetransformer_bench2drive_dev10.xml \
+        --routes=$B2D/leaderboard/data/${ROUTES_XML:-drivetransformer_bench2drive_dev10.xml} \
         --routes-subset=$ROUTES \
         --repetitions=$REPS \
         --track=MAP \
