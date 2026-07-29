@@ -1,0 +1,7 @@
+# 3x3 of the 5x-training-length pilot (kl01 anchor): first lever to
+# move open-loop MAE (.197 vs .213) — closed-loop is the real test.
+run_config: /home/srahmani/ditto_out/b2d_kl01_5x_cpu.yaml
+policy: ditto_multi
+stochastic: false
+action_repeat: 2
+stuck_recovery: false
