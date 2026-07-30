@@ -18,8 +18,12 @@
 #         lights off — matches the kl01/gen-2 configs)
 
 set -euo pipefail
-module load 2024r1 python/3.10.12
-source /scratch/$USER/ditto_av/envs/ditto/bin/activate
+# self-contained conda env: works on ANY node. The ditto venv is NOT
+# usable on compute-p2 (job 10545405: module tree absent, python fell
+# through to system python without yaml — same failure mode as GPU
+# nodes; venv is safe only on login + compute-p1).
+PY=/scratch/$USER/ditto_av/envs/carla_eval/bin/python
+$PY -c "import yaml, numpy, torch" || { echo "carla_eval env broken"; exit 1; }
 export OMP_NUM_THREADS=1
 export PYTHONUNBUFFERED=1
 
@@ -43,14 +47,14 @@ tr -d '\r' < $MANIFEST | sed '/^$/d' | \
 echo "extracted: $(ls $TMP/extracted | wc -l) clip dirs"
 
 # temp config: only the data stage runs; run_dir is throwaway on /tmp
-python - <<EOF
+$PY - <<EOF
 import yaml
 cfg = yaml.safe_load(open("$REPO/configs/b2d_v3kl01.yaml"))
 cfg["run_dir"] = "/tmp/$SLURM_JOB_ID/datastage"
 yaml.safe_dump(cfg, open("/tmp/$SLURM_JOB_ID/data_cfg.yaml", "w"), sort_keys=False)
 EOF
 cd $REPO
-python scripts/run_b2d.py --config /tmp/$SLURM_JOB_ID/data_cfg.yaml \
+$PY scripts/run_b2d.py --config /tmp/$SLURM_JOB_ID/data_cfg.yaml \
     --stage data --manifest $MANIFEST --extracted $TMP/extracted
 
 # only the packed cache goes to scratch (2 files per key)
