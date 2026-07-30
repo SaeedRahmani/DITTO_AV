@@ -132,8 +132,20 @@ offline, no simulator in the training loop:**
 
 | model | driving score | completion | success rate |
 |---|---|---|---|
-| gen-1 kl01 (297 clips, 1x steps) | 11.47 | 53.5% | 18.2% |
-| **gen-2 final (1000 clips, 10x steps)** | **21.49** | **58.9%** | **23.6%** |
+| gen-1 kl01 (297 clips, 1x steps, multi) | 11.47 | 53.5% | 18.2% |
+| gen-2 (1000 clips, 10x steps, DITTO-multi) | **21.49** | 58.9% | 23.6% |
+| **gen-2 (same, latent-BC policy)** | 20.56 | **69.1%** | **34.1%** |
+
+**34.1% success rate exceeds every published Bench2Drive baseline we
+know of** (DriveAdapter 33.1, ThinkTwice 31.2, TCP-traj 30.0 — VERIFY
+these leaderboard numbers against the current Bench2Drive paper before
+submission), with the privileged-input + offline caveats stated. DS
+remains behind sensor SOTA (~60): the gap is penalty (0.31 — min-speed
++ collisions), the exact target of the gen-3 waypoint+PID phase.
+Policy triage (Phase-0a, 3 seeds + dev-10): latent-BC beats
+DITTO-multi closed-loop at gen-2 scale on completion/SR while multi
+holds a small DS edge on the 220 — report both rows; the
+when-does-imagination-matching-help analysis is a core contribution.
 
 Against published Bench2Drive numbers: driving score 21.49 EXCEEDS
 AD-MLP (18.05), the comparable privileged state-input baseline, and
