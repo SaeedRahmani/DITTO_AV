@@ -55,24 +55,73 @@ the training loop. Two evidence pillars:
 2. 220-route gen-1 benchmark (auto after dev-10) -> `runs/bench220/`.
 3. 1000-clip download; training-length pilots 5x/20x.
 
-### Gen-2: scale for performance (start when download lands)
-4. Extract new clips via node-local /tmp ONLY — measured 2026-07-29:
-   826k/1M inodes used; a persistent scratch extraction of 703 clips
-   (~140k files) would breach the >=100k-headroom rule. Required shape:
-   job copies tarballs to /tmp/$SLURM_JOB_ID, extracts anno there,
-   validates, builds the packed npz cache to scratch, rm -rf /tmp dir
-   (trap EXIT). validate_b2d.sbatch as-is extracts to scratch — do NOT
-   run it unmodified on the new clips.
-5. Retrain kl01-config on 1000 clips; steps per pilot verdict; if 5x/
-   20x helps, fold in. GPU lanes per live audit (MIG fine for training).
-6. Closed-loop selection at gen-2: 3-route 3x3 smoke for {anchor 0.1
-   +-0.05 re-check, lights on/off at the new scale}; then dev-10 on the
-   winner; **3 seeds** on the final config (paper needs error bars).
-7. Attack the residual wedge if it survives scale (obstacle-blocked is
-   still the terminal state everywhere): recovery-data augmentation or
-   steer-authority pairing — closed-loop-selected, one axis at a time.
-8. FINAL 220-route benchmark on the gen-2 winner (+ the gen-1 row as
-   the data-scale ablation).
+### GEN-3: the SOTA program (adopted 2026-07-30; supersedes gen-2 plan — gen-2 is DONE, DS 21.49)
+
+Target: driving score 40+ (solid), 60+ (= published SOTA class:
+TCP-traj 59.9, ThinkTwice 62.4, DriveAdapter 64.2 — all imitate the
+same Think2Drive expert, through cameras; we use privileged state, so
+frame claims honestly). Ceiling argument: the expert scores ~90%
+success; our gap is imitation quality, not a ceiling.
+
+**Phase 0 — correctness & triage review (gates everything; IN PROGRESS)**
+- 0a Policy-objective triage: BC beat multi closed-loop at gen-2 scale
+  (22.12/65.8% vs 16.80/48.1% smoke)! Confirm: BC on seeds s1/s2 +
+  BC dev-10 vs multi dev-10. If BC holds, the deployed policy AND the
+  anchor story need rethink (paper finding either way: when does
+  imagination matching help? Phase-1 says multimodal data; B2D may be
+  effectively unimodal per-state — measure with the multimodality
+  probe from Phase 1 on B2D latents).
+- 0b Speed audit: 2309 min-speed infractions on the 220 — is the
+  expert also slow (data property) or is it policy shrinkage? Compare
+  expert clip speed profiles vs agent tick logs on same route types.
+- 0c Waypoint-target harness BEFORE training on them: extend
+  replay_frame_check-style exact test to future-pose extraction
+  (frame convention pi/2 again — never trust, always replay-test).
+- 0d Control-ceiling test: PID-tracking GROUND-TRUTH future waypoints
+  (privileged oracle) on the 3 smoke routes + dev-10. This bounds the
+  waypoint abstraction: expect near-expert scores; go/no-go for
+  Phase 1. Also calibrates the PID gains offline of any learning.
+- 0e Protocol audit: published baselines run the SENSORS track; we run
+  MAP (privileged). Document precisely; never claim parity without
+  the caveat. Verify weather/scenario settings match the official
+  eval (leaderboard defaults).
+- 0f Standing regressions: pytest + replay_frame_check after ANY
+  featurizer/controller change; 3-route 3x3 as canary; >=3 reps
+  always; multi-session claims via PIPELINE_STATUS.
+
+**Phase 1 — waypoint action abstraction + PID tracker (the big lever)**
+[entry: 0d passes]
+Redefine action = future ego-frame waypoints (from anno ego poses; the
+data already contains them). WM learns dynamics under that abstraction;
+BC/DITTO objectives unchanged (they live in latent space). Deployment:
+PID tracks predicted waypoints (port a Bench2Drive team-code PID);
+creep-when-blocked in the controller (standard practice, config-gated).
+Directly attacks all three top failure modes: min-speed (2309 events),
+collisions (~356), wedge (136 blocked routes). This is the TCP-traj
+lesson (+~10 DS from output parameterization alone in their ablations).
+
+**Phase 2 — in-model on-policy divergence as the model selector**
+From the original DITTO paper: on-policy latent divergence in the WM
+predicts true return where action-MAE does not. Validate on our ~12
+configs with known closed-loop numbers; if it ranks them correctly,
+use it to search hyperparameters 10x cheaper (then confirm top-k with
+3x3s). Paper-positive either way (extends the open!=closed story).
+
+**Phase 3 — scale (entry: Phases 1-2 stable)**
+Capacity sweep on H100 (nets are tiny; trainings are 39 min);
+ability-weighted sampling (upweight the scenario families of the 136
+blocked routes); lights re-integration; anchor/objective re-tune at
+final scale — all selected via Phase-2 metric + 3x3 confirmation.
+
+**Phase 4 — wedge-directed (if blocked-rate still dominates)**
+Controller creep tuning; retrieval-conditioned commitment;
+imagination-DAgger (perturbed-start WM rollouts relabeled via
+retrieval) — one axis at a time, closed-loop selected.
+
+**Phase 5 — final protocol (no cherry-picking)**
+3 seeds of the final config; dev-10 select; ONE honest 220 run
+(+2 more reps if budget allows for variance); per-ability error
+analysis; full comparison table with track caveats.
 
 ### Paper (start in parallel, now)
 9. Method + Phase-1 sections are fully evidenced — draft them.
