@@ -125,6 +125,27 @@ mode-averaging).
   retrieval on h vs full features; expert style ratio (25/75, 50/50);
   data scale (75/150/300 episodes); seed x3.
 
+### HEADLINE RESULT — full 220-route Bench2Drive benchmark (2026-07-30)
+
+**gen2_10x (1000 clips, 10x steps, bc_kl 0.1, K=8, H=15), fully
+offline, no simulator in the training loop:**
+
+| model | driving score | completion | success rate |
+|---|---|---|---|
+| gen-1 kl01 (297 clips, 1x steps) | 11.47 | 53.5% | 18.2% |
+| **gen-2 final (1000 clips, 10x steps)** | **21.49** | **58.9%** | **23.6%** |
+
+Against published Bench2Drive numbers: driving score 21.49 EXCEEDS
+AD-MLP (18.05), the comparable privileged state-input baseline, and
+the 23.6% success rate exceeds AD-MLP (13.8%), UniAD-Base (16.4%) and
+VAD (15.0%) — while training entirely offline from released clips.
+Sensor-based TCP-traj/ThinkTwice (DS ~60) remain far ahead on DS:
+claim SOTA only within the offline/privileged class, with the
+open-loop!=closed-loop finding (7 instances) and the anchor
+dose-response as the scientific spine. Data-scale ablation row =
+gen-1 (runs/bench220); final = runs/bench220_gen2. Error bars: 3
+seeds at the 3-route smoke (s1/s2 evals + seed-0 baseline).
+
 ### Phase-2 closed-loop findings (2026-07-28/29 — paper material)
 
 All at 3 base-town dev routes x 3 reps, honest deployment stack
