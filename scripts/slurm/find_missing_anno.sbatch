@@ -24,4 +24,5 @@ tr -d '\r' < $REPO/manifests/b2d_full.txt | sed '/^$/d' | \
       echo "NOT_PRESENT_AS_NAMED: {}" >&2
     fi' | sort > $OUT
 echo "present-as-named: $(wc -l < $OUT)"
+touch $OUT.v2done
 echo "FIND_ANNO_DONE"

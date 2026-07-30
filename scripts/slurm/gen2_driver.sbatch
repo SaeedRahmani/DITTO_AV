@@ -34,7 +34,7 @@ names = sorted(l.strip().removesuffix(".tar.gz")
 tr = [n for i, n in enumerate(names) if i % 6 != 5]
 va = [n for i, n in enumerate(names) if i % 6 == 5]
 print(hashlib.md5(("|".join(tr) + "##" + "|".join(va)
-                   + "##route16").encode()).hexdigest()[:12])
+                   + "##routeTrue").encode()).hexdigest()[:12])
 PYEOF
 )
 echo "computed key: $KEY"
