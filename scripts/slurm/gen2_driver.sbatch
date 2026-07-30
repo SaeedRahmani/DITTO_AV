@@ -42,7 +42,8 @@ echo "computed key: $KEY"
   echo "CACHE KEY MISMATCH: $CACHE/${KEY}_*.npz absent — do not train"; exit 1; }
 
 # 3. train inline on this allocation's GPU
-export MANIFEST=manifests/b2d_full_present.txt TRUST=1
+# absolute path: phase2_gpu cds into the HOME clone, which may lag
+export MANIFEST=$MF TRUST=1
 bash $REPO/scripts/slurm/phase2_gpu.sbatch configs/b2d_gen2.yaml gen2
 
 # 4. submit the closed-loop eval directly (no dependency)
