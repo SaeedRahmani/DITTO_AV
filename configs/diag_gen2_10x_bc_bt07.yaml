@@ -1,0 +1,8 @@
+# Phase-0b follow-up: agent stopped 84% of ticks vs expert 32% — brake
+# flicker suspected. Raise binarization threshold 0.5 -> 0.7.
+run_config: /home/srahmani/ditto_out/b2d_gen2_10x_cpu.yaml
+policy: bc
+stochastic: false
+action_repeat: 2
+stuck_recovery: false
+brake_threshold: 0.7

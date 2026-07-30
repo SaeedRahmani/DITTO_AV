@@ -1,0 +1,7 @@
+# Brake binarization threshold 0.85 arm.
+run_config: /home/srahmani/ditto_out/b2d_gen2_10x_cpu.yaml
+policy: bc
+stochastic: false
+action_repeat: 2
+stuck_recovery: false
+brake_threshold: 0.85
