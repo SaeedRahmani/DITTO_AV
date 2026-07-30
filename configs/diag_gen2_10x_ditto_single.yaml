@@ -1,0 +1,8 @@
+# Closed-loop policy ablation at the final config (gen2_10x): the paper's
+# core claim (multi > single > BC) was proven closed-loop only in
+# Phase-1 — this measures it on CARLA.
+run_config: /home/srahmani/ditto_out/b2d_gen2_10x_cpu.yaml
+policy: ditto_single
+stochastic: false
+action_repeat: 2
+stuck_recovery: false
