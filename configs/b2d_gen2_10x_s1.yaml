@@ -1,0 +1,22 @@
+# Final-config seed 1 (gen2_10x recipe) — paper error bars.
+run_dir: runs/b2d_gen2_10x_s1
+seed: 1
+device: cpu
+env:
+  action_space: continuous
+  extra_obs_dims: 16
+  light_obs: false
+wm:
+  train_steps: 60000
+  batch_size: 32
+  seq_len: 16
+ac:
+  train_steps: 30000
+  horizon: 15
+  batch_size: 64
+  k_modes: 8
+  n_negatives: 16
+  bc_kl_coef: 0.1
+bc:
+  train_steps: 50000
+  lr: 0.0003
