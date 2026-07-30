@@ -25,6 +25,7 @@ set -euo pipefail
 PY=/scratch/$USER/ditto_av/envs/carla_eval/bin/python
 $PY -c "import yaml, numpy, torch" || { echo "carla_eval env broken"; exit 1; }
 export OMP_NUM_THREADS=1
+export WANDB_DISABLED=1
 export PYTHONUNBUFFERED=1
 
 REPO=/scratch/$USER/ditto_av/DITTO_AV

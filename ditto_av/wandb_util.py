@@ -12,6 +12,11 @@ from dataclasses import asdict
 
 try:
     import wandb
+    if not hasattr(wandb, "init"):
+        # a bare `wandb/` DIRECTORY on sys.path (e.g. the repo root's
+        # offline-run logs, when the env has no real wandb installed)
+        # imports as an empty namespace package — treat as absent
+        wandb = None
 except ImportError:  # keep the pipeline runnable without wandb
     wandb = None
 
