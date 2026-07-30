@@ -35,11 +35,11 @@ FREE_GB=$(df --output=avail -BG /tmp | tail -1 | tr -dc 0-9)
 [ "$FREE_GB" -ge 100 ] || { echo "only ${FREE_GB}G free on /tmp — abort"; exit 1; }
 
 # anno-only extraction, parallel across the job's CPUs
+# tarball members are prefixed "./<name>/..." — match with */anno/*
 tr -d '\r' < $MANIFEST | sed '/^$/d' | \
   xargs -P 8 -I{} sh -c '
-    clip={}; name=${clip%.tar.gz}
-    tar -xzf '"$DATA"'/$clip -C '"$TMP"'/extracted --wildcards "$name/anno/*" \
-      || echo "EXTRACT_FAIL $clip"'
+    tar -xzf '"$DATA"'/{} -C '"$TMP"'/extracted --wildcards "*/anno/*" \
+      || echo "EXTRACT_FAIL {}"'
 echo "extracted: $(ls $TMP/extracted | wc -l) clip dirs"
 
 # temp config: only the data stage runs; run_dir is throwaway on /tmp
