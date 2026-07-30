@@ -277,6 +277,18 @@ wandb.ai project `ditto-av`; restart it after login-node reboots.
   `__pycache__`, already-synced wandb dirs, and extraction dirs whose
   packed output is confirmed written.
 - Long-running work: always `sbatch`, never foreground SSH; poll `squeue`.
+- **Multiple concurrent AI sessions** (learned 2026-07-30, the hard
+  way: two sessions cancelled each other's gen-2 jobs): before
+  submitting to any pipeline stage, CLAIM it with a timestamped line in
+  `outputs/PIPELINE_STATUS.md` and read the last ~10 lines for another
+  session's claim first. Never cancel a job you did not submit unless
+  it is provably corrupting shared outputs — prefer writing a
+  correction note and letting the owner's own gates catch the problem.
+  Robustness pattern that ended the incident: verification gates INSIDE
+  jobs (recompute the cache key, abort on mismatch) beat trusting any
+  session's bookkeeping; and orchestrating inside one allocation
+  (inline train -> submit next stage) avoids Slurm purging dependents
+  of cancelled parents.
 - If home quota errors appear (`Disk quota exceeded`), the culprit is almost
   always a cache writing to `$HOME/.cache` — redirect it to scratch
   (`XDG_CACHE_HOME=/scratch/$USER/ditto_av/cache`), don't delete user files.
