@@ -1,0 +1,24 @@
+# Gen-2 steps-per-datum sweep: 1000 clips x 20x steps. Gen-2 at 5x
+# (14.72/46.3%) trailed the small-data 5x pilot (17.11/56.3%) — 4x
+# data at fixed steps = 4x fewer epochs; scale steps with data.
+run_dir: runs/b2d_gen2_20x
+seed: 0
+device: cpu
+env:
+  action_space: continuous
+  extra_obs_dims: 16
+  light_obs: false
+wm:
+  train_steps: 120000
+  batch_size: 32
+  seq_len: 16
+ac:
+  train_steps: 60000
+  horizon: 15
+  batch_size: 64
+  k_modes: 8
+  n_negatives: 16
+  bc_kl_coef: 0.1
+bc:
+  train_steps: 100000
+  lr: 0.0003
