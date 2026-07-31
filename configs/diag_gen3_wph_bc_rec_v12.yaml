@@ -1,0 +1,10 @@
+# Speed probe A (220 analysis 2026-08-01: 104/220 routes exhaust the
+# ~200 s budget; tracker v_max 8.0 caps below the expert plan's own
+# spacing, which reaches ~13.6 m/s). Raise the cap; nothing else.
+run_config: /home/srahmani/ditto_out/b2d_gen3_wph_cpu.yaml
+policy: bc
+stochastic: false
+action_repeat: 2
+stuck_recovery: true
+tracker:
+  v_max: 12.0

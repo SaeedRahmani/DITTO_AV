@@ -1,0 +1,10 @@
+# Speed probe B: cap ~expert max + 10% speed gain (counteracts BC
+# shrinkage of the plan spacing; 0b measured policy-side slowdown).
+run_config: /home/srahmani/ditto_out/b2d_gen3_wph_cpu.yaml
+policy: bc
+stochastic: false
+action_repeat: 2
+stuck_recovery: true
+tracker:
+  v_max: 14.0
+  speed_gain: 1.1
