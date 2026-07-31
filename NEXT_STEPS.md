@@ -67,12 +67,26 @@ mini end-to-end train + deployment-tail run on 12 clips):
    DittoCarlaAgent (configs/diag_gen3_wp_bc.yaml).
 4. tests/test_waypoints.py incl the offline-wp -> wp_to_vehicle ->
    world round-trip identity on a curved trajectory.
-Chain (cache -> H100 train -> 3x3 smoke) submitted — job ids in
-outputs/PIPELINE_STATUS.md. Next gates: 3x3 vs gen3_clean BC 25.36 and
-route-PID 100.00; then dev-10; then (if it wins) the 220.
-KNOWN RISK to watch in the 3x3 tick logs: prev-action = previous wp
-plan makes BC partly a plan-copy task (great MAE, maybe inert
-closed-loop) — judge closed-loop only, never the MAE.
+**v1 VERDICT (2026-07-31, jobs 10556343/4/5): wp-BC LOSES.**
+3x3 11.99/58.4%/0.301 (vs gen3_clean control-BC 25.36/82.7%/0.297);
+dev-10 ~19.3/60.3% (vs ~19.2/75.3%). Same penalty, far less completion.
+Diagnosis (runs/carla_smoke tick logs, agent_ticks_gen3_wp_3x3.jsonl):
+- NOT inert (the plan-copy fear): plans command v_wp~3.4 mean, agent
+  commits to lateral maneuvers. Failure is the opposite: plan DRIFT
+  (wp6 lateral -4.7 -> -10 m over 40 ticks; action-channel covariate
+  shift — the 12-dim prev-action feeds back) -> off-lane ->
+  collisions_layout -> terminal POWER-WEDGE (throttle 0.75 at
+  standstill for 100s of ticks; wp mode had NO recovery). Plus steer
+  oscillation 8-13 sign-flips/100 ticks (fresh per-tick plans jitter).
+- Steer-sign/frame chain PROVEN clean (round-trip test + route-PID
+  geometry identity) — do not re-litigate the frame.
+Probe round (deployment-only, no retrain; jobs 10556814/5): rec
+(reverse StuckRecovery now wired into wp mode), smooth (tracker ema
+0.5 + lookahead_min 5 + kp_steer 1.0), smrec (both), multi (the
+ditto_multi wp head from the same training job — imagination matching
+is the anti-drift objective; Phase-0a's BC>multi verdict was for
+CONTROL actions and need not transfer). Winner -> dev-10 -> 220 only
+if it beats gen3_clean there.
 
 ## Goal (do not lose sight of this)
 
