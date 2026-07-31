@@ -133,18 +133,27 @@ offline, no simulator in the training loop:**
 | model | driving score | completion | success rate |
 |---|---|---|---|
 | gen-1 kl01 (297 clips, 1x steps, multi) | 11.47 | 53.5% | 18.2% |
-| gen-2 (1000 clips, 10x steps, DITTO-multi) | **21.49** | 58.9% | 23.6% |
-| **gen-2 (same, latent-BC policy)** | 20.56 | **69.1%** | **34.1%** |
+| gen-2 (1000 clips, 10x steps, DITTO-multi) | 21.49 | 58.9% | 23.6% |
+| gen-2 (same, latent-BC policy) | 20.56 | 69.1% | 34.1% |
+| **gen-3 wph (wp head + PID tracker + recovery)** | **22.10** | 68.7% | **39.1%** |
 
-**34.1% success rate exceeds every published Bench2Drive baseline we
-know of** — VERIFIED 2026-07-31 against the official benchmark_v3
+**39.1% success rate (gen-3 wph, runs/bench220_gen3wph) exceeds every
+published Bench2Drive baseline we know of by 6 points** — VERIFIED 2026-07-31 against the official benchmark_v3
 table (github Thinklab-SJTU/Bench2Drive assets/benchmark_v3.jpg,
 protocol V0.0.3): DriveAdapter* 64.22 DS / 33.08 SR, ThinkTwice* 62.44
 / 31.23, TCP-traj* 59.90 / 30.00, TCP-traj w/o distillation 49.30 /
 20.45, UniAD-Base 45.81 / 16.36, VAD 42.35 / 15.00, AD-MLP 18.05 /
 0.00. Claim with the privileged-input + offline caveats stated. DS
-remains behind sensor SOTA (~60): the gap is penalty (0.31 — min-speed
-+ collisions), the exact target of the gen-3 waypoint+PID phase.
+remains behind sensor SOTA (~60). gen-3 wph (waypoint output
+parameterization on the control-action WM, tracked by a pure-pursuit
+PID with reverse recovery) added +5.0 SR over gen-2 BC and shifted the
+failure mode: wedging is nearly eliminated (9/220 blocked); 104/220
+routes now exhaust the ~200 s in-game budget driving below traffic
+speed (min_speed 2750) — speed is the current binding constraint,
+tracker-side (v_max cap) before model-side. The wp-as-WM-action
+variant LOST to control actions (action-channel covariate shift,
+measured plan drift) — a paper finding: WHERE the waypoint
+abstraction goes matters (output head yes, dynamics action no).
 Note the closest published analogue to our no-distillation setting is
 TCP-traj w/o distillation (49.30/20.45); all starred baselines distill
 Think2Drive expert features.

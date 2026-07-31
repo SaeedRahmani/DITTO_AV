@@ -20,8 +20,10 @@ Benchmark rows banked (runs/bench220*, all 220 routes each):
 |---|---|---|---|
 | gen-1 kl01 multi (297 clips) | 11.47 | 53.5% | 18.2% |
 | gen-2 10x multi | 21.49 | 58.9% | 23.6% |
-| gen-2 10x **BC** | 20.56 | 69.1% | **34.1%** |
-34.1% SR exceeds all published Bench2Drive baselines — VERIFIED
+| gen-2 10x **BC** | 20.56 | 69.1% | 34.1% |
+| **gen-3 wph BC+rec** (wp head) | **22.10** | 68.7% | **39.1%** |
+39.1% SR (gen-3 wph, 2026-07-31 220-run, runs/bench220_gen3wph)
+exceeds all published Bench2Drive baselines by 6 points — VERIFIED
 2026-07-31 vs official benchmark_v3 (DriveAdapter 33.08, ThinkTwice
 31.23, TCP-traj 30.00; AD-MLP SR is 0.00, a prior note misread it);
 DS trails sensor SOTA (~60, all with expert-feature distillation;
@@ -136,6 +138,17 @@ chunks wph220_00..18 = jobs 10557555-10557573 (participation/visual
 alternating), collector 10557574 -> runs/bench220_gen3wph (self-
 committing). Compare against gen2_10x rows (21.49 multi / 20.56 BC,
 SR 34.1%) and the verified benchmark_v3 baselines.
+**220 FINAL (landed 2026-07-31 21:02, commit b343997): DS 22.10,
+completion 68.7%, penalty 0.308, SR 39.1% (86/220) — NEW RECORDS on
+DS and SR (previous SR record 34.1; DriveAdapter 33.08).**
+Failure profile SHIFTED (2026-08-01 analysis): wedging nearly
+eliminated (9 blocked vs 136 in gen-1 era); 104/220 routes now die at
+the ~200 s in-game budget ("Failed - TickRuntime", mean completion
+47.6% at cutoff; completed routes take 65 s) with min_speed 2750.
+SPEED is the binding constraint for completion AND penalty. Next
+lever (deployment-only): tracker v_max (default 8.0 caps below the
+expert's own plan spacing, which reaches ~13.6 m/s) + speed_gain.
+Probe ladder: 3x3 -> dev-10 -> fresh 220 if it wins.
 
 ## Goal (do not lose sight of this)
 
