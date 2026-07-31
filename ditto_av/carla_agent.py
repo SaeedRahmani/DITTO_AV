@@ -259,6 +259,109 @@ class StuckRecovery:
         return None
 
 
+class RoutePIDDriver:
+    """Privileged route-following reference controller (Phase-0d).
+
+    Bounds what waypoint-tracking control achieves on the benchmark,
+    independent of any learned policy: pure-pursuit steering on the
+    dense route plan, curvature-limited target speed, and privileged
+    gating on lead actors and red lights. Expected to drive the
+    non-obstacle scenario families near-perfectly and to wedge (by
+    design — it never leaves the route lane) where the route is
+    blocked; that contrast isolates control quality from decision
+    quality. Also the PID gains calibrated here carry into the Phase-1
+    waypoint tracker. Pure numpy — unit-testable without CARLA.
+
+    All geometry uses raw CARLA yaw (right-handed steer sign); the
+    training-frame compass offset is irrelevant here.
+    """
+
+    def __init__(self, plan_xy, v_max: float = 6.5, a_lat: float = 2.5,
+                 kp_speed: float = 0.5, kp_steer: float = 1.6,
+                 lookahead_min: float = 3.0, lookahead_k: float = 1.0,
+                 stop_wall: float = 6.0, corridor_half: float = 1.7):
+        self.plan = np.asarray(plan_xy, dtype=float)
+        seg = np.diff(self.plan, axis=0)
+        self._arc = np.concatenate(
+            [[0.0], np.cumsum(np.linalg.norm(seg, axis=1))])
+        self.v_max, self.a_lat = v_max, a_lat
+        self.kp_speed, self.kp_steer = kp_speed, kp_steer
+        self.lmin, self.lk = lookahead_min, lookahead_k
+        self.stop_wall = stop_wall
+        self.corridor_half = corridor_half
+        self._idx = 0
+
+    def _advance(self, ego_xy):
+        w = self.plan[self._idx:self._idx + 60]
+        self._idx += int(np.argmin(np.linalg.norm(w - ego_xy, axis=1)))
+        return self._idx
+
+    def _lookahead_point(self, i, dist):
+        target_arc = self._arc[i] + dist
+        j = int(np.searchsorted(self._arc, target_arc))
+        return self.plan[min(j, len(self.plan) - 1)]
+
+    def _curvature_speed(self, i):
+        """Speed cap from heading change over the next ~12 m of plan."""
+        j = int(np.searchsorted(self._arc, self._arc[i] + 12.0))
+        j = min(j, len(self.plan) - 1)
+        if j <= i + 1:
+            return self.v_max
+        seg = np.diff(self.plan[i:j + 1], axis=0)
+        keep = np.linalg.norm(seg, axis=1) > 1e-3
+        seg = seg[keep]
+        if len(seg) < 2:
+            return self.v_max
+        h = np.unwrap(np.arctan2(seg[:, 1], seg[:, 0]))
+        arc = max(self._arc[j] - self._arc[i], 1e-3)
+        kappa = abs(h[-1] - h[0]) / arc
+        return float(np.clip(np.sqrt(self.a_lat / max(kappa, 1e-4)),
+                             1.5, self.v_max))
+
+    def act(self, ego_xy, ego_yaw, ego_speed, actors,
+            light_dist=None, light_state=None):
+        """-> (throttle, steer, brake, dbg). actors: [(id, xy, yaw)];
+        light_dist/state: from the relevant-light probe (0=Red 1=Yellow
+        2=Green)."""
+        i = self._advance(np.asarray(ego_xy, dtype=float))
+        c, s = np.cos(-ego_yaw), np.sin(-ego_yaw)
+        rot = np.array([[c, -s], [s, c]])
+
+        # lateral: pure pursuit on a speed-scaled lookahead
+        ld = max(self.lmin, self.lk * ego_speed)
+        tp = rot @ (self._lookahead_point(i, ld) - ego_xy)
+        alpha = float(np.arctan2(tp[1], max(tp[0], 0.3)))
+        steer = float(np.clip(self.kp_steer * alpha, -1.0, 1.0))
+
+        # longitudinal target: curvature cap, lead-actor gap, red light
+        v_t = self._curvature_speed(i)
+        gap = None
+        horizon = max(self.stop_wall, ego_speed * 2.2)
+        for _, a_xy, _a_yaw in actors:
+            rel = rot @ (np.asarray(a_xy, dtype=float) - ego_xy)
+            if -1.0 < rel[0] < horizon and abs(rel[1]) < self.corridor_half:
+                gap = rel[0] if gap is None else min(gap, rel[0])
+        if gap is not None:
+            # linear ramp: full stop at stop_wall behind the lead
+            v_t = min(v_t, max(0.0, 0.6 * (gap - self.stop_wall)))
+        if (light_state in (0, 1) and light_dist is not None
+                and light_dist < max(12.0, ego_speed * ego_speed / 4.0)):
+            v_t = 0.0 if light_dist < 18.0 else min(v_t, 2.0)
+
+        err = v_t - ego_speed
+        if v_t < 0.15 and ego_speed < 1.0:
+            throttle, brake = 0.0, 1.0
+        elif err >= 0.0:
+            throttle, brake = float(np.clip(self.kp_speed * err, 0.0, 0.75)), 0.0
+        else:
+            throttle = 0.0
+            brake = float(np.clip(-0.6 * err, 0.0, 1.0)) if err < -1.0 else 0.0
+        return throttle, steer, brake, {"v_t": round(v_t, 2),
+                                        "gap": None if gap is None
+                                        else round(float(gap), 1),
+                                        "alpha": round(alpha, 3)}
+
+
 try:  # pragma: no cover - requires the carla package + leaderboard on path
     import carla
     from leaderboard.autoagents.autonomous_agent import (AutonomousAgent,
@@ -290,6 +393,27 @@ try:  # pragma: no cover - requires the carla package + leaderboard on path
             # path before calling setup(); strip it
             conf_path = str(path_to_conf_file).split("+")[0]
             conf = yaml.safe_load(open(conf_path))
+            # Phase-0d reference mode: privileged route-PID controller,
+            # no world model / policy involved (RoutePIDDriver docstring)
+            self._route_pid_conf = (conf.get("route_pid") or None) \
+                if isinstance(conf.get("route_pid"), dict) \
+                else ({} if conf.get("route_pid") else None)
+            self._route_pid = None  # built on set_global_plan
+            if self._route_pid_conf is not None:
+                self._dense_plan_xy = getattr(self, "_dense_plan_xy", None)
+                self._near_cursor = getattr(self, "_near_cursor", None)
+                self._far_cursor = getattr(self, "_far_cursor", None)
+                self._light_boxes = {}
+                self._repeat = int(conf.get("action_repeat", 2))
+                self._prev_xy = {}
+                self._step = -1
+                self._last = carla.VehicleControl()
+                import os as _os
+                self._log_path = _os.environ.get("DITTO_AGENT_LOG")
+                if self._dense_plan_xy is not None:
+                    self._route_pid = RoutePIDDriver(
+                        self._dense_plan_xy, **self._route_pid_conf)
+                return
             run_cfg = load_config(conf["run_config"])
             self._cfg = run_cfg
             wm = load_world_model(run_cfg, run_cfg.env.obs_dim)
@@ -441,6 +565,8 @@ try:  # pragma: no cover - requires the carla package + leaderboard on path
             self._step += 1
             if self._step % self._repeat:
                 return self._last
+            if getattr(self, "_route_pid_conf", None) is not None:
+                return self._run_step_route_pid()
             ego = CarlaDataProvider.get_hero_actor()
             tr = ego.get_transform()
             ego_xy = np.array([tr.location.x, tr.location.y])
@@ -532,6 +658,51 @@ try:  # pragma: no cover - requires the carla package + leaderboard on path
                                   else light["state"]),
                         "rec": int(rec is not None),
                     }) + "\n")
+            return self._last
+
+        def _run_step_route_pid(self):
+            ego = CarlaDataProvider.get_hero_actor()
+            tr = ego.get_transform()
+            ego_xy = np.array([tr.location.x, tr.location.y])
+            ego_yaw = float(np.deg2rad(tr.rotation.yaw))  # raw CARLA yaw
+            v = ego.get_velocity()
+            ego_speed = float(np.linalg.norm([v.x, v.y, v.z]))
+            if self._route_pid is None:
+                if self._dense_plan_xy is None:
+                    return carla.VehicleControl()  # plan not set yet
+                self._route_pid = RoutePIDDriver(
+                    self._dense_plan_xy, **self._route_pid_conf)
+            world = CarlaDataProvider.get_world()
+            actors = []
+            for pattern in ("vehicle.*", "walker.*"):
+                for a in world.get_actors().filter(pattern):
+                    if a.id == ego.id:
+                        continue
+                    loc = a.get_transform()
+                    actors.append((a.id,
+                                   np.array([loc.location.x,
+                                             loc.location.y]),
+                                   float(np.deg2rad(loc.rotation.yaw))))
+            light = self._relevant_light(
+                world, CarlaDataProvider.get_map(), ego, ego_xy)
+            ld = ls = None
+            if light is not None and light["xy"] is not None:
+                ld = float(np.hypot(*(light["xy"] - ego_xy)))
+                ls = light["state"]
+            throttle, steer, brake, dbg = self._route_pid.act(
+                ego_xy, ego_yaw, ego_speed, actors,
+                light_dist=ld, light_state=ls)
+            self._last = carla.VehicleControl(
+                throttle=throttle, steer=steer, brake=brake)
+            if self._log_path:
+                import json as _json
+                with open(self._log_path, "a") as f:
+                    f.write(_json.dumps({
+                        "step": self._step, "speed": round(ego_speed, 3),
+                        "throttle": round(throttle, 3),
+                        "steer": round(steer, 3), "brake": round(brake, 3),
+                        "n_actors": len(actors), "light": ls,
+                        "pid": dbg}) + "\n")
             return self._last
 
         def destroy(self):

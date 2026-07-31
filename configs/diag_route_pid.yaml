@@ -1,0 +1,6 @@
+# Phase-0d: privileged route-PID reference controller (RoutePIDDriver).
+# No learned model — bounds waypoint-tracking control quality on the
+# benchmark; expected near-perfect on non-obstacle families, blocked
+# where the route lane is obstructed (it never leaves the lane).
+route_pid: true
+action_repeat: 2

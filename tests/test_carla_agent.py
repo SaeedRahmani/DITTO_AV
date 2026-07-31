@@ -145,3 +145,65 @@ def test_continuous_wm_driver_smoke():
         assert 0.0 <= a[0] <= 1.0 and -1.0 <= a[1] <= 1.0 and 0.0 <= a[2] <= 1.0
     driver.reset()
     assert driver.state is None
+
+
+# ---------------- RoutePIDDriver (Phase-0d reference controller) -------------
+
+def _straight_plan(n=200, spacing=1.0):
+    import numpy as np
+    return np.stack([np.arange(n) * spacing, np.zeros(n)], axis=1)
+
+
+def test_route_pid_straight_drives_forward():
+    import numpy as np
+    from ditto_av.carla_agent import RoutePIDDriver
+    d = RoutePIDDriver(_straight_plan())
+    throttle, steer, brake, dbg = d.act(
+        np.array([5.0, 0.0]), 0.0, 3.0, actors=[])
+    assert throttle > 0.0 and brake == 0.0
+    assert abs(steer) < 0.05
+    assert dbg["v_t"] > 5.0  # straight: near v_max
+
+
+def test_route_pid_steers_toward_offset_plan():
+    import numpy as np
+    from ditto_av.carla_agent import RoutePIDDriver
+    # ego displaced to the left of the lane (negative y in CARLA frame):
+    # the lookahead sits to the ego's right -> positive steer
+    throttle, steer, brake, dbg = RoutePIDDriver(_straight_plan()).act(
+        np.array([5.0, -2.0]), 0.0, 3.0, actors=[])
+    assert steer > 0.1
+
+
+def test_route_pid_stops_for_lead_vehicle():
+    import numpy as np
+    from ditto_av.carla_agent import RoutePIDDriver
+    d = RoutePIDDriver(_straight_plan())
+    lead = [(1, np.array([9.0, 0.0]), 0.0)]  # 4 m ahead of ego at x=5
+    throttle, steer, brake, dbg = d.act(
+        np.array([5.0, 0.0]), 0.0, 2.0, actors=lead)
+    assert dbg["v_t"] == 0.0
+    assert throttle == 0.0
+
+
+def test_route_pid_stops_at_red_light():
+    import numpy as np
+    from ditto_av.carla_agent import RoutePIDDriver
+    d = RoutePIDDriver(_straight_plan())
+    throttle, steer, brake, dbg = d.act(
+        np.array([5.0, 0.0]), 0.0, 5.0, actors=[],
+        light_dist=10.0, light_state=0)
+    assert dbg["v_t"] == 0.0
+
+
+def test_route_pid_slows_for_curve():
+    import numpy as np
+    from ditto_av.carla_agent import RoutePIDDriver
+    t = np.linspace(0, np.pi / 2, 120)
+    r = 12.0
+    plan = np.stack([r * np.sin(t), r * (1 - np.cos(t))], axis=1)
+    d = RoutePIDDriver(plan)
+    throttle, steer, brake, dbg = d.act(
+        np.array([1.0, 0.0]), 0.0, 6.0, actors=[])
+    assert dbg["v_t"] < 6.0  # curvature cap engaged
+    assert steer > 0.0  # curve bends toward +y
