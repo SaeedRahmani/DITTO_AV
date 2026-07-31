@@ -127,6 +127,15 @@ lesson) confirmed once the action-channel drift was removed; penalty
 0.542 = far cleaner driving. plain-vs-rec trades penalty vs
 completion; dev-10 on BOTH = jobs 10557439/40 (A/B splits). 220 gate:
 beat gen2_10x BC dev-10 27.78/70.1.
+**dev-10 VERDICT: GATE PASSED.** wph+rec 30.49/83.2%/0.335 (20/30
+full - record) beats the champion 27.78/70.1; plain 29.69/67.6 (13/30,
+29 runs - one rep lost, winner unaffected). Reverse recovery earns its
+keep at dev-10 scale in wph too (completion +15.6 over plain).
+**FINAL 220 LAUNCHED on gen3_wph_bc_rec** (2026-07-31 ~17:30): 19
+chunks wph220_00..18 = jobs 10557555-10557573 (participation/visual
+alternating), collector 10557574 -> runs/bench220_gen3wph (self-
+committing). Compare against gen2_10x rows (21.49 multi / 20.56 BC,
+SR 34.1%) and the verified benchmark_v3 baselines.
 
 ## Goal (do not lose sight of this)
 
