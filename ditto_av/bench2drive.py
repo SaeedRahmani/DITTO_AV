@@ -110,7 +110,8 @@ def _light_block(fr: dict, world_to_ego: np.ndarray,
 def load_clip(clip_dir: Path, n_neighbors: int = 6,
               radius: float = 60.0,
               with_route: bool = False,
-              with_lights: bool = False) -> Dict[str, np.ndarray]:
+              with_lights: bool = False,
+              with_waypoints: int = 0) -> Dict[str, np.ndarray]:
     """Parse one clip directory (containing `anno/*.json.gz`)."""
     clip_dir = Path(clip_dir)
     frames = sorted((clip_dir / "anno").glob("*.json.gz"))
@@ -199,22 +200,60 @@ def load_clip(clip_dir: Path, n_neighbors: int = 6,
         action[t] = [float(fr["throttle"]), float(fr["steer"]),
                      float(fr["brake"])]
 
-    return {"obs": obs, "action": action, "reset": reset}
+    out = {"obs": obs, "action": action, "reset": reset}
+    if with_waypoints:
+        wp = future_waypoints(raw, yaws, k=with_waypoints)
+        out["wp"] = (wp / WP_SCALE).reshape(len(raw), -1).astype(np.float32)
+    return out
+
+
+WP_STRIDE = 5   # frames between waypoints (0.5 s at the 10 Hz anno rate)
+WP_SCALE = 20.0  # meters; keeps a 3 s horizon roughly within [-1, 1]
+
+
+def future_waypoints(raw: List[dict], yaws: np.ndarray,
+                     k: int = 6, stride: int = WP_STRIDE) -> np.ndarray:
+    """Ego-frame future waypoints per frame — the Phase-1 action target.
+
+    wp[t, j-1] = R(-theta_t) @ (xy_{t+j*stride} - xy_t), unscaled meters,
+    shape (n, k, 2). Uses the SAME compass-frame rotation as every other
+    relative feature (anno theta = CARLA yaw + pi/2 — settled). Indices
+    past the clip end clamp to the final pose (the expert has stopped or
+    the clip simply ends; a repeated last point reads as "stay").
+    Verified by scripts/waypoint_check.py before any training uses it.
+    """
+    xy = np.array([[float(fr["x"]), float(fr["y"])] for fr in raw])
+    n = len(raw)
+    wp = np.zeros((n, k, 2), dtype=np.float32)
+    for t in range(n):
+        c, s = np.cos(yaws[t]), np.sin(yaws[t])
+        w2e = np.array([[c, s], [-s, c]])
+        for j in range(1, k + 1):
+            wp[t, j - 1] = w2e @ (xy[min(t + j * stride, n - 1)] - xy[t])
+    return wp
 
 
 def clips_to_npz(clip_dirs: List[Path], out_path: Path,
                  n_neighbors: int = 6,
                  with_route: bool = False,
-                 with_lights: bool = False) -> Dict[str, np.ndarray]:
-    """Convert clips into one npz compatible with TrajectoryData."""
+                 with_lights: bool = False,
+                 with_waypoints: int = 0) -> Dict[str, np.ndarray]:
+    """Convert clips into one npz compatible with TrajectoryData.
+
+    with_waypoints=k adds a "wp" array (n, k*2), scaled by WP_SCALE —
+    the waypoint action target for the Phase-1 abstraction.
+    """
     parts = [load_clip(d, n_neighbors=n_neighbors, with_route=with_route,
-                       with_lights=with_lights)
+                       with_lights=with_lights,
+                       with_waypoints=with_waypoints)
              for d in clip_dirs]
     data = {
         "obs": np.concatenate([p["obs"] for p in parts]),
         "action": np.concatenate([p["action"] for p in parts]),
         "reset": np.concatenate([p["reset"] for p in parts]),
     }
+    if with_waypoints:
+        data["wp"] = np.concatenate([p["wp"] for p in parts])
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(out_path, **data)
