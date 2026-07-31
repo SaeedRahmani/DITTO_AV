@@ -109,16 +109,25 @@ class ContinuousWMDriver:
     """
 
     def __init__(self, wm, policy, action_dim: int = 3,
-                 device: str = "cpu", stochastic: bool = False):
+                 device: str = "cpu", stochastic: bool = False,
+                 external_feedback: bool = False):
         self.wm, self.policy = wm, policy
         self.action_dim = action_dim
         self.device = device
         self.stochastic = stochastic
+        # wp_head mode: the policy's output (waypoints) is NOT the WM's
+        # action; the agent sets set_executed() with the control that
+        # actually drove the vehicle (training-consistent feedback)
+        self.external_feedback = external_feedback
         self.reset()
 
     def reset(self):
         self.state = None
         self.prev_action: Optional[torch.Tensor] = None
+
+    def set_executed(self, control: Sequence[float]):
+        self.prev_action = torch.as_tensor(control, dtype=torch.float32,
+                                           device=self.device)
 
     @torch.no_grad()
     def act(self, obs_vec: np.ndarray) -> np.ndarray:
@@ -135,7 +144,8 @@ class ContinuousWMDriver:
         feat, _, self.state = self.wm.observe(obs_t, act_t, reset_t,
                                               self.state)
         a = self.policy.act(feat[0, 0], stochastic=self.stochastic)
-        self.prev_action = a
+        if not self.external_feedback:
+            self.prev_action = a
         return a.cpu().numpy()
 
 
@@ -545,12 +555,16 @@ try:  # pragma: no cover - requires the carla package + leaderboard on path
             self._cfg = run_cfg
             wm = load_world_model(run_cfg, run_cfg.env.obs_dim)
             policy = make_actor_critic(
-                True, run_cfg.wm.feature_dim, run_cfg.env.action_dim,
+                True, run_cfg.wm.feature_dim, run_cfg.env.policy_action_dim,
                 run_cfg.ac.hidden_dim, run_cfg.ac.layers,
-                action_space=run_cfg.env.action_space)
+                action_space=("waypoints" if run_cfg.env.wp_out
+                              else run_cfg.env.action_space))
             # Phase-1 waypoint abstraction: the policy predicts future
-            # ego-frame waypoints; a PID tracker turns them into control
-            self._wp_mode = run_cfg.env.waypoints
+            # ego-frame waypoints; a PID tracker turns them into control.
+            # wp_head additionally keeps the WM on control actions and
+            # feeds back the EXECUTED control (set_executed below).
+            self._wp_mode = run_cfg.env.wp_out
+            self._wp_head = run_cfg.env.wp_head
             self._tracker = WaypointTracker(**(conf.get("tracker") or {})) \
                 if self._wp_mode else None
             import torch as _torch
@@ -560,7 +574,8 @@ try:  # pragma: no cover - requires the carla package + leaderboard on path
             policy.eval()
             self._driver = ContinuousWMDriver(
                 wm, policy, run_cfg.env.action_dim,
-                stochastic=bool(conf.get("stochastic", False)))
+                stochastic=bool(conf.get("stochastic", False)),
+                external_feedback=self._wp_head)
             self._with_route, self._with_lights = extra_obs_layout(
                 run_cfg.env.extra_obs_dims, run_cfg.env.light_obs)
             # set_global_plan can run before setup(); keep its state
@@ -807,6 +822,11 @@ try:  # pragma: no cover - requires the carla package + leaderboard on path
             """
             wp_v = wp_to_vehicle(np.asarray(a))
             throttle, steer, brake, dbg = self._tracker.act(wp_v, ego_speed)
+            if self._wp_head:
+                # the WM's action channel is the executed control (the
+                # tracker's raw output, pre-recovery — same precedent as
+                # control mode feeding the raw policy action)
+                self._driver.set_executed([throttle, steer, brake])
             self._last = carla.VehicleControl(
                 throttle=throttle, steer=steer, brake=brake)
             # gen3_wp 3x3 diagnosis: dominant failure is a POWER-WEDGE

@@ -23,10 +23,15 @@ def train_bc(cfg: Config, bank: LatentBank, seed: int = 0):
     rng = np.random.default_rng(seed)
     device = cfg.device
     continuous = cfg.env.continuous
+    # wp_head: same features (control-action WM), waypoint labels/output
+    labels = bank.wp if cfg.env.wp_head else bank.action
+    assert labels is not None, "wp_head needs wp arrays in the npz"
     policy = make_actor_critic(continuous, cfg.wm.feature_dim,
-                               cfg.env.action_dim, cfg.bc.hidden_dim,
+                               cfg.env.policy_action_dim, cfg.bc.hidden_dim,
                                cfg.bc.layers,
-                               action_space=cfg.env.action_space).to(device)
+                               action_space=("waypoints" if cfg.env.wp_head
+                                             else cfg.env.action_space)
+                               ).to(device)
     opt = torch.optim.Adam(policy.actor.parameters(), lr=cfg.bc.lr)
 
     n = bank.feat.shape[0]
@@ -39,10 +44,9 @@ def train_bc(cfg: Config, bank: LatentBank, seed: int = 0):
         i = train_idx[torch.randint(len(train_idx), (cfg.bc.batch_size,),
                                     device=device)]
         if continuous:
-            loss = -policy.dist(bank.feat[i]).log_prob(bank.action[i]).mean()
+            loss = -policy.dist(bank.feat[i]).log_prob(labels[i]).mean()
         else:
-            loss = F.cross_entropy(policy.actor(bank.feat[i]),
-                                   bank.action[i])
+            loss = F.cross_entropy(policy.actor(bank.feat[i]), labels[i])
         opt.zero_grad()
         loss.backward()
         opt.step()
@@ -53,12 +57,12 @@ def train_bc(cfg: Config, bank: LatentBank, seed: int = 0):
             with torch.no_grad():
                 if continuous:
                     pred = policy.act(bank.feat[val_idx])
-                    metric = (pred - bank.action[val_idx]).abs().mean()
+                    metric = (pred - labels[val_idx]).abs().mean()
                     label = "val mae"
                 else:
                     val_logits = policy.actor(bank.feat[val_idx])
                     metric = (val_logits.argmax(-1) ==
-                              bank.action[val_idx]).float().mean()
+                              labels[val_idx]).float().mean()
                     label = "val acc"
             print(f"bc step {step:5d} | loss {loss.item():.3f} "
                   f"| {label} {metric:.3f}")

@@ -94,6 +94,54 @@ def test_env_config_waypoints():
     assert not EnvConfig(action_space="continuous").waypoints
 
 
+def test_env_config_wp_head():
+    # wp_head: WM keeps control actions, policy head emits waypoints
+    cfg = EnvConfig(action_space="continuous", wp_head=True)
+    assert cfg.action_dim == 3
+    assert cfg.policy_action_dim == 12
+    assert cfg.wp_out and not cfg.waypoints
+    with pytest.raises(ValueError):
+        EnvConfig(action_space="waypoints", wp_head=True).policy_action_dim
+    with pytest.raises(ValueError):
+        EnvConfig(action_space="discrete_meta", wp_head=True).policy_action_dim
+    plain = EnvConfig(action_space="continuous")
+    assert plain.policy_action_dim == 3 and not plain.wp_out
+
+
+def test_wm_driver_external_feedback():
+    """wp_head deployment: the WM must receive the executed control,
+    never the 12-dim waypoint output."""
+    import torch as th
+
+    class FakeWM:
+        def init_state(self, n):
+            return "s0"
+
+        def observe(self, obs, act, reset, state):
+            self.last_act = act
+            feat = th.zeros(obs.shape[0], obs.shape[1], 4)
+            return feat, None, "s"
+
+    class FakePolicy:
+        def act(self, feat, stochastic=False):
+            return th.arange(12, dtype=th.float32)
+
+    from ditto_av.carla_agent import ContinuousWMDriver
+    drv = ContinuousWMDriver(FakeWM(), FakePolicy(), action_dim=3,
+                             external_feedback=True)
+    a = drv.act(np.zeros(5, dtype=np.float32))
+    assert a.shape == (12,)
+    assert drv.prev_action is None          # policy output NOT fed back
+    drv.set_executed([0.5, -0.1, 0.0])
+    drv.act(np.zeros(5, dtype=np.float32))
+    assert drv.wm.last_act.shape == (1, 1, 3)
+    assert np.allclose(drv.wm.last_act.numpy().ravel(), [0.5, -0.1, 0.0])
+    # default mode still self-feeds
+    drv2 = ContinuousWMDriver(FakeWM(), FakePolicy(), action_dim=12)
+    drv2.act(np.zeros(5, dtype=np.float32))
+    assert drv2.prev_action is not None
+
+
 def test_make_actor_critic_wp_bounds():
     p = make_actor_critic(True, 16, 12, 32, 1, action_space="waypoints")
     assert torch.allclose(p.low, torch.full((12,), -WP_BOUND))
@@ -128,7 +176,10 @@ def test_npz_wp_as_action(tmp_path):
     rng = np.random.default_rng(0)
     obs, act, reset = td.sample_wm_batch(2, 8, rng, action_dim=12)
     assert act.shape == (8, 2, 12)
-    assert TrajectoryData([out]).action.shape == (30, 3)
+    # wp_head layout: control actions for the WM, wp rides along
+    td2 = TrajectoryData([out])
+    assert td2.action.shape == (30, 3)
+    assert td2.wp is not None and td2.wp.shape == (30, 12)
 
 
 def test_load_clip_without_waypoints_unchanged(tmp_path):

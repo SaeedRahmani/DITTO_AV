@@ -23,6 +23,12 @@ class EnvConfig:
     action_space: str = "discrete_meta"
     continuous_dims: int = 3
     wp_k: int = 6  # waypoints per action (0.5 s stride -> 3 s horizon)
+    # wp_head: the WM keeps CONTROL actions (the proven feature regime)
+    # and only the BC head outputs waypoints, tracked by a PID at
+    # deployment with the executed control fed back to the WM. The v2
+    # answer to gen3_wp's action-channel drift (wp-as-WM-action lost
+    # dev-10 to control actions). Requires action_space: continuous.
+    wp_head: bool = False
     # appended observation dims beyond the vehicle rows (e.g. Bench2Drive
     # route conditioning: 16 = near/far command point + one-hot command)
     extra_obs_dims: int = 0
@@ -45,9 +51,24 @@ class EnvConfig:
 
     @property
     def action_dim(self) -> int:
+        """The WORLD MODEL's action dim (wp_head keeps control actions)."""
         if self.waypoints:
             return 2 * self.wp_k
         return self.continuous_dims if self.continuous else 5
+
+    @property
+    def policy_action_dim(self) -> int:
+        """The policy head's output dim (wp under waypoints OR wp_head)."""
+        if self.wp_head:
+            if not self.continuous or self.waypoints:
+                raise ValueError("wp_head requires action_space: continuous")
+            return 2 * self.wp_k
+        return self.action_dim
+
+    @property
+    def wp_out(self) -> bool:
+        """Does the deployed policy emit waypoints (either wp mode)?"""
+        return self.waypoints or self.wp_head
 
 
 @dataclass

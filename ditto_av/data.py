@@ -18,14 +18,20 @@ class TrajectoryData:
     """
 
     def __init__(self, npz_paths: Sequence[Path], action_key: str = "action"):
-        obs, action, reset = [], [], []
+        obs, action, reset, wp = [], [], [], []
         for p in npz_paths:
             d = np.load(p)
             obs.append(d["obs"])
             action.append(d[action_key])
             reset.append(d["reset"])
+            if "wp" in d:
+                wp.append(d["wp"])
         self.obs = np.concatenate(obs).astype(np.float32)
         self.action = np.concatenate(action)
+        # waypoint labels ride along when the npz has them (wp_head mode
+        # regresses these while the WM keeps control actions)
+        self.wp = (np.concatenate(wp).astype(np.float32)
+                   if len(wp) == len(npz_paths) else None)
         # discrete envs store int action ids; Bench2Drive stores continuous
         # (throttle, steer, brake) vectors
         self.discrete_actions = self.action.ndim == 1
@@ -89,8 +95,9 @@ class LatentBank:
 
     def __init__(self, h: torch.Tensor, z: torch.Tensor, feat: torch.Tensor,
                  action: torch.Tensor, ep_bounds: List[Tuple[int, int]],
-                 horizon: int):
+                 horizon: int, wp: torch.Tensor = None):
         self.h, self.z, self.feat, self.action = h, z, feat, action
+        self.wp = wp  # aligned waypoint labels (wp_head BC target)
         self.ep_bounds = ep_bounds
         self.horizon = horizon
         # window index: flat positions t such that [t, t+H] stays in-episode
@@ -147,5 +154,10 @@ def build_latent_bank(wm, data: TrajectoryData, action_dim: int, horizon: int,
         acts.append(torch.as_tensor(data.action[s:e], device=device))
         bounds.append((cursor, cursor + T))
         cursor += T
+    wp = None
+    if data.wp is not None:
+        wp = torch.as_tensor(
+            np.concatenate([data.wp[s:e] for s, e in data.episodes]),
+            device=device)
     return LatentBank(torch.cat(hs), torch.cat(zs), torch.cat(feats),
-                      torch.cat(acts), bounds, horizon)
+                      torch.cat(acts), bounds, horizon, wp=wp)

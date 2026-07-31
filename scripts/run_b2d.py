@@ -74,7 +74,7 @@ def stage_data(cfg, args):
     d = cfg.dirs()
     with_route, with_lights = extra_obs_layout(cfg.env.extra_obs_dims,
                                                cfg.env.light_obs)
-    wp_k = cfg.env.wp_k if cfg.env.waypoints else 0
+    wp_k = cfg.env.wp_k if cfg.env.wp_out else 0
     train, val = split_clips(Path(args.manifest), Path(args.extracted),
                              trust_manifest=args.trust_manifest)
     # parsing ~60k small json.gz files can take >1 h when BeeGFS is under
@@ -135,6 +135,11 @@ def stage_policies(cfg, args):
                              cfg.device)
     print(f"latent bank: {bank.feat.shape[0]} steps, {bank.n_windows} windows")
     train_bc(cfg, bank, seed=cfg.seed)
+    if cfg.env.wp_head:
+        # a 12-dim wp head cannot act in the 3-dim-action dream; and
+        # BC>multi is settled closed-loop for both action types
+        print("wp_head mode: DITTO imagination policies skipped")
+        return
     train_latent_policy(cfg, wm, bank, reward_mode="single", seed=cfg.seed)
     train_latent_policy(cfg, wm, bank, reward_mode="multi", seed=cfg.seed)
 
@@ -202,6 +207,7 @@ def stage_eval(cfg, args):
 
     # policies
     results["policies"] = {}
+    labels = bank.wp if cfg.env.wp_head else bank.action
     for name in ("bc", "ditto_single", "ditto_multi"):
         ckpt = d["ckpt"] / f"{name}.pt"
         if not ckpt.exists():
@@ -209,20 +215,24 @@ def stage_eval(cfg, args):
         hid, lay = ((cfg.bc.hidden_dim, cfg.bc.layers) if name == "bc"
                     else (cfg.ac.hidden_dim, cfg.ac.layers))
         policy = make_actor_critic(cfg.env.continuous, cfg.wm.feature_dim,
-                                   cfg.env.action_dim, hid, lay,
-                                   action_space=cfg.env.action_space
+                                   cfg.env.policy_action_dim, hid, lay,
+                                   action_space=("waypoints" if cfg.env.wp_head
+                                                 else cfg.env.action_space)
                                    ).to(device)
         policy.load_state_dict(torch.load(ckpt, map_location=device))
         policy.eval()
         dist = policy.dist(bank.feat)
-        nll = float(-dist.log_prob(bank.action).mean())
+        nll = float(-dist.log_prob(labels).mean())
         pred = policy.act(bank.feat, stochastic=False)
         if cfg.env.continuous:
-            mae = float((pred - bank.action).abs().mean())
+            mae = float((pred - labels).abs().mean())
         else:
-            mae = float((pred != bank.action).float().mean())
-        sim, mse = _dream_rollout(wm, bank, obs, start, policy=policy,
-                                  horizon=H)
+            mae = float((pred != labels).float().mean())
+        if cfg.env.wp_head:  # a wp head cannot act in the control dream
+            sim, mse = float("nan"), float("nan")
+        else:
+            sim, mse = _dream_rollout(wm, bank, obs, start, policy=policy,
+                                      horizon=H)
         results["policies"][name] = {
             "action_nll": nll, "action_mae": mae,
             "latent_match": sim, "hstep_obs_mse": mse}
