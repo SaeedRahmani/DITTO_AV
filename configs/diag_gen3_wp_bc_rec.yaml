@@ -1,0 +1,8 @@
+# gen3_wp probe A: v1 diagnosis showed terminal POWER-WEDGES (throttle
+# 0.75 at standstill against layout, no recovery in wp mode). Reverse
+# recovery targets exactly that; tracker unchanged.
+run_config: /home/srahmani/ditto_out/b2d_gen3_wp_cpu.yaml
+policy: bc
+stochastic: false
+action_repeat: 2
+stuck_recovery: true

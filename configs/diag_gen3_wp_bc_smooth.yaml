@@ -1,0 +1,11 @@
+# gen3_wp probe B: steer oscillation (8-13 flips/100 ticks) + plan
+# jitter -> EMA-filtered plan, longer min lookahead, softer steer gain.
+run_config: /home/srahmani/ditto_out/b2d_gen3_wp_cpu.yaml
+policy: bc
+stochastic: false
+action_repeat: 2
+stuck_recovery: false
+tracker:
+  ema: 0.5
+  lookahead_min: 5.0
+  kp_steer: 1.0

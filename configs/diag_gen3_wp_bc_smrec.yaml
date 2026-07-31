@@ -1,0 +1,10 @@
+# gen3_wp probe C: smoothing + reverse recovery combined (A + B).
+run_config: /home/srahmani/ditto_out/b2d_gen3_wp_cpu.yaml
+policy: bc
+stochastic: false
+action_repeat: 2
+stuck_recovery: true
+tracker:
+  ema: 0.5
+  lookahead_min: 5.0
+  kp_steer: 1.0

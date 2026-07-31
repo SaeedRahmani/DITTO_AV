@@ -293,12 +293,19 @@ class WaypointTracker:
                  kp_speed: float = 0.5, kp_steer: float = 1.6,
                  lookahead_min: float = 3.0, lookahead_k: float = 1.0,
                  speed_gain: float = 1.0, stride_s: float = WP_STRIDE / FPS,
-                 creep_after: int = 0, creep_throttle: float = 0.4):
+                 creep_after: int = 0, creep_throttle: float = 0.4,
+                 ema: float = 0.0):
         self.v_max, self.a_lat = v_max, a_lat
         self.kp_speed, self.kp_steer = kp_speed, kp_steer
         self.lmin, self.lk = lookahead_min, lookahead_k
         self.speed_gain = speed_gain
         self.stride_s = stride_s
+        # ema > 0 low-pass filters the plan across ticks (weight on the
+        # PREVIOUS smoothed plan): fresh per-tick predictions jitter and
+        # the 3x3 probe showed steer oscillation (8-13 sign flips/100
+        # ticks on the bad runs); at 0.1 s/model-tick, 0.5 ~ 0.2 s lag
+        self.ema = float(ema)
+        self._plan: Optional[np.ndarray] = None
         # creep_after > 0: after that many consecutive commanded-stop
         # ticks at standstill, apply creep_throttle (the standard
         # Bench2Drive team-code unblock heuristic). Off by default —
@@ -309,7 +316,16 @@ class WaypointTracker:
 
     def act(self, wp_vehicle: np.ndarray, ego_speed: float):
         """-> (throttle, steer, brake, dbg). wp_vehicle: (k, 2) meters."""
-        pts = np.vstack([np.zeros(2), np.asarray(wp_vehicle, dtype=float)])
+        wp_vehicle = np.asarray(wp_vehicle, dtype=float)
+        if self.ema > 0.0:
+            if self._plan is not None:
+                # advance the stored plan by the ego's motion since last
+                # model tick (1/FPS s); without this the filter lags a
+                # moving frame by ema/(1-ema) ticks (~10% speed shrink)
+                prev = self._plan - np.array([ego_speed / FPS, 0.0])
+                wp_vehicle = self.ema * prev + (1.0 - self.ema) * wp_vehicle
+            self._plan = wp_vehicle
+        pts = np.vstack([np.zeros(2), wp_vehicle])
         seg = np.diff(pts, axis=0)
         seglen = np.linalg.norm(seg, axis=1)
         arc = np.concatenate([[0.0], np.cumsum(seglen)])
@@ -790,6 +806,16 @@ try:  # pragma: no cover - requires the carla package + leaderboard on path
             throttle, steer, brake, dbg = self._tracker.act(wp_v, ego_speed)
             self._last = carla.VehicleControl(
                 throttle=throttle, steer=steer, brake=brake)
+            # gen3_wp 3x3 diagnosis: dominant failure is a POWER-WEDGE
+            # (throttle 0.75 at standstill against layout for hundreds
+            # of ticks, plan saying forward) — reverse recovery applies
+            if self._recovery is not None:
+                rec = self._recovery.update(ego_speed, throttle, brake,
+                                            steer)
+                if rec is not None:
+                    self._last = carla.VehicleControl(
+                        throttle=rec[0], steer=rec[1], brake=0.0,
+                        reverse=rec[2])
             if self._log_path:
                 import json as _json
                 with open(self._log_path, "a") as f:

@@ -185,6 +185,27 @@ def test_tracker_steer_sign_and_curvature():
     assert dbg["v_t"] < dbg["v_wp"]
 
 
+def test_tracker_ema_smoothing():
+    # jittering plan: EMA damps the lookahead target swing -> less steer
+    noisy = WaypointTracker(ema=0.0)
+    smooth = WaypointTracker(ema=0.6)
+    rng = np.random.default_rng(3)
+    steers_n, steers_s = [], []
+    for _ in range(40):
+        wp = straight_wp(3.0) + rng.normal(0, 0.8, (6, 2))
+        _, sn, _, _ = noisy.act(wp, ego_speed=6.0)
+        _, ss, _, _ = smooth.act(wp, ego_speed=6.0)
+        steers_n.append(sn)
+        steers_s.append(ss)
+    assert np.std(steers_s) < 0.65 * np.std(steers_n)
+    # steady state on a clean plan: the motion-compensated filter must
+    # not shrink the target speed while moving
+    trk = WaypointTracker(ema=0.6)
+    for _ in range(30):
+        _, _, _, dbg = trk.act(straight_wp(3.0), ego_speed=6.0)
+    assert abs(dbg["v_t"] - 6.0) < 0.3
+
+
 def test_tracker_creep_gate():
     trk = WaypointTracker(creep_after=3, creep_throttle=0.33)
     for _ in range(3):
