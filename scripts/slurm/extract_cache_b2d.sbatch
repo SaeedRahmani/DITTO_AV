@@ -13,9 +13,11 @@
 # scratch. Scratch never sees the ~200k extracted files (826k/1M inode
 # quota, 2026-07-29). Training jobs then use the SAME manifest with
 # --trust-manifest and hit the cache without any extraction.
-# Usage: sbatch scripts/slurm/extract_cache_b2d.sbatch [manifest]
-#        (default manifests/b2d_full.txt, layout: route conditioning on,
-#         lights off — matches the kl01/gen-2 configs)
+# Usage: sbatch scripts/slurm/extract_cache_b2d.sbatch [manifest] [config]
+#        (defaults: manifests/b2d_full.txt + configs/b2d_v3kl01.yaml —
+#         route conditioning on, lights off, control actions. The config
+#         determines the npz layout AND the cache key: pass the wp config
+#         for the ##wp6 waypoint-action cache.)
 
 set -euo pipefail
 # self-contained conda env: works on ANY node. The ditto venv is NOT
@@ -48,9 +50,10 @@ tr -d '\r' < $MANIFEST | sed '/^$/d' | \
 echo "extracted: $(ls $TMP/extracted | wc -l) clip dirs"
 
 # temp config: only the data stage runs; run_dir is throwaway on /tmp
+LAYOUT_CFG=$REPO/${2:-configs/b2d_v3kl01.yaml}
 $PY - <<EOF
 import yaml
-cfg = yaml.safe_load(open("$REPO/configs/b2d_v3kl01.yaml"))
+cfg = yaml.safe_load(open("$LAYOUT_CFG"))
 cfg["run_dir"] = "/tmp/$SLURM_JOB_ID/datastage"
 yaml.safe_dump(cfg, open("/tmp/$SLURM_JOB_ID/data_cfg.yaml", "w"), sort_keys=False)
 EOF

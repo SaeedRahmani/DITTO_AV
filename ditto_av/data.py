@@ -12,14 +12,17 @@ class TrajectoryData:
     """Flat (obs, action, reset) arrays with episode boundary bookkeeping.
 
     `action[t]` is the action taken *at* step t (after seeing obs[t]).
+    `action_key` selects which npz array plays the action role — "wp"
+    swaps in the future-waypoint targets (the Phase-1 abstraction); the
+    control array stays in the npz untouched.
     """
 
-    def __init__(self, npz_paths: Sequence[Path]):
+    def __init__(self, npz_paths: Sequence[Path], action_key: str = "action"):
         obs, action, reset = [], [], []
         for p in npz_paths:
             d = np.load(p)
             obs.append(d["obs"])
-            action.append(d["action"])
+            action.append(d[action_key])
             reset.append(d["reset"])
         self.obs = np.concatenate(obs).astype(np.float32)
         self.action = np.concatenate(action)

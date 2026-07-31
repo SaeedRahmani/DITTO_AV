@@ -25,7 +25,8 @@ def train_bc(cfg: Config, bank: LatentBank, seed: int = 0):
     continuous = cfg.env.continuous
     policy = make_actor_critic(continuous, cfg.wm.feature_dim,
                                cfg.env.action_dim, cfg.bc.hidden_dim,
-                               cfg.bc.layers).to(device)
+                               cfg.bc.layers,
+                               action_space=cfg.env.action_space).to(device)
     opt = torch.optim.Adam(policy.actor.parameters(), lr=cfg.bc.lr)
 
     n = bank.feat.shape[0]

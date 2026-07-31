@@ -1,0 +1,26 @@
+# GEN-3 Phase 1: waypoint action abstraction. Same data/recipe as
+# gen3_clean (999 clips, ego-box poses, 10x steps, bc_kl 0.1); only the
+# action changes: 12-dim future ego-frame waypoints (wp_k=6, 0.5 s
+# stride, /WP_SCALE, compass frame) regressed by the BC head and
+# tracked by WaypointTracker + PID at deployment (diag_gen3_wp_bc).
+run_dir: runs/b2d_gen3_wp
+seed: 0
+device: cpu
+env:
+  action_space: waypoints
+  extra_obs_dims: 16
+  light_obs: false
+wm:
+  train_steps: 60000
+  batch_size: 32
+  seq_len: 16
+ac:
+  train_steps: 30000
+  horizon: 15
+  batch_size: 64
+  k_modes: 8
+  n_negatives: 16
+  bc_kl_coef: 0.1
+bc:
+  train_steps: 50000
+  lr: 0.0003

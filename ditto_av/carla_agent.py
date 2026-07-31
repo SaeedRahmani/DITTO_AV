@@ -19,7 +19,7 @@ import torch
 
 from .bench2drive import (FPS, LIGHT_DIMS, LIGHT_STATES, N_COMMANDS,
                           POS_SCALE, ROUTE_DIMS, V_MAX, VEL_SCALE,
-                          extra_obs_layout)
+                          WP_SCALE, WP_STRIDE, extra_obs_layout)
 
 
 def featurize_frame(ego_xy: np.ndarray, ego_yaw: float, ego_speed: float,
@@ -259,6 +259,114 @@ class StuckRecovery:
         return None
 
 
+def wp_to_vehicle(wp_flat: np.ndarray) -> np.ndarray:
+    """Predicted waypoint action -> vehicle-frame points in meters.
+
+    The policy emits waypoints in the training (compass) frame, scaled
+    by 1/WP_SCALE. The compass frame is CARLA yaw + pi/2, so vehicle
+    coords are a fixed +90 deg rotation of compass coords: FORWARD
+    (vehicle +x) = compass -y, LATERAL (vehicle +y, right) = compass +x
+    — the settled Phase-0c frame fact. Round-trip against the offline
+    future_waypoints construction is enforced by tests/test_waypoints.py.
+    """
+    wp = np.asarray(wp_flat, dtype=np.float64).reshape(-1, 2) * WP_SCALE
+    return np.stack([-wp[:, 1], wp[:, 0]], axis=1)
+
+
+class WaypointTracker:
+    """Tracks the policy's predicted waypoints (Phase-1 deployment).
+
+    Stateless per tick except the config-gated creep counter: every
+    model tick gets a fresh 3 s plan in the vehicle frame, so unlike
+    RoutePIDDriver there is no route index to advance. Steering is pure
+    pursuit at a speed-scaled lookahead along the predicted polyline;
+    the target speed comes from the plan's own spacing (the expert's
+    intended travel over the first second — the TCP-style speed source),
+    capped by curvature. Gains default to the RoutePIDDriver values that
+    scored 100.00 smoke / 94.00 dev-10 in Phase-0d. No privileged
+    gating: stopping for actors/lights must come from the learned
+    waypoints (the obs already contains both). Pure numpy — unit-tested
+    without CARLA.
+    """
+
+    def __init__(self, v_max: float = 8.0, a_lat: float = 2.5,
+                 kp_speed: float = 0.5, kp_steer: float = 1.6,
+                 lookahead_min: float = 3.0, lookahead_k: float = 1.0,
+                 speed_gain: float = 1.0, stride_s: float = WP_STRIDE / FPS,
+                 creep_after: int = 0, creep_throttle: float = 0.4):
+        self.v_max, self.a_lat = v_max, a_lat
+        self.kp_speed, self.kp_steer = kp_speed, kp_steer
+        self.lmin, self.lk = lookahead_min, lookahead_k
+        self.speed_gain = speed_gain
+        self.stride_s = stride_s
+        # creep_after > 0: after that many consecutive commanded-stop
+        # ticks at standstill, apply creep_throttle (the standard
+        # Bench2Drive team-code unblock heuristic). Off by default —
+        # measure the pure tracker first.
+        self.creep_after = creep_after
+        self.creep_throttle = creep_throttle
+        self._still = 0
+
+    def act(self, wp_vehicle: np.ndarray, ego_speed: float):
+        """-> (throttle, steer, brake, dbg). wp_vehicle: (k, 2) meters."""
+        pts = np.vstack([np.zeros(2), np.asarray(wp_vehicle, dtype=float)])
+        seg = np.diff(pts, axis=0)
+        seglen = np.linalg.norm(seg, axis=1)
+        arc = np.concatenate([[0.0], np.cumsum(seglen)])
+
+        # target speed = planned travel over the first two strides (1 s);
+        # a stopping expert collapses the spacing -> v_t -> 0
+        n_sp = min(2, len(seglen))
+        v_wp = self.speed_gain * arc[n_sp] / (n_sp * self.stride_s)
+
+        # curvature cap from heading change along the usable segments
+        # (repeated end points at standstill carry no heading)
+        keep = seglen > 0.3
+        segk = seg[keep]
+        v_curve = self.v_max
+        if len(segk) >= 2:
+            h = np.unwrap(np.arctan2(segk[:, 1], segk[:, 0]))
+            kappa = abs(h[-1] - h[0]) / max(arc[-1], 1e-3)
+            v_curve = float(np.clip(np.sqrt(self.a_lat / max(kappa, 1e-4)),
+                                    1.5, self.v_max))
+        v_t = min(v_wp, v_curve, self.v_max)
+
+        # pure pursuit at arc-length lookahead, interpolated on the
+        # polyline (predicted points are up to ~5 m apart at speed)
+        steer = 0.0
+        alpha = 0.0
+        if arc[-1] > 0.5:
+            ld = min(max(self.lmin, self.lk * ego_speed), arc[-1])
+            j = int(np.searchsorted(arc, ld, side="right") - 1)
+            j = min(j, len(seglen) - 1)
+            frac = (ld - arc[j]) / max(seglen[j], 1e-6)
+            tp = pts[j] + min(frac, 1.0) * seg[j]
+            alpha = float(np.arctan2(tp[1], max(tp[0], 0.3)))
+            steer = float(np.clip(self.kp_steer * alpha, -1.0, 1.0))
+
+        err = v_t - ego_speed
+        if v_t < 0.15 and ego_speed < 1.0:
+            throttle, brake = 0.0, 1.0
+        elif err >= 0.0:
+            throttle = float(np.clip(self.kp_speed * err, 0.0, 0.75))
+            brake = 0.0
+        else:
+            throttle = 0.0
+            brake = float(np.clip(-0.6 * err, 0.0, 1.0)) if err < -1.0 \
+                else 0.0
+
+        if self.creep_after > 0:
+            if ego_speed < 0.3 and v_t < 0.15:
+                self._still += 1
+            else:
+                self._still = 0
+            if self._still > self.creep_after:
+                throttle, brake = self.creep_throttle, 0.0
+        return throttle, steer, brake, {"v_t": round(v_t, 2),
+                                        "v_wp": round(float(v_wp), 2),
+                                        "alpha": round(alpha, 3)}
+
+
 class RoutePIDDriver:
     """Privileged route-following reference controller (Phase-0d).
 
@@ -419,7 +527,13 @@ try:  # pragma: no cover - requires the carla package + leaderboard on path
             wm = load_world_model(run_cfg, run_cfg.env.obs_dim)
             policy = make_actor_critic(
                 True, run_cfg.wm.feature_dim, run_cfg.env.action_dim,
-                run_cfg.ac.hidden_dim, run_cfg.ac.layers)
+                run_cfg.ac.hidden_dim, run_cfg.ac.layers,
+                action_space=run_cfg.env.action_space)
+            # Phase-1 waypoint abstraction: the policy predicts future
+            # ego-frame waypoints; a PID tracker turns them into control
+            self._wp_mode = run_cfg.env.waypoints
+            self._tracker = WaypointTracker(**(conf.get("tracker") or {})) \
+                if self._wp_mode else None
             import torch as _torch
             ckpt = (run_cfg.dirs()["ckpt"]
                     / f"{conf.get('policy', 'ditto_multi')}.pt")
@@ -615,6 +729,9 @@ try:  # pragma: no cover - requires the carla package + leaderboard on path
                 ego_xy, ego_yaw, ego_speed, actors, self._prev_xy,
                 route=route, light=light)
             a = self._driver.act(obs)
+            if self._wp_mode:
+                return self._control_from_waypoints(a, ego_speed, obs,
+                                                    route, light, actors)
             brake = float(np.clip(a[2], 0.0, 1.0))
             if brake >= self._brake_threshold:
                 throttle, brake = 0.0, 1.0
@@ -657,6 +774,39 @@ try:  # pragma: no cover - requires the carla package + leaderboard on path
                                   or light["xy"] is None
                                   else light["state"]),
                         "rec": int(rec is not None),
+                    }) + "\n")
+            return self._last
+
+        def _control_from_waypoints(self, a, ego_speed, obs, route, light,
+                                    actors):
+            """Phase-1 deployment tail: predicted wp -> tracker -> control.
+
+            The raw 12-dim action already fed the world model inside
+            ContinuousWMDriver (same precedent as the control-mode
+            gains: the WM sees what the policy said, the vehicle gets
+            the tracker's interpretation of it).
+            """
+            wp_v = wp_to_vehicle(np.asarray(a))
+            throttle, steer, brake, dbg = self._tracker.act(wp_v, ego_speed)
+            self._last = carla.VehicleControl(
+                throttle=throttle, steer=steer, brake=brake)
+            if self._log_path:
+                import json as _json
+                with open(self._log_path, "a") as f:
+                    f.write(_json.dumps({
+                        "step": self._step, "speed": round(ego_speed, 3),
+                        "throttle": round(throttle, 3),
+                        "steer": round(steer, 3), "brake": round(brake, 3),
+                        "n_actors": len(actors),
+                        "near_cmd": (route or {}).get("near_cmd"),
+                        "wp1": [round(float(wp_v[0, 0]), 2),
+                                round(float(wp_v[0, 1]), 2)],
+                        "wp6": [round(float(wp_v[-1, 0]), 2),
+                                round(float(wp_v[-1, 1]), 2)],
+                        "light": (None if light is None
+                                  or light["xy"] is None
+                                  else light["state"]),
+                        "trk": dbg,
                     }) + "\n")
             return self._last
 

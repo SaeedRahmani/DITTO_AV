@@ -17,9 +17,12 @@ class EnvConfig:
     observed_vehicles: int = 7
     obs_features: tuple = ("presence", "x", "y", "vx", "vy", "cos_h", "sin_h")
     # "discrete_meta": highway-env 5-way meta-actions;
-    # "continuous": e.g. Bench2Drive (throttle, steer, brake)
+    # "continuous": e.g. Bench2Drive (throttle, steer, brake);
+    # "waypoints": Bench2Drive future ego-frame waypoints (wp_k points,
+    #   compass frame, /WP_SCALE) tracked by a PID at deployment
     action_space: str = "discrete_meta"
     continuous_dims: int = 3
+    wp_k: int = 6  # waypoints per action (0.5 s stride -> 3 s horizon)
     # appended observation dims beyond the vehicle rows (e.g. Bench2Drive
     # route conditioning: 16 = near/far command point + one-hot command)
     extra_obs_dims: int = 0
@@ -34,10 +37,16 @@ class EnvConfig:
 
     @property
     def continuous(self) -> bool:
-        return self.action_space == "continuous"
+        return self.action_space in ("continuous", "waypoints")
+
+    @property
+    def waypoints(self) -> bool:
+        return self.action_space == "waypoints"
 
     @property
     def action_dim(self) -> int:
+        if self.waypoints:
+            return 2 * self.wp_k
         return self.continuous_dims if self.continuous else 5
 
 

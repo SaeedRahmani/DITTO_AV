@@ -28,7 +28,8 @@ def train_latent_policy(cfg: Config, wm: VectorWorldModel, bank: LatentBank,
 
     policy = make_actor_critic(continuous, cfg.wm.feature_dim,
                                cfg.env.action_dim, acfg.hidden_dim,
-                               acfg.layers).to(device)
+                               acfg.layers,
+                               action_space=cfg.env.action_space).to(device)
 
     # BC anchor: start from the cloned policy and stay in its trust region
     bc_policy = None
@@ -36,7 +37,9 @@ def train_latent_policy(cfg: Config, wm: VectorWorldModel, bank: LatentBank,
     if acfg.bc_init and bc_ckpt.exists():
         bc_policy = make_actor_critic(continuous, cfg.wm.feature_dim,
                                       cfg.env.action_dim, cfg.bc.hidden_dim,
-                                      cfg.bc.layers).to(device)
+                                      cfg.bc.layers,
+                                      action_space=cfg.env.action_space
+                                      ).to(device)
         bc_policy.load_state_dict(torch.load(bc_ckpt, map_location=device))
         policy.actor.load_state_dict(bc_policy.actor.state_dict())
         bc_policy.requires_grad_(False)

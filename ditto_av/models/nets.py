@@ -134,11 +134,24 @@ class GaussianActorCritic(nn.Module):
         return self.clamp(a)
 
 
+# act() clamp for the waypoint head, in /WP_SCALE units: measured over
+# 43 clips the scaled forward component peaks at 2.04 (13.6 m/s * 3 s),
+# lateral at 1.03; +-3.0 leaves headroom for faster highway clips while
+# still bounding a diverged dream rollout. NLL on labels is unclamped.
+WP_BOUND = 3.0
+
+
 def make_actor_critic(continuous: bool, feature_dim: int, action_dim: int,
-                      hidden_dim: int, layers: int):
-    """B2D bounds (throttle, steer, brake); highway stays discrete."""
+                      hidden_dim: int, layers: int,
+                      action_space: str = "continuous"):
+    """B2D control bounds (throttle, steer, brake) or symmetric waypoint
+    bounds; highway stays discrete."""
     if continuous:
+        if action_space == "waypoints":
+            low = [-WP_BOUND] * action_dim
+            high = [WP_BOUND] * action_dim
+        else:
+            low, high = [0.0, -1.0, 0.0], [1.0, 1.0, 1.0]
         return GaussianActorCritic(feature_dim, action_dim, hidden_dim,
-                                   layers, low=[0.0, -1.0, 0.0],
-                                   high=[1.0, 1.0, 1.0])
+                                   layers, low=low, high=high)
     return ActorCritic(feature_dim, action_dim, hidden_dim, layers)

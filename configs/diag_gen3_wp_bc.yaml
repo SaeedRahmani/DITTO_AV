@@ -1,0 +1,9 @@
+# GEN-3 Phase 1 deployment: BC waypoint head + WaypointTracker (pure
+# pursuit on the predicted points, target speed from their spacing; PID
+# gains proven by the Phase-0d route-PID oracle). No stuck recovery, no
+# creep (measure the pure tracker first; creep is a tracker: config key).
+run_config: /home/srahmani/ditto_out/b2d_gen3_wp_cpu.yaml
+policy: bc
+stochastic: false
+action_repeat: 2
+stuck_recovery: false

@@ -48,21 +48,28 @@ Phase-0 verdicts (2026-07-30/31, all committed):
   completion up, penalty mixed (single-seed noise). Cleanup's main
   role: certified poses for Phase-1 targets.
 
-### Phase 1 implementation entry point (the DS 40+ lever)
-Data side DONE: `future_waypoints()` + `wp` array in
-ditto_av/bench2drive.py (k=6 points, 0.5 s stride, /WP_SCALE=20,
-compass frame). Remaining:
-1. Plumb `wp` through stage_data/TrajectoryData as the ACTION for a
-   waypoint-variant config (env.action_space: waypoints, action_dim
-   12; extend the npz cache key again, e.g. ##wp6).
-2. WM trains on waypoint actions unchanged; BC head regresses wp.
-3. Deployment: predicted wp (compass frame: forward=-y!) -> convert to
-   CARLA frame -> track with the RoutePIDDriver machinery (pure
-   pursuit on predicted points, curvature-limited speed from their
-   spacing; gains already benchmark-proven by 0d).
-4. Regression gates before any eval: pytest + scripts/waypoint_check.py
-   + a new deployment-side frame test (predicted-wp -> world round
-   trip); then 3-route 3x3, then dev-10, then (if it wins) 220.
+### Phase 1 implementation — LANDED 2026-07-31 (this commit)
+All four items built and gated (59 tests green, WAYPOINT_CHECK_OK,
+mini end-to-end train + deployment-tail run on 12 clips):
+1. `env.action_space: waypoints` (action_dim 12 = wp_k 6 x 2); `wp`
+   plumbed as the action via TrajectoryData(action_key="wp"); npz
+   cache key extended ##wp6; Gaussian head bounds +-3.0 (nets.WP_BOUND,
+   measured range: fwd max 2.04 scaled).
+2. WM/BC/DITTO train on wp actions unchanged (configs/b2d_gen3_wp.yaml
+   = gen3_clean recipe, only the action swapped).
+3. Deployment: carla_agent.wp_to_vehicle (compass->vehicle = fixed
+   +90deg rot; fwd=-y settled) + WaypointTracker (pure pursuit on
+   predicted points, target speed from their spacing, curvature cap;
+   0d-proven gains; config-gated creep, default off) wired into
+   DittoCarlaAgent (configs/diag_gen3_wp_bc.yaml).
+4. tests/test_waypoints.py incl the offline-wp -> wp_to_vehicle ->
+   world round-trip identity on a curved trajectory.
+Chain (cache -> H100 train -> 3x3 smoke) submitted — job ids in
+outputs/PIPELINE_STATUS.md. Next gates: 3x3 vs gen3_clean BC 25.36 and
+route-PID 100.00; then dev-10; then (if it wins) the 220.
+KNOWN RISK to watch in the 3x3 tick logs: prev-action = previous wp
+plan makes BC partly a plan-copy task (great MAE, maybe inert
+closed-loop) — judge closed-loop only, never the MAE.
 
 ## Goal (do not lose sight of this)
 

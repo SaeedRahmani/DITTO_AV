@@ -40,6 +40,11 @@ from ditto_av.trainers.wm_trainer import (load_world_model,  # noqa: E402
 VAL_EVERY = 6  # every 6th manifest clip is held out (~17%)
 
 
+def action_key(cfg) -> str:
+    """Which npz array is the action: waypoint targets in Phase-1 mode."""
+    return "wp" if cfg.env.waypoints else "action"
+
+
 def split_clips(manifest: Path, extracted: Path, trust_manifest=False):
     names = sorted(ln.strip().removesuffix(".tar.gz")
                    for ln in manifest.read_text().splitlines() if ln.strip())
@@ -69,16 +74,18 @@ def stage_data(cfg, args):
     d = cfg.dirs()
     with_route, with_lights = extra_obs_layout(cfg.env.extra_obs_dims,
                                                cfg.env.light_obs)
+    wp_k = cfg.env.wp_k if cfg.env.waypoints else 0
     train, val = split_clips(Path(args.manifest), Path(args.extracted),
                              trust_manifest=args.trust_manifest)
     # parsing ~60k small json.gz files can take >1 h when BeeGFS is under
     # load; cache the parsed npzs keyed on the exact clip split + layout
-    # (lights suffix only when on, so existing cache entries stay valid)
+    # (lights/wp suffixes only when on, so existing entries stay valid)
     key = hashlib.md5(("|".join(p.name for p in train) + "##"
                        + "|".join(p.name for p in val)
                        + f"##route{with_route}"
                        + "##egobox1"  # ego pose from the exact ego box
                        + ("##lights1" if with_lights else "")
+                       + (f"##wp{wp_k}" if wp_k else "")
                        ).encode()).hexdigest()[:12]
     cache = Path(args.extracted).parent / "npz_cache"
     cache.mkdir(exist_ok=True)
@@ -91,9 +98,11 @@ def stage_data(cfg, args):
         va = dict(np.load(d["data"] / "b2d_val.npz"))
     else:
         tr = clips_to_npz(train, d["data"] / "b2d_train.npz",
-                          with_route=with_route, with_lights=with_lights)
+                          with_route=with_route, with_lights=with_lights,
+                          with_waypoints=wp_k)
         va = clips_to_npz(val, d["data"] / "b2d_val.npz",
-                          with_route=with_route, with_lights=with_lights)
+                          with_route=with_route, with_lights=with_lights,
+                          with_waypoints=wp_k)
         try:
             shutil.copy(d["data"] / "b2d_train.npz", ctr)
             shutil.copy(d["data"] / "b2d_val.npz", cva)
@@ -110,16 +119,18 @@ def stage_data(cfg, args):
 
 
 def stage_wm(cfg, args):
-    data = TrajectoryData([cfg.dirs()["data"] / "b2d_train.npz"])
+    data = TrajectoryData([cfg.dirs()["data"] / "b2d_train.npz"],
+                          action_key=action_key(cfg))
     print(f"world-model data: {len(data.obs)} steps, "
           f"{len(data.episodes)} episodes, "
-          f"discrete={data.discrete_actions}")
+          f"discrete={data.discrete_actions}, action={action_key(cfg)}")
     train_world_model(cfg, data, seed=cfg.seed)
 
 
 def stage_policies(cfg, args):
     wm = load_world_model(cfg, cfg.env.obs_dim)
-    data = TrajectoryData([cfg.dirs()["data"] / "b2d_train.npz"])
+    data = TrajectoryData([cfg.dirs()["data"] / "b2d_train.npz"],
+                          action_key=action_key(cfg))
     bank = build_latent_bank(wm, data, cfg.env.action_dim, cfg.ac.horizon,
                              cfg.device)
     print(f"latent bank: {bank.feat.shape[0]} steps, {bank.n_windows} windows")
@@ -168,7 +179,8 @@ def stage_eval(cfg, args):
     device = cfg.device
     d = cfg.dirs()
     wm = load_world_model(cfg, cfg.env.obs_dim)
-    val = TrajectoryData([d["data"] / "b2d_val.npz"])
+    val = TrajectoryData([d["data"] / "b2d_val.npz"],
+                         action_key=action_key(cfg))
     bank = build_latent_bank(wm, val, cfg.env.action_dim, cfg.ac.horizon,
                              cfg.device)
     obs = torch.as_tensor(val.obs, device=device)
@@ -197,7 +209,9 @@ def stage_eval(cfg, args):
         hid, lay = ((cfg.bc.hidden_dim, cfg.bc.layers) if name == "bc"
                     else (cfg.ac.hidden_dim, cfg.ac.layers))
         policy = make_actor_critic(cfg.env.continuous, cfg.wm.feature_dim,
-                                   cfg.env.action_dim, hid, lay).to(device)
+                                   cfg.env.action_dim, hid, lay,
+                                   action_space=cfg.env.action_space
+                                   ).to(device)
         policy.load_state_dict(torch.load(ckpt, map_location=device))
         policy.eval()
         dist = policy.dist(bank.feat)
