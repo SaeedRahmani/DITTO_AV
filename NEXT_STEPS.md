@@ -98,8 +98,27 @@ Probe round VERDICT (2026-07-31, jobs 10556814/5; 3x3 each):
 - completion still 62 vs control-BC 82.7 — plan drift remains the
   binding constraint; if dev-10 confirms, the next training-side lever
   list: shorter wp horizon (k=4), prev-action noise augmentation.
-dev-10 on rec = jobs 10557053/4. Gate to the 220: beat gen3_clean
-dev-10 (~19.2/75.3) and credibly challenge gen2_10x BC (27.78/70.1).
+dev-10 on rec VERDICT (jobs 10557053/4): **GATE FAILED — no 220.**
+wp+rec 16.37/69.0%/0.251 (12/30 full) vs v1 19.27/60.3 (6/30) vs
+gen3_clean control-BC ~19.2/75.3 (16/30) vs gen2_10x BC 27.78/70.1.
+Recovery is a real, consistent lever (completion +8.7, penalty -0.06,
+full routes x2 — keep stuck_recovery ON for wp-family deployments; the
+3x3's 27.93 composed was short-route noise). But wp-as-WM-action loses
+to control actions, period. Root cause stands: action-channel drift.
+
+### v2 in progress — gen3_wph: waypoint HEAD, control-action WM
+(the TCP-traj architecture in our stack; started 2026-07-31)
+WM + latent features stay exactly gen3_clean (control prev-actions —
+REUSE its world_model.pt to pin the 82.7%-completion features); only
+the BC head changes: regresses wp labels (12-dim, bounds +-3) from the
+same features; deployment tracks predicted wp with WaypointTracker +
+reverse recovery, and feeds the EXECUTED control (tracker output) back
+into the WM (training-consistent). DITTO heads skipped in this mode
+(12-dim head cannot drive a 3-dim-action dream; BC>multi settled for
+both action types anyway). env config: action_space continuous +
+wp_head true; same npz cache as wp mode (a8074aa357d4 — has both
+action and wp). Gates: pytest + mini e2e, 3x3 (plain + rec), dev-10,
+220 only if it beats gen2_10x BC dev-10.
 
 ## Goal (do not lose sight of this)
 
