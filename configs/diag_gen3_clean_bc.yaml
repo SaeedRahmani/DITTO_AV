@@ -1,0 +1,7 @@
+# Gen-3 cleaned-obs BC (ego-box pose): same recipe as gen2_10x,
+# only the data noise fixed — isolates the cleanup effect.
+run_config: /home/srahmani/ditto_out/b2d_gen3_clean_cpu.yaml
+policy: bc
+stochastic: false
+action_repeat: 2
+stuck_recovery: false
