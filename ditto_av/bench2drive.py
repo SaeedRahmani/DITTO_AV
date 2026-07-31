@@ -107,6 +107,21 @@ def _light_block(fr: dict, world_to_ego: np.ndarray,
     return out
 
 
+def _ego_xy(fr: dict) -> np.ndarray:
+    """Ego world position from the ego_vehicle bounding box.
+
+    The top-level anno x/y is GNSS-like: offset 0.6-2.1 m from the true
+    pose per frame, moving ~1 m/frame while parked (measured 2026-07-31,
+    BlockedIntersection_Town03_Route134). The ego box location is
+    physics-exact (deltas match the speed field at exactly 10 Hz).
+    Falls back to x/y when the box is missing.
+    """
+    for b in fr.get("bounding_boxes", []):
+        if b.get("class") == "ego_vehicle":
+            return np.array(b["location"][:2], dtype=np.float64)
+    return np.array([fr["x"], fr["y"]], dtype=np.float64)
+
+
 def load_clip(clip_dir: Path, n_neighbors: int = 6,
               radius: float = 60.0,
               with_route: bool = False,
@@ -151,7 +166,7 @@ def load_clip(clip_dir: Path, n_neighbors: int = 6,
     reset[0] = True
 
     for t, fr in enumerate(raw):
-        ego_xy = np.array([fr["x"], fr["y"]], dtype=np.float64)
+        ego_xy = _ego_xy(fr)
         ego_yaw = float(yaws[t])
         c, s = np.cos(ego_yaw), np.sin(ego_yaw)
         world_to_ego = np.array([[c, s], [-s, c]])
@@ -222,7 +237,7 @@ def future_waypoints(raw: List[dict], yaws: np.ndarray,
     the clip simply ends; a repeated last point reads as "stay").
     Verified by scripts/waypoint_check.py before any training uses it.
     """
-    xy = np.array([[float(fr["x"]), float(fr["y"])] for fr in raw])
+    xy = np.stack([_ego_xy(fr) for fr in raw])
     n = len(raw)
     wp = np.zeros((n, k, 2), dtype=np.float32)
     for t in range(n):

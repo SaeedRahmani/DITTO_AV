@@ -77,6 +77,7 @@ def stage_data(cfg, args):
     key = hashlib.md5(("|".join(p.name for p in train) + "##"
                        + "|".join(p.name for p in val)
                        + f"##route{with_route}"
+                       + "##egobox1"  # ego pose from the exact ego box
                        + ("##lights1" if with_lights else "")
                        ).encode()).hexdigest()[:12]
     cache = Path(args.extracted).parent / "npz_cache"

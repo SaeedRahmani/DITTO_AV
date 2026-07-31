@@ -23,8 +23,8 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from ditto_av.bench2drive import (_load_frame, future_waypoints,  # noqa: E402
-                                  WP_STRIDE)
+from ditto_av.bench2drive import (_ego_xy, _load_frame,  # noqa: E402
+                                  future_waypoints, WP_STRIDE)
 
 FPS = 10.0
 
@@ -39,7 +39,7 @@ def check_clip(clip_dir: Path):
         np.maximum.accumulate(idx, out=idx)
         idx[idx < 0] = np.flatnonzero(ok)[0]
         yaws = yaws[idx]
-    xy = np.array([[float(fr["x"]), float(fr["y"])] for fr in raw])
+    xy = np.stack([_ego_xy(fr) for fr in raw])
     speed = np.array([float(fr["speed"]) for fr in raw])
     steer = np.array([float(fr["steer"]) for fr in raw])
     wp = future_waypoints(raw, yaws, k=6)          # (n, 6, 2) meters
