@@ -119,6 +119,14 @@ both action types anyway). env config: action_space continuous +
 wp_head true; same npz cache as wp mode (a8074aa357d4 — has both
 action and wp). Gates: pytest + mini e2e, 3x3 (plain + rec), dev-10,
 220 only if it beats gen2_10x BC dev-10.
+**3x3 VERDICT (2026-07-31, train 10557266, eval 10557267):
+BREAKTHROUGH.** plain 48.98/73.5%/pen 0.542 (6/9 full) — nearly 2x
+the best composed 3x3 ever banked; rec 33.16/86.1%/0.341 (7/9, best
+completion banked). The output-parameterization hypothesis (TCP-traj
+lesson) confirmed once the action-channel drift was removed; penalty
+0.542 = far cleaner driving. plain-vs-rec trades penalty vs
+completion; dev-10 on BOTH = jobs 10557439/40 (A/B splits). 220 gate:
+beat gen2_10x BC dev-10 27.78/70.1.
 
 ## Goal (do not lose sight of this)
 
