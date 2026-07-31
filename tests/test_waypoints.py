@@ -198,12 +198,12 @@ def test_tracker_ema_smoothing():
         steers_n.append(sn)
         steers_s.append(ss)
     assert np.std(steers_s) < 0.65 * np.std(steers_n)
-    # steady state on a clean plan: the motion-compensated filter must
-    # not shrink the target speed while moving
+    # cruise steady state: a plan constant in the vehicle frame (it
+    # rolls with the car) must pass through the filter unbiased
     trk = WaypointTracker(ema=0.6)
     for _ in range(30):
         _, _, _, dbg = trk.act(straight_wp(3.0), ego_speed=6.0)
-    assert abs(dbg["v_t"] - 6.0) < 0.3
+    assert abs(dbg["v_t"] - 6.0) < 0.05
 
 
 def test_tracker_creep_gate():

@@ -319,11 +319,14 @@ class WaypointTracker:
         wp_vehicle = np.asarray(wp_vehicle, dtype=float)
         if self.ema > 0.0:
             if self._plan is not None:
-                # advance the stored plan by the ego's motion since last
-                # model tick (1/FPS s); without this the filter lags a
-                # moving frame by ema/(1-ema) ticks (~10% speed shrink)
-                prev = self._plan - np.array([ego_speed / FPS, 0.0])
-                wp_vehicle = self.ema * prev + (1.0 - self.ema) * wp_vehicle
+                # plain EMA in the vehicle frame: unbiased in cruise
+                # (the plan rolls with the car, so it is stationary in
+                # this frame; motion-compensating would shift it back
+                # ema/(1-ema) ticks = a ~1 m standing bias at 6 m/s).
+                # Toward a FIXED world point (stop line) it lags by at
+                # most one tick of travel, vanishing at standstill.
+                wp_vehicle = self.ema * self._plan \
+                    + (1.0 - self.ema) * wp_vehicle
             self._plan = wp_vehicle
         pts = np.vstack([np.zeros(2), wp_vehicle])
         seg = np.diff(pts, axis=0)
