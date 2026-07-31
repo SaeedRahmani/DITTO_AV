@@ -80,13 +80,26 @@ Diagnosis (runs/carla_smoke tick logs, agent_ticks_gen3_wp_3x3.jsonl):
   oscillation 8-13 sign-flips/100 ticks (fresh per-tick plans jitter).
 - Steer-sign/frame chain PROVEN clean (round-trip test + route-PID
   geometry identity) — do not re-litigate the frame.
-Probe round (deployment-only, no retrain; jobs 10556814/5): rec
-(reverse StuckRecovery now wired into wp mode), smooth (tracker ema
-0.5 + lookahead_min 5 + kp_steer 1.0), smrec (both), multi (the
-ditto_multi wp head from the same training job — imagination matching
-is the anti-drift objective; Phase-0a's BC>multi verdict was for
-CONTROL actions and need not transfer). Winner -> dev-10 -> 220 only
-if it beats gen3_clean there.
+Probe round VERDICT (2026-07-31, jobs 10556814/5; 3x3 each):
+| variant | score | compl | pen | full |
+|---|---|---|---|---|
+| wp v1 | 11.99 | 58.4 | 0.301 | 2/9 |
+| wp + reverse recovery | **27.93** | 61.9 | 0.401 | 4/9 |
+| wp + smooth tracker | 18.88 | 54.8 | 0.374 | 2/9 |
+| wp + smooth + rec | 13.39 | 59.7 | 0.293 | 3/9 |
+| wp ditto_multi | 7.34 | 25.1 | 0.412 | 0/9 |
+- rec posts the best composed 3x3 banked in the project (beats
+  gen3_clean 25.36) — the power-wedge diagnosis was the right target.
+  Note recovery was config-dead in wp mode v1; levers are per-mode.
+- smooth+rec < rec alone: interactions non-additive AGAIN (settled
+  lesson holds); smoothing alone mildly positive but not stacking.
+- multi wp head collapses (7.34/25.1): BC>multi extends to waypoint
+  actions, stronger than for control actions.
+- completion still 62 vs control-BC 82.7 — plan drift remains the
+  binding constraint; if dev-10 confirms, the next training-side lever
+  list: shorter wp horizon (k=4), prev-action noise augmentation.
+dev-10 on rec = jobs 10557053/4. Gate to the 220: beat gen3_clean
+dev-10 (~19.2/75.3) and credibly challenge gen2_10x BC (27.78/70.1).
 
 ## Goal (do not lose sight of this)
 
