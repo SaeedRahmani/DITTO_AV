@@ -812,6 +812,7 @@ try:  # pragma: no cover - requires the carla package + leaderboard on path
             # gen3_wp 3x3 diagnosis: dominant failure is a POWER-WEDGE
             # (throttle 0.75 at standstill against layout for hundreds
             # of ticks, plan saying forward) — reverse recovery applies
+            rec = None
             if self._recovery is not None:
                 rec = self._recovery.update(ego_speed, throttle, brake,
                                             steer)
@@ -836,6 +837,7 @@ try:  # pragma: no cover - requires the carla package + leaderboard on path
                                   or light["xy"] is None
                                   else light["state"]),
                         "trk": dbg,
+                        "rec": int(rec is not None),
                     }) + "\n")
             return self._last
 
