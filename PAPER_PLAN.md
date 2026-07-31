@@ -137,21 +137,29 @@ offline, no simulator in the training loop:**
 | **gen-2 (same, latent-BC policy)** | 20.56 | **69.1%** | **34.1%** |
 
 **34.1% success rate exceeds every published Bench2Drive baseline we
-know of** (DriveAdapter 33.1, ThinkTwice 31.2, TCP-traj 30.0 — VERIFY
-these leaderboard numbers against the current Bench2Drive paper before
-submission), with the privileged-input + offline caveats stated. DS
+know of** — VERIFIED 2026-07-31 against the official benchmark_v3
+table (github Thinklab-SJTU/Bench2Drive assets/benchmark_v3.jpg,
+protocol V0.0.3): DriveAdapter* 64.22 DS / 33.08 SR, ThinkTwice* 62.44
+/ 31.23, TCP-traj* 59.90 / 30.00, TCP-traj w/o distillation 49.30 /
+20.45, UniAD-Base 45.81 / 16.36, VAD 42.35 / 15.00, AD-MLP 18.05 /
+0.00. Claim with the privileged-input + offline caveats stated. DS
 remains behind sensor SOTA (~60): the gap is penalty (0.31 — min-speed
 + collisions), the exact target of the gen-3 waypoint+PID phase.
+Note the closest published analogue to our no-distillation setting is
+TCP-traj w/o distillation (49.30/20.45); all starred baselines distill
+Think2Drive expert features.
 Policy triage (Phase-0a, 3 seeds + dev-10): latent-BC beats
 DITTO-multi closed-loop at gen-2 scale on completion/SR while multi
 holds a small DS edge on the 220 — report both rows; the
 when-does-imagination-matching-help analysis is a core contribution.
 
-Against published Bench2Drive numbers: driving score 21.49 EXCEEDS
-AD-MLP (18.05), the comparable privileged state-input baseline, and
-the 23.6% success rate exceeds AD-MLP (13.8%), UniAD-Base (16.4%) and
-VAD (15.0%) — while training entirely offline from released clips.
-Sensor-based TCP-traj/ThinkTwice (DS ~60) remain far ahead on DS:
+Against published Bench2Drive numbers (benchmark_v3, verified
+2026-07-31): driving score 21.49 EXCEEDS AD-MLP (18.05), the
+comparable privileged state-input baseline (whose SR is 0.00 — an
+earlier note here misread 13.18, which is UniAD-Tiny's SR), and the
+23.6% success rate exceeds UniAD-Base (16.36%), VAD (15.00%) and
+UniAD-Tiny (13.18%) — while training entirely offline from released
+clips. Sensor-based TCP-traj/ThinkTwice (DS ~60) remain far ahead on DS:
 claim SOTA only within the offline/privileged class, with the
 open-loop!=closed-loop finding (7 instances) and the anchor
 dose-response as the scientific spine. Data-scale ablation row =

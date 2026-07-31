@@ -21,8 +21,11 @@ Benchmark rows banked (runs/bench220*, all 220 routes each):
 | gen-1 kl01 multi (297 clips) | 11.47 | 53.5% | 18.2% |
 | gen-2 10x multi | 21.49 | 58.9% | 23.6% |
 | gen-2 10x **BC** | 20.56 | 69.1% | **34.1%** |
-34.1% SR exceeds all published Bench2Drive baselines (DriveAdapter
-33.1 — VERIFY numbers before submission); DS trails sensor SOTA (~60).
+34.1% SR exceeds all published Bench2Drive baselines — VERIFIED
+2026-07-31 vs official benchmark_v3 (DriveAdapter 33.08, ThinkTwice
+31.23, TCP-traj 30.00; AD-MLP SR is 0.00, a prior note misread it);
+DS trails sensor SOTA (~60, all with expert-feature distillation;
+TCP-traj w/o distillation: 49.30/20.45).
 
 Phase-0 verdicts (2026-07-30/31, all committed):
 - 0a: **BC beats DITTO-multi closed-loop at scale** (3 seeds + dev-10:
