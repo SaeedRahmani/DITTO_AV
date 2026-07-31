@@ -7,33 +7,62 @@ History: git log of this file — old session narratives were compressed
 out on 2026-07-29 (C2 cleanup); nothing scientific was lost, the
 verdicts live in runs/ and the settled-facts list below.
 
-## >>> HANDOFF 2026-07-29 — what is true right now <<<
+## >>> HANDOFF 2026-07-31 — read this first <<<
 
-**The pipeline drives itself on the cluster** (survives SSH/session
-death): eval chains -> decider jobs chained with `--dependency`
-(scripts/pipeline_decider.py) -> dev-10 -> full 220-route benchmark,
-each stage aggregating results, committing to the repo (push manually
-from a login session), appending to `outputs/PIPELINE_STATUS.md`
-(**check that file + `squeue -u $USER` first, every session**), and
-submitting the next stage on lanes chosen by a LIVE free-GPU audit
-(pick_lanes(); never assume yesterday's fastest lane).
+State: GEN-3 Phase 0 is CLOSED (all verdicts below); the next work is
+**Phase 1: waypoint action head + PID deployment** — pure
+implementation, nothing queued on the cluster. Check
+`outputs/PIPELINE_STATUS.md` + `squeue -u $USER` at session start
+anyway (self-driving chains may have been launched by another session).
 
-In flight at handoff:
-- **Anchor/K grid DONE** (runs/carla_smoke/KL_ANCHOR_RESULTS.md):
-  kl01 (bc_kl 0.1, K=8, H=15) wins at **64.6%** completion, clean
-  dose-response peak, K=16 negative transfer, lights non-additive.
-- **Town12-via-overlay proven in the leaderboard** (53% on route 2091).
-- **dev-10 (kl01 vs v3, 10 routes x 3 reps)** auto-launched by the
-  confirm3x3 decider; then the **220-route benchmark auto-fires** on
-  the dev-10 winner (user-authorized). This gen-1 220 run doubles as
-  benchmark-pipeline dress rehearsal AND the small-data ablation row —
-  the FINAL 220 number must come from the scaled gen-2 winner.
-- **Full-data download running** (login nohup, `outputs/
-  b2d_download_full.log`): 703 new clips -> 1000 total (~335 GB).
-  Tarballs only; extraction happens per the node-local /tmp pattern.
-- **Training-length pilots** on gpu-a100-small (serialize, 1-job QOS):
-  kl01 at 5x and 20x steps (`runs/b2d_kl01_{5,20}x` when done) — all
-  runs so far were smoke-scale (wm 6000 steps, ~5 min on MIG).
+Benchmark rows banked (runs/bench220*, all 220 routes each):
+| model | DS | completion | success |
+|---|---|---|---|
+| gen-1 kl01 multi (297 clips) | 11.47 | 53.5% | 18.2% |
+| gen-2 10x multi | 21.49 | 58.9% | 23.6% |
+| gen-2 10x **BC** | 20.56 | 69.1% | **34.1%** |
+34.1% SR exceeds all published Bench2Drive baselines (DriveAdapter
+33.1 — VERIFY numbers before submission); DS trails sensor SOTA (~60).
+
+Phase-0 verdicts (2026-07-30/31, all committed):
+- 0a: **BC beats DITTO-multi closed-loop at scale** (3 seeds + dev-10:
+  27.78/70.1% vs 22.51/64.2%) — BC is the deployed policy; the
+  when-does-imagination-matching-help question is a paper contribution
+  (Phase-1 highway says multimodal data; B2D at scale says BC).
+- 0b: agent stopped 84% of ticks vs expert 32% (cruise speed fine) —
+  stop-frequency is the DS bottleneck; brake-threshold probes NEGATIVE
+  (policy-intent, not flicker). runs/carla_smoke/SPEED_AUDIT.md.
+- 0c: **DATA LANDMINE FIXED** — anno top-level x/y is GNSS-noisy
+  (0.6-2.1 m/frame); ego pose now from the physics-exact ego_vehicle
+  box everywhere (obs + waypoints), npz cache key ##egobox1.
+  scripts/waypoint_check.py certifies waypoint targets
+  (WAYPOINT_CHECK_OK: phys .069, backward 0, lateral .33 m).
+  Frame fact: in the compass frame FORWARD = -y, LATERAL = x.
+- 0d: **route-PID oracle scores 100.00 smoke / 94.00 dev-10 (30/30
+  routes, incl the wedge route)** — waypoint-tracking ceiling ==
+  benchmark max; RoutePIDDriver in ditto_av/carla_agent.py
+  (configs/diag_route_pid.yaml), also the paper's privileged
+  rule-based reference row. GO for Phase 1.
+- gen3_clean (cleaned-obs BC retrain, runs/b2d_gen3_clean): smoke
+  25.36/82.7% (up from 22.12/65.8%); dev-10 ~19.2/75.3%, 16/30 full —
+  completion up, penalty mixed (single-seed noise). Cleanup's main
+  role: certified poses for Phase-1 targets.
+
+### Phase 1 implementation entry point (the DS 40+ lever)
+Data side DONE: `future_waypoints()` + `wp` array in
+ditto_av/bench2drive.py (k=6 points, 0.5 s stride, /WP_SCALE=20,
+compass frame). Remaining:
+1. Plumb `wp` through stage_data/TrajectoryData as the ACTION for a
+   waypoint-variant config (env.action_space: waypoints, action_dim
+   12; extend the npz cache key again, e.g. ##wp6).
+2. WM trains on waypoint actions unchanged; BC head regresses wp.
+3. Deployment: predicted wp (compass frame: forward=-y!) -> convert to
+   CARLA frame -> track with the RoutePIDDriver machinery (pure
+   pursuit on predicted points, curvature-limited speed from their
+   spacing; gains already benchmark-proven by 0d).
+4. Regression gates before any eval: pytest + scripts/waypoint_check.py
+   + a new deployment-side frame test (predicted-wp -> world round
+   trip); then 3-route 3x3, then dev-10, then (if it wins) 220.
 
 ## Goal (do not lose sight of this)
 
@@ -49,11 +78,6 @@ the training loop. Two evidence pillars:
    K-transfer failure) are first-class contributions.
 
 ## Plan
-
-### Running now (automated — just verify, don't relaunch)
-1. dev-10: kl01 vs v3 -> `runs/carla_smoke/dev10_results.json`.
-2. 220-route gen-1 benchmark (auto after dev-10) -> `runs/bench220/`.
-3. 1000-clip download; training-length pilots 5x/20x.
 
 ### GEN-3: the SOTA program (adopted 2026-07-30; supersedes gen-2 plan — gen-2 is DONE, DS 21.49)
 
