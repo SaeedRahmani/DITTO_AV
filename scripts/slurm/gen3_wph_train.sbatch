@@ -1,0 +1,42 @@
+#!/bin/bash
+#SBATCH --job-name=g3wph-train
+#SBATCH --partition=participation
+#SBATCH --gpus-per-task=1
+#SBATCH --time=01:30:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=2
+#SBATCH --mem-per-cpu=3900M
+#SBATCH --output=/home/%u/ditto_out/slurm-%j.out
+#SBATCH --account=research-ceg-tp
+# gen3_wph training: BC-only on top of the REUSED gen3_clean world
+# model (control-action WM; pins the 82.7%-completion features so the
+# wp-head change is isolated — the point of the v2 experiment).
+# Stages: data (cache hit a8074aa357d4) -> policies (BC; DITTO heads
+# skipped in wp_head mode) -> eval. Submitted 2026-07-31 as job
+# 10557266 (via a scratchpad copy of this script).
+
+set -euo pipefail
+export OMP_NUM_THREADS=1 PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
+export WANDB_MODE=offline WANDB_DIR=$HOME/ditto_out
+export XDG_CACHE_HOME=$HOME/ditto_out/cache
+PY=$HOME/envs/ditto_gpu/bin/python
+$PY -c "import torch; assert torch.cuda.is_available()"
+RUN=$HOME/ditto_out/b2d_gen3_wph
+mkdir -p $RUN/checkpoints
+cp -v $HOME/ditto_out/b2d_gen3_clean/checkpoints/world_model.pt \
+      $RUN/checkpoints/
+cd $HOME/ditto_work/DITTO_AV
+$PY - <<'PYEOF'
+import yaml
+cfg = yaml.safe_load(open("configs/b2d_gen3_wph.yaml"))
+cfg["run_dir"] = "/home/srahmani/ditto_out/b2d_gen3_wph"
+cfg["device"] = "cuda"
+yaml.safe_dump(cfg, open("/home/srahmani/ditto_out/b2d_gen3_wph_config.yaml",
+                         "w"), sort_keys=False)
+PYEOF
+for STAGE in data policies eval; do
+  $PY scripts/run_b2d.py --config $HOME/ditto_out/b2d_gen3_wph_config.yaml \
+      --stage $STAGE --manifest manifests/b2d_full999.txt --trust-manifest \
+      --extracted /scratch/$USER/ditto_av/data/bench2drive/extracted
+done
+echo "GEN3_WPH_TRAIN_DONE"
