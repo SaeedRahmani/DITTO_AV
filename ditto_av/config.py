@@ -141,6 +141,12 @@ class BCConfig:
     lr: float = 1e-3
     hidden_dim: int = 256
     layers: int = 2
+    # hard-frame upweighting (gen-3 wph: the deployed plan is worst in
+    # stopped/obstructed states — launches and bypass maneuvers are
+    # rare per-frame in the data). Additive sampling weight multipliers;
+    # 0 = uniform sampling (default, all pre-gen3 runs unaffected).
+    upweight_launch: float = 0.0    # standstill frames whose plan moves
+    upweight_maneuver: float = 0.0  # frames with large lateral wp
 
 
 @dataclass

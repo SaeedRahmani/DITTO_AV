@@ -1,0 +1,7 @@
+# upweighted-BC head on the champion deployment stack (tracker default
+# + reverse recovery, NO gap cap).
+run_config: /home/srahmani/ditto_out/b2d_gen3_wph_lw_cpu.yaml
+policy: bc
+stochastic: false
+action_repeat: 2
+stuck_recovery: true

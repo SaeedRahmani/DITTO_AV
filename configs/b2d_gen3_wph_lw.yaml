@@ -1,0 +1,29 @@
+# gen3_wph + hard-frame upweighted BC (launch 4x, maneuver 2x): the
+# deployment-lever ledger closed with plan-quality-in-stopped-states as
+# the binding constraint (41% of ticks plan-GO-static; bypass never
+# committed from standstill). Same WM (gen3_clean, reused), same data;
+# only the BC sampling distribution changes.
+run_dir: runs/b2d_gen3_wph_lw
+seed: 0
+device: cpu
+env:
+  action_space: continuous
+  wp_head: true
+  extra_obs_dims: 16
+  light_obs: false
+wm:
+  train_steps: 60000
+  batch_size: 32
+  seq_len: 16
+ac:
+  train_steps: 30000
+  horizon: 15
+  batch_size: 64
+  k_modes: 8
+  n_negatives: 16
+  bc_kl_coef: 0.1
+bc:
+  train_steps: 50000
+  lr: 0.0003
+  upweight_launch: 4.0
+  upweight_maneuver: 2.0

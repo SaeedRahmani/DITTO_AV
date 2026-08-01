@@ -134,7 +134,21 @@ def stage_policies(cfg, args):
     bank = build_latent_bank(wm, data, cfg.env.action_dim, cfg.ac.horizon,
                              cfg.device)
     print(f"latent bank: {bank.feat.shape[0]} steps, {bank.n_windows} windows")
-    train_bc(cfg, bank, seed=cfg.seed)
+    weights = None
+    if cfg.bc.upweight_launch or cfg.bc.upweight_maneuver:
+        from ditto_av.bench2drive import VEL_SCALE, WP_SCALE
+        assert data.wp is not None, "frame upweighting needs wp arrays"
+        speed = data.obs[:, 3] * VEL_SCALE                    # m/s
+        wp = data.wp.reshape(len(data.obs), -1, 2) * WP_SCALE  # m, compass
+        arc1s = (np.linalg.norm(wp[:, 0], axis=1)
+                 + np.linalg.norm(wp[:, 1] - wp[:, 0], axis=1))
+        launch = (speed < 1.5) & (arc1s > 1.0)   # stopped, plan moves
+        maneuver = np.abs(wp[:, -1, 0]) > 3.0    # compass lateral = x
+        weights = (1.0 + cfg.bc.upweight_launch * launch
+                   + cfg.bc.upweight_maneuver * maneuver)
+        print(f"hard frames: launch {launch.mean():.3f}, "
+              f"maneuver {maneuver.mean():.3f}")
+    train_bc(cfg, bank, seed=cfg.seed, sample_weights=weights)
     if cfg.env.wp_head:
         # a 12-dim wp head cannot act in the 3-dim-action dream; and
         # BC>multi is settled closed-loop for both action types

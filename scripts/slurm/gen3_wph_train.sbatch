@@ -21,21 +21,23 @@ export WANDB_MODE=offline WANDB_DIR=$HOME/ditto_out
 export XDG_CACHE_HOME=$HOME/ditto_out/cache
 PY=$HOME/envs/ditto_gpu/bin/python
 $PY -c "import torch; assert torch.cuda.is_available()"
-RUN=$HOME/ditto_out/b2d_gen3_wph
+CONFIG=${1:-configs/b2d_gen3_wph.yaml}
+SUFFIX=${2:-gen3_wph}
+RUN=$HOME/ditto_out/b2d_$SUFFIX
 mkdir -p $RUN/checkpoints
 cp -v $HOME/ditto_out/b2d_gen3_clean/checkpoints/world_model.pt \
       $RUN/checkpoints/
 cd $HOME/ditto_work/DITTO_AV
-$PY - <<'PYEOF'
-import yaml
-cfg = yaml.safe_load(open("configs/b2d_gen3_wph.yaml"))
-cfg["run_dir"] = "/home/srahmani/ditto_out/b2d_gen3_wph"
+$PY - "$CONFIG" "$RUN" <<'PYEOF'
+import sys, yaml
+cfg = yaml.safe_load(open(sys.argv[1]))
+cfg["run_dir"] = sys.argv[2]
 cfg["device"] = "cuda"
-yaml.safe_dump(cfg, open("/home/srahmani/ditto_out/b2d_gen3_wph_config.yaml",
-                         "w"), sort_keys=False)
+yaml.safe_dump(cfg, open(sys.argv[2] + "_config.yaml", "w"),
+               sort_keys=False)
 PYEOF
 for STAGE in data policies eval; do
-  $PY scripts/run_b2d.py --config $HOME/ditto_out/b2d_gen3_wph_config.yaml \
+  $PY scripts/run_b2d.py --config ${RUN}_config.yaml \
       --stage $STAGE --manifest manifests/b2d_full999.txt --trust-manifest \
       --extracted /scratch/$USER/ditto_av/data/bench2drive/extracted
 done

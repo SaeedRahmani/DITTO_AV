@@ -12,12 +12,15 @@ from ..models.nets import make_actor_critic
 from .. import wandb_util
 
 
-def train_bc(cfg: Config, bank: LatentBank, seed: int = 0):
+def train_bc(cfg: Config, bank: LatentBank, seed: int = 0,
+             sample_weights=None):
     """Behavior cloning on world-model posterior features (latent BC).
 
     Uses the same feature space as the DITTO policies so the comparison
     isolates the effect of the on-policy latent-matching objective.
     Discrete actions: cross-entropy; continuous: Gaussian NLL.
+    `sample_weights` (N,) biases TRAIN batch sampling toward hard
+    frames (launches/maneuvers); validation stays uniform.
     """
     torch.manual_seed(seed)
     rng = np.random.default_rng(seed)
@@ -39,10 +42,21 @@ def train_bc(cfg: Config, bank: LatentBank, seed: int = 0):
     perm = rng.permutation(n)
     train_idx = torch.as_tensor(perm[:-n_val], device=device)
     val_idx = torch.as_tensor(perm[-n_val:], device=device)
+    w_train = None
+    if sample_weights is not None:
+        w_train = torch.as_tensor(sample_weights, dtype=torch.float32,
+                                  device=device)[train_idx]
+        print(f"bc weighted sampling: mean w {float(w_train.mean()):.2f}, "
+              f"frac upweighted {float((w_train > 1).float().mean()):.3f}")
 
     for step in range(1, cfg.bc.train_steps + 1):
-        i = train_idx[torch.randint(len(train_idx), (cfg.bc.batch_size,),
-                                    device=device)]
+        if w_train is not None:
+            i = train_idx[torch.multinomial(w_train, cfg.bc.batch_size,
+                                            replacement=True)]
+        else:
+            i = train_idx[torch.randint(len(train_idx),
+                                        (cfg.bc.batch_size,),
+                                        device=device)]
         if continuous:
             loss = -policy.dist(bank.feat[i]).log_prob(labels[i]).mean()
         else:
