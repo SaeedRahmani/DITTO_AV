@@ -148,11 +148,20 @@ def stage_policies(cfg, args):
                    + cfg.bc.upweight_maneuver * maneuver)
         print(f"hard frames: launch {launch.mean():.3f}, "
               f"maneuver {maneuver.mean():.3f}")
-    train_bc(cfg, bank, seed=cfg.seed, sample_weights=weights)
+    if cfg.bc.train_steps > 0:
+        train_bc(cfg, bank, seed=cfg.seed, sample_weights=weights)
+    else:  # reuse a copied-in BC checkpoint (gen-4: identical recipe)
+        assert (cfg.dirs()["ckpt"] / "bc.pt").exists(), \
+            "bc.train_steps=0 requires an existing bc.pt"
+        print("bc reused (train_steps=0)")
     if cfg.env.wp_head:
-        # a 12-dim wp head cannot act in the 3-dim-action dream; and
-        # BC>multi is settled closed-loop for both action types
-        print("wp_head mode: DITTO imagination policies skipped")
+        if cfg.ac.wp_imagination:
+            # gen-4: DITTO on the wp head via the tracker port
+            from ditto_av.trainers.dwp_trainer import train_latent_policy_wp
+            train_latent_policy_wp(cfg, wm, bank, seed=cfg.seed)
+        else:
+            # a raw 12-dim wp head cannot act in the 3-dim-action dream
+            print("wp_head mode: DITTO imagination policies skipped")
         return
     train_latent_policy(cfg, wm, bank, reward_mode="single", seed=cfg.seed)
     train_latent_policy(cfg, wm, bank, reward_mode="multi", seed=cfg.seed)
@@ -222,7 +231,7 @@ def stage_eval(cfg, args):
     # policies
     results["policies"] = {}
     labels = bank.wp if cfg.env.wp_head else bank.action
-    for name in ("bc", "ditto_single", "ditto_multi"):
+    for name in ("bc", "ditto_single", "ditto_multi", "ditto_wp"):
         ckpt = d["ckpt"] / f"{name}.pt"
         if not ckpt.exists():
             continue

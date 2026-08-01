@@ -132,6 +132,18 @@ class ACConfig:
     bc_init: bool = True
     bc_kl_coef: float = 0.3
     grad_clip: float = 10.0
+    # --- gen-4 DITTO-WP (wp_head imagination; trainers/dwp_trainer) ---
+    # train the on-policy waypoint policy (dream steps through the
+    # tracker port = deployment-consistent imagination)
+    wp_imagination: bool = False
+    # reward space: "none" = raw h (DITTO); "wp" = frozen ridge-probe
+    # projection h -> expert-waypoint labels (ego-intent subspace)
+    reward_proj: str = "none"
+    proj_ridge: float = 1.0
+    # fraction of rollouts starting from self-reached (off-manifold)
+    # states, targets re-retrieved from the reached latent
+    divergent_frac: float = 0.0
+    divergent_steps: int = 5
 
 
 @dataclass

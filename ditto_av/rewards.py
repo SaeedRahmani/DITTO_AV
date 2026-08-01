@@ -38,14 +38,42 @@ class LatentMatcher:
     """
 
     def __init__(self, bank: LatentBank, mode: str = "multi", k: int = 8,
-                 n_negatives: int = 0):
+                 n_negatives: int = 0, proj: Tensor = None):
         assert mode in ("single", "multi", "multi_traj")
         self.bank = bank
         self.mode = mode
         self.k = k
         self.n_negatives = n_negatives
+        # proj (D, P): optional task projection of h before similarity
+        # (gen-4: a frozen wp-probe — raw latent similarity to ANY
+        # plausible traffic state is 0.85-0.92, exogenous traffic
+        # dominates; matching in the ego-intent subspace restores the
+        # dynamic range where it matters). Retrieval stays on full h
+        # (scene context IS the right retrieval key); only rewards
+        # (and negatives) are projected.
+        self.proj = proj
+        self._windows_r = bank.windows_h if proj is None \
+            else bank.windows_h @ proj
         starts = bank.windows_h[:, 0, :]  # (N, D)
         self._starts_normed = F.normalize(starts, dim=-1)
+
+    def project(self, h: Tensor) -> Tensor:
+        """Map dreamed h into the reward space (identity when proj off)."""
+        return h if self.proj is None else h @ self.proj
+
+    @torch.no_grad()
+    def retrieve_from_h(self, h: Tensor) -> Tensor:
+        """Top-K expert windows for arbitrary query latents (B, D).
+
+        The divergent-start relabel (gen-4): after the policy walks off
+        the expert manifold in imagination, the nearest expert modes
+        FROM THE REACHED STATE become the targets — offline DAgger with
+        retrieval as the relabeler. Returns (B, K, H+1, D_reward).
+        """
+        q = F.normalize(h, dim=-1)
+        sim = q @ self._starts_normed.T
+        _, top = sim.topk(self.k, dim=-1)
+        return self._windows_r[top]
 
     @torch.no_grad()
     def targets(self, window_ids: Tensor) -> Tensor:
@@ -54,18 +82,19 @@ class LatentMatcher:
         Returns (B, K, H+1, D); K = 1 in single mode.
         """
         if self.mode == "single":
-            return self.bank.windows_h[window_ids].unsqueeze(1)
+            return self._windows_r[window_ids].unsqueeze(1)
         q = self._starts_normed[window_ids]                # (B, D)
         sim = q @ self._starts_normed.T                    # (B, N)
         _, top = sim.topk(self.k, dim=-1)                  # (B, K)
-        return self.bank.windows_h[top]                    # (B, K, H+1, D)
+        return self._windows_r[top]                        # (B, K, H+1, D)
 
     @torch.no_grad()
     def rewards(self, dreamed_h: Tensor, targets: Tensor) -> Tensor:
         """Stepwise rewards for a dreamed rollout.
 
-        dreamed_h: (H+1, B, D) latent states, index 0 = shared start.
-        targets:   (B, K, H+1, D).
+        dreamed_h: (H+1, B, D) latent states, index 0 = shared start —
+        pass through self.project() first when a projection is set.
+        targets:   (B, K, H+1, D_reward).
         Returns (H, B): reward at step t compares dreamed state t with the
         expert state t of the best-matching mode (max over K).
 
@@ -88,7 +117,7 @@ class LatentMatcher:
             B = targets.shape[0]
             idx = torch.randint(self.bank.n_windows, (B, self.n_negatives),
                                 device=dreamed_h.device)
-            neg = self.bank.windows_h[idx][:, :, 1:, :]    # (B, M, H, D)
+            neg = self._windows_r[idx][:, :, 1:, :]        # (B, M, H, D)
             neg_sim = max_cos(d, neg).mean(dim=1)          # (B, H)
             reward = reward - neg_sim.permute(1, 0)
         return reward
