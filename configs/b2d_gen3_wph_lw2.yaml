@@ -1,0 +1,27 @@
+# lw dose retune: launch 2x only (lw@4/2 fixed launches — blocked 1,
+# completion up — but overshot: penalty 0.258, deviations 5; the
+# maneuver upweight is the suspected dirt driver). One axis.
+run_dir: runs/b2d_gen3_wph_lw2
+seed: 0
+device: cpu
+env:
+  action_space: continuous
+  wp_head: true
+  extra_obs_dims: 16
+  light_obs: false
+wm:
+  train_steps: 60000
+  batch_size: 32
+  seq_len: 16
+ac:
+  train_steps: 30000
+  horizon: 15
+  batch_size: 64
+  k_modes: 8
+  n_negatives: 16
+  bc_kl_coef: 0.1
+bc:
+  train_steps: 50000
+  lr: 0.0003
+  upweight_launch: 2.0
+  upweight_maneuver: 0.0
