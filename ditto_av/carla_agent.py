@@ -873,8 +873,19 @@ try:  # pragma: no cover - requires the carla package + leaderboard on path
             # of ticks, plan saying forward) — reverse recovery applies
             rec = None
             if self._recovery is not None:
-                rec = self._recovery.update(ego_speed, throttle, brake,
-                                            steer)
+                # during a lead-gap hold the output is (0, brake) even
+                # though the PLAN wants forward progress; recovery must
+                # see that intent or it never triggers behind scenario
+                # obstacles (dev-10 gap probe: 10/30 blocked, recovery
+                # starved). Reversing widens the gap and gives the plan
+                # room to commit a bypass — the champion's escape path.
+                gap_hold = (dbg.get("gap") is not None
+                            and dbg["v_t"] < 0.15 and dbg["v_wp"] > 1.5)
+                rec = self._recovery.update(
+                    ego_speed,
+                    0.6 if gap_hold else throttle,
+                    0.0 if gap_hold else brake,
+                    steer)
                 if rec is not None:
                     self._last = carla.VehicleControl(
                         throttle=rec[0], steer=rec[1], brake=0.0,
