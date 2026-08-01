@@ -36,10 +36,18 @@ single-axis config probes. Remaining levers are STRUCTURAL:
 evidence points exactly here: plan quality in states the expert never
 visits); (2) WM+steps scaling done jointly at final scale (Phase 3
 proper, not the BC head alone); (3) Phase-2 divergence selector —
-the ~15 banked dev-10 rows are its ready-made validation set; (4)
-paper drafting (Method + Phase-1 + closed-loop sections are fully
-evidenced). Check `outputs/PIPELINE_STATUS.md` + `squeue -u $USER` at
-session start (self-driving chains may be in flight).
+DONE 2026-08-01, VERDICT INVERTED: on-policy latent match ANTI-predicts
+closed-loop (Spearman -0.60 all pairs / -0.47 within multi-only;
+divergence +0.56) — the metric measures reward exploitation, not
+driving; a first-class negative finding (runs/phase2_selector/,
+scripts/phase2_selector.py — 17-model registry, reproducible join);
+(4) paper drafting — STARTED: **paper/draft.md v0.1** is a complete
+working draft (abstract -> limitations, four contributions, all real
+numbers with src pointers, figure specs). Open decision for the
+author: keep the multimodality title or re-scope to the full
+what-transfers arc. Check `outputs/PIPELINE_STATUS.md` +
+`squeue -u $USER` at session start (self-driving chains may be in
+flight).
 
 Benchmark rows banked (runs/bench220*, all 220 routes each):
 | model | DS | completion | success |
