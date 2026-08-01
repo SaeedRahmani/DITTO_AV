@@ -26,11 +26,19 @@ doses collapse penalty), 3-route 3x3 now actively MISLEADS vs dev-10
 a selector; dev-10 is the minimum honest signal).
 Binding constraint for DS 40+: the 104/220 in-game-budget timeouts
 (plan slows/stalls in obstructed+dense states, state-level OOD).
-Remaining untested levers, in value order: (1) Phase-3 capacity/steps
-scaling of BC head + WM (all nets still smoke-scale); (2)
-imagination-DAgger / state-OOD robustness (Phase-4 idea); (3) Phase-2
-divergence selector — the ~15 banked dev-10 rows are its validation
-set. Check `outputs/PIPELINE_STATUS.md` + `squeue -u $USER` at
+PROBE LEDGER FINAL (2026-08-01): SEVEN consecutive post-220 probes
+failed the dev-10 gate — v12/v14g (speed), gap1/gap2 (corridor),
+lw/lw2 (upweight), cap 512x3 (20.40/68.7, 10/30: capacity HURT —
+sharper copy-prior, timeouts 14). The champion config is a genuine
+local optimum on every cheap axis; do NOT burn more compute on
+single-axis config probes. Remaining levers are STRUCTURAL:
+(1) imagination-DAgger / state-OOD robustness (Phase-4 idea — the
+evidence points exactly here: plan quality in states the expert never
+visits); (2) WM+steps scaling done jointly at final scale (Phase 3
+proper, not the BC head alone); (3) Phase-2 divergence selector —
+the ~15 banked dev-10 rows are its ready-made validation set; (4)
+paper drafting (Method + Phase-1 + closed-loop sections are fully
+evidenced). Check `outputs/PIPELINE_STATUS.md` + `squeue -u $USER` at
 session start (self-driving chains may be in flight).
 
 Benchmark rows banked (runs/bench220*, all 220 routes each):
