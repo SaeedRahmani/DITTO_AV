@@ -145,10 +145,28 @@ Failure profile SHIFTED (2026-08-01 analysis): wedging nearly
 eliminated (9 blocked vs 136 in gen-1 era); 104/220 routes now die at
 the ~200 s in-game budget ("Failed - TickRuntime", mean completion
 47.6% at cutoff; completed routes take 65 s) with min_speed 2750.
-SPEED is the binding constraint for completion AND penalty. Next
-lever (deployment-only): tracker v_max (default 8.0 caps below the
-expert's own plan spacing, which reaches ~13.6 m/s) + speed_gain.
-Probe ladder: 3x3 -> dev-10 -> fresh 220 if it wins.
+SPEED is the binding constraint for completion AND penalty.
+DEPLOYMENT-LEVER LEDGER (2026-08-01, all dev-10, gate = rec
+30.49/83.2/0.335 20-30 full; verdicts committed):
+- v_max 12 / 14+gain: NEGATIVE (21.55/75.3; cap engaged 16% of ticks
+  but mean speed unchanged 1.4 m/s — standstill time dominates).
+- Tick audit: 41% of ALL ticks = plan-says-GO-but-static (queuing only
+  2.2%); recovery active 12.5%; ~21 obstruction stretches/route. The
+  car grinds into leads/obstacles (no gap logic) and sits in (obs,
+  action) states the expert never produced — where the BC plan is OOD.
+- lead_gap (RoutePID corridor cap): collisions halved 44->19, penalty
+  0.449, timeouts 5 — but blocked 0->10 (brake-hold starved the
+  throttle>0 recovery trigger); completion 65.4. GATE FAILED.
+- gap2 (+recovery sees plan intent during hold): 31.46/64.9/0.470
+  (13/30) — DS edges the champion, SR collapses (blocked 12: the plan
+  never commits the bypass from standstill even with room). NOT a
+  champion replacement; KEEP as the paper's controller-safety ablation.
+CONCLUSION (echoes the control-era settled lesson): deployment levers
+are exhausted; the binding constraint is PLAN QUALITY IN
+STOPPED/OBSTRUCTED (OOD) STATES — training-side. Next: launch/maneuver
+frame upweighting in BC sampling (WM reused, BC-only retrain);
+then prev-action noise augmentation; then Phase-5 seeds of the final
+config. Champion for the paper remains wph rec (220: 22.10/39.1%).
 
 ## Goal (do not lose sight of this)
 
