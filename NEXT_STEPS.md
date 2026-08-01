@@ -7,13 +7,31 @@ History: git log of this file — old session narratives were compressed
 out on 2026-07-29 (C2 cleanup); nothing scientific was lost, the
 verdicts live in runs/ and the settled-facts list below.
 
-## >>> HANDOFF 2026-07-31 — read this first <<<
+## >>> HANDOFF 2026-08-01 — read this first <<<
 
-State: GEN-3 Phase 0 is CLOSED (all verdicts below); the next work is
-**Phase 1: waypoint action head + PID deployment** — pure
-implementation, nothing queued on the cluster. Check
-`outputs/PIPELINE_STATUS.md` + `squeue -u $USER` at session start
-anyway (self-driving chains may have been launched by another session).
+State: GEN-3 Phases 0 AND 1 are CLOSED. **Champion = gen3_wph rec**
+(waypoint BC head on the reused gen3_clean control-action WM,
+WaypointTracker + reverse recovery; configs/diag_gen3_wph_bc_rec.yaml;
+ckpts ~/ditto_out/b2d_gen3_wph): **220-route FINAL DS 22.10 /
+completion 68.7% / SR 39.1%** (runs/bench220_gen3wph) — project
+records; SR beats all published baselines (DriveAdapter 33.08).
+Phase-5 seed bars exist (dev-10 seeds 0/1/2: 30.49/25.86/28.45,
+mean ~28.3 +- 2.3 — full-pipeline retrains s1/s2).
+The COMPLETE post-champion probe ledger (7 verdicts, all dev-10-gated,
+evidence in runs/carla_smoke/gen3_wph_era/) is in the sections below —
+read it before proposing any deployment tweak or BC-sampling change:
+everything cheap has been measured; upweighting family DEAD (both
+doses collapse penalty), 3-route 3x3 now actively MISLEADS vs dev-10
+(lw2: 45.40 3x3 vs 15.64 dev-10 — even short-route closed-loop is not
+a selector; dev-10 is the minimum honest signal).
+Binding constraint for DS 40+: the 104/220 in-game-budget timeouts
+(plan slows/stalls in obstructed+dense states, state-level OOD).
+Remaining untested levers, in value order: (1) Phase-3 capacity/steps
+scaling of BC head + WM (all nets still smoke-scale); (2)
+imagination-DAgger / state-OOD robustness (Phase-4 idea); (3) Phase-2
+divergence selector — the ~15 banked dev-10 rows are its validation
+set. Check `outputs/PIPELINE_STATUS.md` + `squeue -u $USER` at
+session start (self-driving chains may be in flight).
 
 Benchmark rows banked (runs/bench220*, all 220 routes each):
 | model | DS | completion | success |
@@ -163,10 +181,17 @@ DEPLOYMENT-LEVER LEDGER (2026-08-01, all dev-10, gate = rec
   champion replacement; KEEP as the paper's controller-safety ablation.
 CONCLUSION (echoes the control-era settled lesson): deployment levers
 are exhausted; the binding constraint is PLAN QUALITY IN
-STOPPED/OBSTRUCTED (OOD) STATES — training-side. Next: launch/maneuver
-frame upweighting in BC sampling (WM reused, BC-only retrain);
-then prev-action noise augmentation; then Phase-5 seeds of the final
-config. Champion for the paper remains wph rec (220: 22.10/39.1%).
+STOPPED/OBSTRUCTED (OOD) STATES — training-side.
+TRAINING-SIDE ROUND (2026-08-01, all dev-10):
+- lw@4/2 (launch 4x + maneuver 2x upweight): 19.72/78.4/0.258 — fixed
+  launches (blocked 1/30) but penalty collapsed. GATE FAILED.
+- lw2 (launch 2x only): 15.64/75.2/0.185 — WORSE penalty at the lower
+  dose; family DEAD. (Its 3x3 said 45.40 — 3x3 is no longer a
+  selector; another open!=closed instance for the paper.)
+- Phase-5 seeds of the champion (full-pipeline): s0 30.49/83.2 (20/30)
+  s1 25.86/73.0 (16/30) s2 28.45/70.6 (12/30) — mean ~28.3 +- 2.3,
+  all >= gen2 champion band; deploy seed 0.
+Champion for the paper remains wph rec (220: 22.10/39.1%).
 
 ## Goal (do not lose sight of this)
 
