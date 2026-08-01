@@ -1,0 +1,28 @@
+# Phase-3 opener: BC-head capacity 512x3 (vs 256x2 champion) — all
+# nets are still smoke-scale; the plan's failure states (obstructed,
+# dense) may simply be under-fit. Same reused gen3_clean WM, same
+# sampling (uniform — upweight family measured dead), same recipe.
+run_dir: runs/b2d_gen3_wph_cap
+seed: 0
+device: cpu
+env:
+  action_space: continuous
+  wp_head: true
+  extra_obs_dims: 16
+  light_obs: false
+wm:
+  train_steps: 60000
+  batch_size: 32
+  seq_len: 16
+ac:
+  train_steps: 30000
+  horizon: 15
+  batch_size: 64
+  k_modes: 8
+  n_negatives: 16
+  bc_kl_coef: 0.1
+bc:
+  train_steps: 50000
+  lr: 0.0003
+  hidden_dim: 512
+  layers: 3

@@ -584,9 +584,16 @@ try:  # pragma: no cover - requires the carla package + leaderboard on path
             run_cfg = load_config(conf["run_config"])
             self._cfg = run_cfg
             wm = load_world_model(run_cfg, run_cfg.env.obs_dim)
+            # the bc head trains with bc.* dims, the DITTO heads with
+            # ac.* (equal until the gen-3 capacity probe) — match the
+            # checkpoint being loaded, same dispatch as stage_eval
+            policy_name = conf.get("policy", "ditto_multi")
+            hid, lay = ((run_cfg.bc.hidden_dim, run_cfg.bc.layers)
+                        if policy_name == "bc"
+                        else (run_cfg.ac.hidden_dim, run_cfg.ac.layers))
             policy = make_actor_critic(
                 True, run_cfg.wm.feature_dim, run_cfg.env.policy_action_dim,
-                run_cfg.ac.hidden_dim, run_cfg.ac.layers,
+                hid, lay,
                 action_space=("waypoints" if run_cfg.env.wp_out
                               else run_cfg.env.action_space))
             # Phase-1 waypoint abstraction: the policy predicts future
@@ -599,7 +606,7 @@ try:  # pragma: no cover - requires the carla package + leaderboard on path
                 if self._wp_mode else None
             import torch as _torch
             ckpt = (run_cfg.dirs()["ckpt"]
-                    / f"{conf.get('policy', 'ditto_multi')}.pt")
+                    / f"{policy_name}.pt")
             policy.load_state_dict(_torch.load(ckpt, map_location="cpu"))
             policy.eval()
             self._driver = ContinuousWMDriver(
