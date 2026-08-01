@@ -304,7 +304,8 @@ class WaypointTracker:
                  lookahead_min: float = 3.0, lookahead_k: float = 1.0,
                  speed_gain: float = 1.0, stride_s: float = WP_STRIDE / FPS,
                  creep_after: int = 0, creep_throttle: float = 0.4,
-                 ema: float = 0.0):
+                 ema: float = 0.0, lead_gap: bool = False,
+                 stop_wall: float = 6.0, corridor_half: float = 1.7):
         self.v_max, self.a_lat = v_max, a_lat
         self.kp_speed, self.kp_steer = kp_speed, kp_steer
         self.lmin, self.lk = lookahead_min, lookahead_k
@@ -316,6 +317,18 @@ class WaypointTracker:
         # ticks on the bad runs); at 0.1 s/model-tick, 0.5 ~ 0.2 s lag
         self.ema = float(ema)
         self._plan: Optional[np.ndarray] = None
+        # lead_gap: privileged corridor speed cap ported verbatim from
+        # RoutePIDDriver (Phase-0d, scored 100.00 with it). The dev-10
+        # tick audit (2026-08-01) showed 41% of ALL ticks are
+        # "plan says GO, car static": with no gap logic the car closes
+        # on leads/obstacles to bumper contact, grinds (44 vehicle
+        # collisions/30 runs) and sits in (obs, action) states the
+        # expert never produced — exactly where the BC plan degrades.
+        # Stopping pre-contact keeps the state in-distribution and
+        # launchable. Same privileged inputs the obs already carries.
+        self.lead_gap = bool(lead_gap)
+        self.stop_wall = stop_wall
+        self.corridor_half = corridor_half
         # creep_after > 0: after that many consecutive commanded-stop
         # ticks at standstill, apply creep_throttle (the standard
         # Bench2Drive team-code unblock heuristic). Off by default —
@@ -324,8 +337,11 @@ class WaypointTracker:
         self.creep_throttle = creep_throttle
         self._still = 0
 
-    def act(self, wp_vehicle: np.ndarray, ego_speed: float):
-        """-> (throttle, steer, brake, dbg). wp_vehicle: (k, 2) meters."""
+    def act(self, wp_vehicle: np.ndarray, ego_speed: float,
+            actors_vehicle: Optional[np.ndarray] = None):
+        """-> (throttle, steer, brake, dbg). wp_vehicle: (k, 2) meters;
+        actors_vehicle: (n, 2) vehicle-frame actor positions (used only
+        when lead_gap is on)."""
         wp_vehicle = np.asarray(wp_vehicle, dtype=float)
         if self.ema > 0.0:
             if self._plan is not None:
@@ -360,6 +376,18 @@ class WaypointTracker:
                                     1.5, self.v_max))
         v_t = min(v_wp, v_curve, self.v_max)
 
+        gap = None
+        if self.lead_gap and actors_vehicle is not None:
+            # RoutePIDDriver's corridor gate: nearest actor ahead within
+            # the half-width; linear ramp to a stop stop_wall short of it
+            horizon = max(self.stop_wall, ego_speed * 2.2)
+            for rel in np.asarray(actors_vehicle, dtype=float).reshape(-1, 2):
+                if -1.0 < rel[0] < horizon \
+                        and abs(rel[1]) < self.corridor_half:
+                    gap = rel[0] if gap is None else min(gap, rel[0])
+            if gap is not None:
+                v_t = min(v_t, max(0.0, 0.6 * (gap - self.stop_wall)))
+
         # pure pursuit at arc-length lookahead, interpolated on the
         # polyline (predicted points are up to ~5 m apart at speed)
         steer = 0.0
@@ -391,8 +419,10 @@ class WaypointTracker:
                 self._still = 0
             if self._still > self.creep_after:
                 throttle, brake = self.creep_throttle, 0.0
-        return throttle, steer, brake, {"v_t": round(v_t, 2),
+        return throttle, steer, brake, {"v_t": round(float(v_t), 2),
                                         "v_wp": round(float(v_wp), 2),
+                                        "gap": (None if gap is None
+                                                else round(float(gap), 1)),
                                         "alpha": round(alpha, 3)}
 
 
@@ -764,8 +794,9 @@ try:  # pragma: no cover - requires the carla package + leaderboard on path
                 route=route, light=light)
             a = self._driver.act(obs)
             if self._wp_mode:
-                return self._control_from_waypoints(a, ego_speed, obs,
-                                                    route, light, actors)
+                return self._control_from_waypoints(
+                    a, ego_speed, obs, route, light, actors,
+                    ego_xy, ego_yaw - self._yaw_off)  # raw CARLA yaw
             brake = float(np.clip(a[2], 0.0, 1.0))
             if brake >= self._brake_threshold:
                 throttle, brake = 0.0, 1.0
@@ -812,7 +843,7 @@ try:  # pragma: no cover - requires the carla package + leaderboard on path
             return self._last
 
         def _control_from_waypoints(self, a, ego_speed, obs, route, light,
-                                    actors):
+                                    actors, ego_xy, carla_yaw):
             """Phase-1 deployment tail: predicted wp -> tracker -> control.
 
             The raw 12-dim action already fed the world model inside
@@ -821,7 +852,15 @@ try:  # pragma: no cover - requires the carla package + leaderboard on path
             the tracker's interpretation of it).
             """
             wp_v = wp_to_vehicle(np.asarray(a))
-            throttle, steer, brake, dbg = self._tracker.act(wp_v, ego_speed)
+            actors_v = None
+            if self._tracker.lead_gap and actors:
+                c, s = np.cos(-carla_yaw), np.sin(-carla_yaw)
+                rot = np.array([[c, -s], [s, c]])
+                actors_v = np.stack([rot @ (np.asarray(xy, dtype=float)
+                                            - ego_xy)
+                                     for _, xy, _ in actors])
+            throttle, steer, brake, dbg = self._tracker.act(
+                wp_v, ego_speed, actors_vehicle=actors_v)
             if self._wp_head:
                 # the WM's action channel is the executed control (the
                 # tracker's raw output, pre-recovery — same precedent as

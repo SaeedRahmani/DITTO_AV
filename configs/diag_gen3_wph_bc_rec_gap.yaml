@@ -1,0 +1,11 @@
+# Obstruction fix (2026-08-01 dev-10 tick audit: 41% of ticks =
+# plan-says-GO-but-static; no gap logic -> bumper grinding + OOD
+# stopped states): rec champion + the RoutePID-proven lead-gap
+# corridor cap in the tracker (stop 6 m short, in-distribution waits).
+run_config: /home/srahmani/ditto_out/b2d_gen3_wph_cpu.yaml
+policy: bc
+stochastic: false
+action_repeat: 2
+stuck_recovery: true
+tracker:
+  lead_gap: true

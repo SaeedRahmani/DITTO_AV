@@ -257,6 +257,30 @@ def test_tracker_ema_smoothing():
     assert abs(dbg["v_t"] - 6.0) < 0.05
 
 
+def test_tracker_lead_gap():
+    """RoutePID's corridor cap, ported: stop stop_wall short of a lead."""
+    trk = WaypointTracker(lead_gap=True)
+    fast = straight_wp(4.0)  # plan says 8 m/s
+    # bumper-close lead dead ahead -> full stop despite the eager plan
+    throttle, _, brake, dbg = trk.act(fast, ego_speed=5.0,
+                                      actors_vehicle=np.array([[4.0, 0.0]]))
+    assert throttle == 0.0 and brake > 0.5 and dbg["v_t"] == 0.0
+    # mid-range lead: ramped cap 0.6*(10-6)=2.4
+    _, _, _, dbg = trk.act(fast, ego_speed=5.0,
+                           actors_vehicle=np.array([[10.0, 0.0]]))
+    assert abs(dbg["v_t"] - 2.4) < 1e-6 and dbg["gap"] == 10.0
+    # outside the corridor (3 m lateral) or behind: no cap
+    _, _, _, dbg = trk.act(fast, ego_speed=5.0,
+                           actors_vehicle=np.array([[10.0, 3.0],
+                                                    [-5.0, 0.0]]))
+    assert dbg["gap"] is None and dbg["v_t"] > 7.0
+    # gate off by default: the same lead is ignored
+    off = WaypointTracker()
+    _, _, _, dbg = off.act(fast, ego_speed=5.0,
+                           actors_vehicle=np.array([[4.0, 0.0]]))
+    assert dbg["v_t"] > 7.0
+
+
 def test_tracker_creep_gate():
     trk = WaypointTracker(creep_after=3, creep_throttle=0.33)
     for _ in range(3):
