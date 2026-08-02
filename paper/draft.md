@@ -277,6 +277,17 @@ letting the trajectory feed the dynamics model's action channel.
   "BC beats multi" across objectives (−0.90 on the dev-10 subset) and
   is flat within-objective (−0.20)
   [src: runs/phase2_selector/table.md].
+  Notably, the original DITTO paper already documented this decoupling
+  *in its own favor*: their expert-prediction-accuracy figure shows
+  DITTO matching expert actions worst among baselines while achieving
+  the best returns — action agreement is not performance. Our results
+  are the same decoupling with the sign flipped by the domain: under
+  an effectively unimodal expert with exogenous-dominated latents,
+  the proxy improves (our gen-4 policies beat their own BC anchor on
+  waypoint MAE, 0.045 vs 0.062) while behavior degrades. The
+  practitioner's rule is symmetric: imitation proxies can under- or
+  over-state control quality, and only closed-loop evaluation
+  distinguishes the two regimes.
 - **Even short-route closed-loop misranks**: a 3-route smoke and the
   10-route dev set disagree by 3× on composed score for the same
   checkpoint (45.4 vs 15.6). Our protocol: 10-route × 3-rep dev set as
