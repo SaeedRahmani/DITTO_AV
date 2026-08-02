@@ -7,7 +7,33 @@ History: git log of this file — old session narratives were compressed
 out on 2026-07-29 (C2 cleanup); nothing scientific was lost, the
 verdicts live in runs/ and the settled-facts list below.
 
-## >>> HANDOFF 2026-08-01 — read this first <<<
+## >>> HANDOFF 2026-08-02 — read this first <<<
+
+**GEN-4 DITTO-WP CLOSED (2026-08-02): the DITTO-loyal imagination
+refinement of the wp head LOSES to plain BC at EVERY dose — 5-point
+curve, all dev-10 (champion BC = 30.49/83.2, 20/30):**
+| variant | score/compl | full |
+|---|---|---|
+| v1: kl 0.1 + divergent starts | 3.46/50.4 | 4/30 |
+| kl 0.3 + divergent | 19.49/70.8 | 11/28 |
+| kl 0.3, no divergent | 24.07/80.8 | 15/30 |
+| kl 0.3, no div, 3k steps (early stop) | 13.31/71.1 | 16/30 |
+| kl 1.0, no divergent, 30k | 18.08/60.5 | 12/30 |
+The architecture was the most careful loyal instantiation possible:
+deployment-consistent imagination (dream through the equivalence-
+pinned tracker port), task-projected nearest-mode rewards (wp-probe
+subspace, R2 0.82), retrieval-relabeled divergent starts, bc_kl
+anchor. Attributions: divergent starts are actively harmful
+(off-manifold retrieval injects bad targets); the residual harm is the
+imagination pressure itself; and in the es/k10 runs the DETERMINISTIC
+mean wp-MAE improved BELOW BC's (0.045-0.051 vs 0.062) while driving
+degraded — the metric-inversion finding in its sharpest form. Evidence
+in runs/carla_smoke/gen4_dwp/. DO NOT re-run imagination-matching
+variants on B2D without a fundamentally new reward idea; the dose axes
+(anchor, steps, start distribution) are exhausted.
+CHAMPION UNCHANGED: gen3_wph BC + rec (220: DS 22.10 / SR 39.1%).
+
+## (previous handoff, 2026-08-01, still-valid context below)
 
 State: GEN-3 Phases 0 AND 1 are CLOSED. **Champion = gen3_wph rec**
 (waypoint BC head on the reused gen3_clean control-action WM,

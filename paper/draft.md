@@ -289,12 +289,47 @@ Highway (controlled, genuinely multimodal data): multi > single > BC on
 every metric, causally tied to multimodality (§4). Bench2Drive at
 scale: latent BC ≥ DITTO-multi closed-loop (dev-10 27.78/70.1 vs
 22.51/64.2; 220 SR 34.1 vs 23.6), and the gap *widens* on the waypoint
-action space. Consistent explanation: the B2D per-state expert is
-effectively unimodal (a single tuned planner), the exogenous-traffic
-latent dominates matching, and the corrective value of on-policy
-imagination is outweighed by reward exploitation. Imagination matching
-is a tool for multimodal demonstration corpora, not a universal
-upgrade.
+action space.
+
+We then built the strongest imagination-refinement variant our
+evidence allowed (DITTO-WP): (i) *deployment-consistent imagination* —
+dream rollouts step the world model through a batched port of the
+deployment tracker (equivalence-pinned by randomized tests), with ego
+speed decoded from the latent, so the imagined dynamics are exactly
+the deployed stack; (ii) *task-projected matching* — rewards computed
+after projecting h through a frozen ridge probe onto expert-waypoint
+labels (R² 0.82), attacking the measured exogenous-latent dominance;
+(iii) *retrieval-relabeled divergent starts* — offline DAgger in
+imagination, with nearest-mode retrieval as the relabeler; (iv) the
+benchmark-proven BC trust-region anchor. The result is a clean
+five-point dose-response, every point below plain BC (10-route dev
+set, BC = 30.49/83.2):
+
+| variant | score / completion |
+|---|---|
+| anchor 0.1 + divergent starts | 3.46 / 50.4 |
+| anchor 0.3 + divergent starts | 19.49 / 70.8 |
+| anchor 0.3, no divergent | 24.07 / 80.8 |
+| anchor 0.3, no divergent, early stop (3k) | 13.31 / 71.1 |
+| anchor 1.0, no divergent | 18.08 / 60.5 |
+
+Attribution: divergent starts are actively harmful (retrieval from
+off-manifold latents fetches behaviorally wrong targets); the residual
+deficit is the imagination pressure itself. The sharpest coda: in the
+early-stop and strong-anchor runs the policy's *deterministic-mean*
+waypoint error improved *below* the BC anchor's (0.045–0.051 vs
+0.062) while closed-loop driving degraded — the objective moves the
+policy in MAE-invisible directions that damage behavior, the
+metric-inversion of §6.2 reproduced inside the training loop itself.
+
+Conclusion: imagination matching is a tool for multimodal
+demonstration corpora; under an effectively unimodal expert at
+benchmark scale it is dose-invariantly harmful even with
+deployment-consistent dynamics, task-projected rewards, and anchoring
+— a boundary we could only locate with closed-loop evaluation.
+
+*Figure 4 (spec): the five-point dose-response bar chart vs the BC
+line; data runs/carla_smoke/gen4_dwp/.*
 
 ### 6.4 Failure-mode evolution and the remaining gap
 
