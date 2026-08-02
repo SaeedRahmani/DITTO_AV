@@ -1,13 +1,14 @@
 # One Expert Is Not Enough: Multimodal Latent Matching for Offline World-Model Imitation in Autonomous Driving
 
-*Working draft v0.1 (2026-08-01). Every number in this draft is banked in
-the repo (runs/); pointers are given inline as `[src: ...]`. Figure specs
-are placeholders with exact data sources. Venue target: CoRL / NeurIPS.
-NOTE ON FRAMING (for the author): the working title reflects the Phase-1
-multimodality thesis; the Bench2Drive arc added two further headline
-findings (output parameterization; selection-metric inversion). Decide
-whether to keep the multimodality title or re-scope to the full
-"offline world-model imitation for driving: what transfers" arc.*
+*Version 0.1 — COMPLETE first draft (2026-08-02). Every number is banked
+in the repo (runs/) with inline `[src: ...]` pointers; all four figures
+are generated reproducibly by `scripts/paper_figures.py` into
+paper/figures/ (PDF + PNG). Venue target: CoRL / NeurIPS.
+OPEN ITEMS FOR v0.2 (author decisions): (1) title framing — keep the
+multimodality thesis or re-scope to the full what-transfers arc; (2)
+LaTeX conversion once the venue template is chosen; (3) related-work
+citations need full bibliography entries; (4) optional: a joint
+WM+data scaling run could strengthen the headline row.*
 
 ## Abstract
 
@@ -193,10 +194,11 @@ rollouts from identical resets diverge; in the trained bank the top-16
 retrieved windows (start cosine 0.979) come 36% from the opposite style
 with 33% action disagreement [src: runs/phase1/multimodality_analysis.md].
 
-*Figure 1 (spec): return and collision bars, ID vs shifted, four
-policies; data runs/phase1/phase1_results.md.*
-*Figure 2 (spec): multi-vs-single gap vs style ratio (100/0, 75/25,
-50/50) — the "appears only under multimodality" figure.*
+*Figure 1: `paper/figures/fig1_highway.pdf` — return and collision
+bars, ID vs shifted, three policies + expert reference (3 seeds).*
+*Figure 2: `paper/figures/fig2_multimodality.pdf` — multi−single
+shifted-return gap at style ratios 50/50, 25/75, 100/0; the gap
+vanishes exactly when the data is unimodal.*
 
 ## 5 Bench2Drive: fully offline closed-loop driving at scale
 
@@ -280,8 +282,8 @@ letting the trajectory feed the dynamics model's action channel.
   checkpoint (45.4 vs 15.6). Our protocol: 10-route × 3-rep dev set as
   the minimum honest selection signal; the 220 only for finals.
 
-*Figure 3 (spec): scatter of latent match vs closed-loop completion,
-17 points colored by objective; data runs/phase2_selector/summary.json.*
+*Figure 3: `paper/figures/fig3_selector_inversion.pdf` — latent match
+vs closed-loop completion, 17 control-family points by objective.*
 
 ### 6.3 When does imagination matching help?
 
@@ -328,8 +330,8 @@ benchmark scale it is dose-invariantly harmful even with
 deployment-consistent dynamics, task-projected rewards, and anchoring
 — a boundary we could only locate with closed-loop evaluation.
 
-*Figure 4 (spec): the five-point dose-response bar chart vs the BC
-line; data runs/carla_smoke/gen4_dwp/.*
+*Figure 4: `paper/figures/fig4_dose_response.pdf` — the five-point
+dose-response vs the BC reference line.*
 
 ### 6.4 Failure-mode evolution and the remaining gap
 
