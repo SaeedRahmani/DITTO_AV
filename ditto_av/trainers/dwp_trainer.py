@@ -186,11 +186,14 @@ def train_latent_policy_wp(cfg: Config, wm: VectorWorldModel,
             with torch.no_grad():
                 # diagnostic on the non-divergent head only (the
                 # divergent tail's step-0 state is off-manifold by
-                # design and has no aligned expert label)
+                # design and has no aligned expert label). Use the
+                # DETERMINISTIC mean, not the sample: the Gaussian's
+                # std floor (0.135) alone contributes ~0.11 |noise| and
+                # buried the actual mean drift in the first gen-4 runs.
                 nb = acfg.batch_size - n_div
                 expert_wp = bank.wp[bank.window_starts[window_ids[:nb]]]
-                m = (policy.clamp(actions[0][:nb])
-                     - expert_wp).abs().mean()
+                mu = policy.act(feats[0][:nb], stochastic=False)
+                m = (mu - expert_wp).abs().mean()
             print(f"{name} step {step:5d} | reward {rewards.mean():.4f} "
                   f"| return {returns.mean():.3f} | entropy {entropy:.2f} "
                   f"| step0 wp-mae {m:.4f}")
