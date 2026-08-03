@@ -211,7 +211,10 @@ class CLPConfig:
     sigma_p: float = 1.0
     sigma_yaw: float = 0.3
     sigma_v: float = 2.0
+    sigma_p2: float = 4.0     # broad kernel component (0 = off)
+    p2_weight: float = 0.3
     collision_penalty: float = 0.0  # 0 = thesis-pure arm
+    penalty_ignore_rear: bool = True  # ghost rear-ends don't count
 
 
 @dataclass

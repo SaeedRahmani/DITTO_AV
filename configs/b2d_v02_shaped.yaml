@@ -1,0 +1,21 @@
+# v0.2 shaped arm: matching reward + front-impact collision penalty.
+# G1 evidence (runs/egosim_selector + V02_PLAN §8 2026-08-03): within
+# the healthy model band, expert-closeness does NOT rank dev-10 DS —
+# collision rate is the transferring correlate (+0.50 vs completion).
+# The thesis-pure arm (b2d_v02.yaml) remains the registered control.
+run_dir: runs/b2d_v02_shaped
+seed: 0
+device: cpu
+env:
+  action_space: continuous
+  wp_head: true
+  extra_obs_dims: 16
+  light_obs: false
+  global_arrays: true
+clp:
+  bc_steps: 8000
+  rl_steps: 4000
+  bc_kl_coef: 0.1
+  divergent_frac: 0.25
+  collision_penalty: 0.5
+  penalty_ignore_rear: true

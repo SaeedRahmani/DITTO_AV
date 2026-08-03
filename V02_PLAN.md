@@ -215,6 +215,31 @@ reward-meaning diagnosis itself — report honestly.
 
 ## 8. Status ledger (newest first)
 
+- 2026-08-03 pm (G1 VERDICT — strict gate FAILED, refined role
+  adopted; SESSION A login cross-checks, 48-clip val split, 12 banked
+  models, two protocols H=40 and H=80+3-battery;
+  runs/egosim_g1_login/): (a) the reward separates broken from healthy
+  with a huge margin — every gen-4 DWP scores below every healthy BC
+  variant (v0.1's latent metric: −0.60 on the same question) — and is
+  maximized on the expert path by construction (G0). (b) Within the
+  healthy band it CANNOT rank dev-10 DS: H=40 compresses the BC family
+  (0.175–0.202); H=80 floors the kernel (all models 17–31 m off).
+  (c) SUBSTANTIVE FINDING: short-horizon expert-closeness ANTI-orders
+  the healthy family (lw/cap track the expert closest yet score worst;
+  the champion wins by conservatism), while collision rate correlates
+  +0.50 with dev-10 completion — safety events transfer, closeness
+  does not (paper finding; echoes v0.1 open≠closed). CONSEQUENCES:
+  reward upgraded (multi-scale kernel σ_p 1 m + 4 m mix, keeps
+  gradient alive off-path; front-impact-only collision penalty — ghost
+  rear-ends by non-reactive replay excluded); shaped arm PROMOTED to
+  co-primary (configs/b2d_v02_shaped.yaml) beside the registered
+  thesis-pure arm; G1's role narrowed to reward-sanity + broken-model
+  detection (PASSED in that role); the decisive go/no-go is now G2
+  (beat own BC init in-sim) + G3/G4 transfer. Do NOT re-run G1
+  expecting a ranking — no short-horizon matching metric ranks
+  near-band drivers. RECOMMENDATION for B's queued 10567542: let it
+  run (thesis-pure G2 = the registered Arm-B ablation point), then run
+  the shaped arm.
 - 2026-08-03 pm: M3+M4 IN FLIGHT (SESSION B): G1 selector script landed
   (scripts/egosim_selector.py — 12 banked wp-family models, dev-10 truth
   3.46-30.49, gate Spearman >= +0.4); v0.2 configs (b2d_v02 297-clip,

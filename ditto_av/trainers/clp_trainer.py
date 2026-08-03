@@ -41,7 +41,9 @@ def sim_from_config(cfg: Config, log: GlobalLog) -> EgoSim:
                   dtheta_max=c.sim_dtheta_max),
         RewardParams(tau=c.reward_tau, sigma_p=c.sigma_p,
                      sigma_yaw=c.sigma_yaw, sigma_v=c.sigma_v,
-                     collision_penalty=c.collision_penalty))
+                     sigma_p2=c.sigma_p2, p2_weight=c.p2_weight,
+                     collision_penalty=c.collision_penalty,
+                     penalty_ignore_rear=c.penalty_ignore_rear))
 
 
 def _seq_batch(log: GlobalLog, starts: torch.Tensor, T: int):
@@ -133,7 +135,11 @@ def _rollout(policy: TokenPolicy, sim: EgoSim, log: GlobalLog,
             r = sim.reward(frame, xy, th, v)
             col = sim.collisions(frame, xy, th)
             if sim.r.collision_penalty > 0:
-                r = r - sim.r.collision_penalty * col.float()
+                col_pen = sim.collisions(
+                    frame, xy, th,
+                    ignore_rear=sim.r.penalty_ignore_rear) \
+                    if sim.r.penalty_ignore_rear else col
+                r = r - sim.r.collision_penalty * col_pen.float()
             err = (log.ego[frame][:, 0:2] - xy).norm(dim=-1)
             obs_l.append(obs)
             act_l.append(a)

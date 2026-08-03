@@ -113,7 +113,16 @@ class RewardParams:
     sigma_p: float = 1.0      # m
     sigma_yaw: float = 0.3    # rad
     sigma_v: float = 2.0      # m/s
+    # multi-scale position kernel: mix in a broad component so the
+    # gradient survives beyond ~3 m off-path (G1 finding: the single
+    # 1 m kernel floors out exactly where recovery must be learned)
+    sigma_p2: float = 4.0     # m; 0 disables the broad component
+    p2_weight: float = 0.3    # weight of the broad component
     collision_penalty: float = 0.0  # 0 = thesis-pure arm
+    # only front/side impacts count for the penalty: a slower-than-log
+    # ego being rear-ended by replayed (non-reactive) traffic is a
+    # ghost artifact, not the policy's fault
+    penalty_ignore_rear: bool = True
 
 
 def _rot_world_to_ego(theta: Tensor) -> Tensor:
@@ -300,21 +309,33 @@ class EgoSim:
         dxy = (ex[..., 0:2] - xy.unsqueeze(1)).norm(dim=-1)
         dth = _wrap(ex[..., 2] - theta.unsqueeze(1)).abs()
         dv = (ex[..., 3] - speed.unsqueeze(1)).abs()
-        logk = -0.5 * ((dxy / r.sigma_p) ** 2
-                       + (dth / r.sigma_yaw) ** 2
+        rest = -0.5 * ((dth / r.sigma_yaw) ** 2
                        + (dv / r.sigma_v) ** 2)
-        return logk.exp().max(dim=1).values
+        kern = torch.exp(-0.5 * (dxy / r.sigma_p) ** 2 + rest)
+        if r.sigma_p2 > 0.0:
+            broad = torch.exp(-0.5 * (dxy / r.sigma_p2) ** 2 + rest)
+            kern = (1.0 - r.p2_weight) * kern + r.p2_weight * broad
+        return kern.max(dim=1).values
 
     # ---------------- collisions --------------------------------------
 
-    def collisions(self, frame: Tensor, xy: Tensor, theta: Tensor
-                   ) -> Tensor:
-        """(B,) bool: ego OBB overlaps any replayed actor OBB (SAT)."""
+    def collisions(self, frame: Tensor, xy: Tensor, theta: Tensor,
+                   ignore_rear: bool = False) -> Tensor:
+        """(B,) bool: ego OBB overlaps any replayed actor OBB (SAT).
+
+        ignore_rear drops actors centered behind the ego — a
+        slower-than-log ego being rear-ended by non-reactive replay
+        traffic is a ghost artifact, not a policy fault."""
         log = self.log
         act = log.act[frame]                               # (B, A, 8)
         pres = act[..., 0] > 0.5
         d = (act[..., 1:3] - xy.unsqueeze(1)).norm(dim=-1)
         cand = pres & (d < 10.0)
+        if ignore_rear:
+            R = _rot_world_to_ego(theta)
+            rel = torch.einsum("bij,baj->bai", R,
+                               act[..., 1:3] - xy.unsqueeze(1))
+            cand = cand & (-rel[..., 1] > -1.0)  # forward = -y
         ego_ext = log.ego[frame][:, 4:6]                   # (B, 2)
         ego_yaw = theta - np.pi / 2   # CARLA yaw of the sim ego
         return _obb_overlap_any(xy, ego_yaw, ego_ext,
