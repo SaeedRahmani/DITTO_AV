@@ -215,6 +215,15 @@ reward-meaning diagnosis itself — report honestly.
 
 ## 8. Status ledger (newest first)
 
+- 2026-08-03 ~17:15: **G3 PASSED — best 3x3 results ever banked.**
+  v02rl 57.25 / completion 100.0 / 9/9 full; v02bc 55.51 / 100.0 / 9/9
+  (v0.1 best-ever 3x3: 48.98 composed, never 9/9 full; champion band
+  completions 73-86 there). RL > BC on score AND penalty; both v0.2
+  arms transfer to CARLA. Evidence: runs/carla_smoke/v02/. 3x3 remains
+  a canary — G4 dev-10 submitted for both arms (rlA 10569214,
+  rlB 10569215, bcA 10569216, bcB 10569217; gate: champion 30.49/83.2).
+  Ops lesson banked: sbatch --export comma-splits values — pass
+  VARIANTS via environment, never --export.
 - 2026-08-03 ~16:30: **G2 PASSED (thesis-pure arm, job 10567542)** —
   closed-loop RL beats its own BC init on held-out clips on EVERY
   metric: collision 0.295->0.124 (-58%; the correlate G1 showed
