@@ -1,0 +1,7 @@
+# 999 tight-shaped RL deployment — challenger to the 999t champion
+# (G2: perr 1.58 vs 1.81, col .083 vs .094, prog .718 vs .671)
+run_config: /home/srahmani/ditto_out/b2d_v02_999s_cpu.yaml
+policy: clp_rl
+stochastic: false
+action_repeat: 2
+stuck_recovery: true
