@@ -39,6 +39,7 @@ done
 
 DEP=$(IFS=:; echo "${JOBS[*]}")
 sbatch --dependency=afterany:$DEP --partition=compute-p1 --time=00:20:00 \
+  --ntasks=1 --cpus-per-task=1 --mem-per-cpu=2G \
   --account=research-ceg-tp \
   --output=/scratch/$USER/ditto_av/outputs/slurm-%j.out \
   --wrap="cd $REPO && /scratch/$USER/ditto_av/envs/carla_eval/bin/python \
