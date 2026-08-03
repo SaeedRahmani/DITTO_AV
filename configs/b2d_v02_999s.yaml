@@ -1,0 +1,20 @@
+# v0.2 999-clip scale, TIGHT-SHAPED arm (evidence-selected: tight 1 m
+# kernel + front-impact collision penalty — the penalty transferred at
+# 3x3: shaped 84.36/3 collisions vs pure 57.25/9).
+run_dir: runs/b2d_v02_999s
+seed: 0
+device: cuda
+env:
+  action_space: continuous
+  wp_head: true
+  extra_obs_dims: 16
+  light_obs: false
+  global_arrays: true
+clp:
+  bc_steps: 20000
+  rl_steps: 8000
+  bc_kl_coef: 0.1
+  divergent_frac: 0.25
+  sigma_p2: 0.0
+  collision_penalty: 0.5
+  penalty_ignore_rear: true
