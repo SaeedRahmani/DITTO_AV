@@ -1,0 +1,17 @@
+run_dir: runs/b2d_v02_999s_s2
+seed: 2
+device: cuda
+env:
+  action_space: continuous
+  wp_head: true
+  extra_obs_dims: 16
+  light_obs: false
+  global_arrays: true
+clp:
+  bc_steps: 20000
+  rl_steps: 8000
+  bc_kl_coef: 0.1
+  divergent_frac: 0.25
+  sigma_p2: 0.0
+  collision_penalty: 0.5
+  penalty_ignore_rear: true
