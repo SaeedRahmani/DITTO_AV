@@ -215,6 +215,16 @@ reward-meaning diagnosis itself — report honestly.
 
 ## 8. Status ledger (newest first)
 
+- 2026-08-03 eve — **220 FINAL (runs/bench220_v02_999t_rl): DS 75.88,
+  completion 99.7%, 219/220 full routes, strict zero-infraction success
+  48.2%** — 3.4x the v0.1 record (22.10/39.1%) on identical data +
+  benchmark; exceeds all published Bench2Drive baselines incl.
+  expert-distilled sensor methods (privileged-offline caveat stands).
+  Infraction profile -> M6 order: collisions_vehicle 120 (shaped arm
+  targets this; its dev-10 in flight), stop 29, red_light 12 (no light
+  obs — retest with TokenPolicy), lanes 16, layout 13. Seeds s1/s2
+  @999t queued (G5).
+
 - 2026-08-03 ~18:40 **G4 COMPLETE (both original arms): v02bc
   74.10 / 100.0 / 30/30 — NEW dev-10 RECORD (2.4x the v0.1 champion's
   30.49/83.2/20-30); v02rl 56.89 / 100.0 / 30/30.** Completion is
