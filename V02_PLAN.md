@@ -215,6 +215,15 @@ reward-meaning diagnosis itself — report honestly.
 
 ## 8. Status ledger (newest first)
 
+- 2026-08-03 ~18:40 **G4 COMPLETE (both original arms): v02bc
+  74.10 / 100.0 / 30/30 — NEW dev-10 RECORD (2.4x the v0.1 champion's
+  30.49/83.2/20-30); v02rl 56.89 / 100.0 / 30/30.** Completion is
+  saturated at dev-10 scale by BOTH arms; penalty (infractions) is the
+  entire remaining game — which is where the shaped arm's 3x3 leads
+  (0.844 vs bc 0.741 vs rl 0.569). Shaped dev-10 in flight
+  (10569623/24) = the champion decision. Seeds s1/s2 submitted
+  (10569798/99, MIG). Next: 999-clip scale-up (Session A's cache
+  build) -> dev-10 confirm -> ONE 220 on the winner.
 - 2026-08-03 ~18:00 **G4 PARTIAL — gate smashed, and a first-class
   finding.** v02rl dev-10 FULL: 56.89 / 100.0 / 30/30 (champion:
   30.49 / 83.2 / 20/30) — every v0.2 arm crushes v0.1. BUT v02bc
