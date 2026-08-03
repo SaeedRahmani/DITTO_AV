@@ -201,9 +201,10 @@ class CLPConfig:
     lat_sigma: float = 0.5    # m
     yaw_sigma: float = 0.1    # rad
     v_sigma: float = 1.0      # m/s
-    # sim kinematics (egosim.SimParams; tracker-consistent defaults)
-    sim_v_max: float = 8.0
-    sim_a_max: float = 3.5
+    # sim kinematics (egosim.SimParams; plan-schedule execution — caps
+    # bound garbage plans only, fidelity-tuned on real clips)
+    sim_v_max: float = 14.0
+    sim_a_max: float = 8.0
     sim_dtheta_max: float = 0.35
     # reward geometry (egosim.RewardParams)
     reward_tau: int = 5

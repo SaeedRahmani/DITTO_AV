@@ -96,9 +96,12 @@ class SimParams:
     radius: float = 60.0
     with_route: bool = True
     with_lights: bool = False
-    v_max: float = 8.0        # tracker-consistent target-speed cap
-    a_lat: float = 2.5        # tracker curvature-cap accel
-    a_max: float = 3.5        # accel/brake cap on speed changes, m/s^2
+    # The plan's own time parametrization (points 0.5 s apart) IS the
+    # speed profile; caps exist only against garbage plans, NOT to
+    # second-guess a valid schedule (real-data fidelity: the B2D expert
+    # brakes at up to ~8 m/s^2 and cruises to 13.6 m/s).
+    v_max: float = 14.0       # hard cap, m/s (expert max ~13.6)
+    a_max: float = 8.0        # accel/brake cap on speed changes, m/s^2
     dtheta_max: float = 0.35  # yaw-rate cap per 0.1 s step, rad
     speed_gain: float = 1.0
     stride_s: float = 0.5     # wp spacing in seconds (WP_STRIDE / FPS)
@@ -224,24 +227,23 @@ class EgoSim:
         arc = torch.cat([torch.zeros(B, 1, device=dev),
                          seglen.cumsum(dim=1)], dim=1)
 
-        n_sp = min(2, k)
-        v_wp = p.speed_gain * arc[:, n_sp] / (n_sp * p.stride_s)
-        valid = seglen > 0.3
-        n_valid = valid.sum(dim=1)
+        # Schedule speed from the plan's own time parametrization. A
+        # stride's chord/stride_s is the AVERAGE speed over it (= the
+        # instantaneous speed at its midpoint, +0.25 s), so using it
+        # directly runs ~1 m ahead of a launching expert; under
+        # constant within-second accel the speed at t=0 is exactly
+        # 1.5*v1 - 0.5*v2 (two-stride extrapolation back to now).
+        # The deployment tracker's n_sp=2 average / curvature cap are
+        # control setpoints for CARLA's inertia to low-pass — using
+        # them here drifted 1.7-2.8 m over 4 s on real experts. Caps
+        # below only bound garbage plans.
         b = torch.arange(B, device=dev)
-        idx_first = torch.argmax(valid.float(), dim=1)
-        idx_last = k - 1 - torch.argmax(valid.flip(1).float(), dim=1)
-        s0, s1 = seg[b, idx_first], seg[b, idx_last]
-        cosang = (s0 * s1).sum(-1) / (s0.norm(dim=-1) * s1.norm(dim=-1)
-                                      ).clamp_min(1e-8)
-        dh = torch.acos(cosang.clamp(-1.0, 1.0))
-        kappa = dh / arc[:, -1].clamp_min(1e-3)
-        v_curve = (p.a_lat / kappa.clamp_min(1e-4)).sqrt() \
-            .clamp(1.5, p.v_max)
-        v_curve = torch.where(n_valid >= 2, v_curve,
-                              torch.full_like(v_curve, p.v_max))
-        v_t = torch.minimum(torch.minimum(v_wp, v_curve),
-                            torch.full_like(v_wp, p.v_max))
+        if k >= 2:
+            v_plan = (2.0 * arc[:, 1] - 0.5 * arc[:, 2]).clamp_min(0.0) \
+                / p.stride_s
+        else:
+            v_plan = arc[:, 1] / p.stride_s
+        v_t = (p.speed_gain * v_plan).clamp(max=p.v_max)
 
         v_next = speed + (v_t - speed).clamp(-p.a_max * DT, p.a_max * DT)
         v_next = v_next.clamp_min(0.0)

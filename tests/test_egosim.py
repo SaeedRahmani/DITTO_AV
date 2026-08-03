@@ -228,6 +228,36 @@ def test_divergent_reset_perturbs_only_masked(glog):
     assert torch.equal(xy, xy0)
 
 
+# ------------------------------------------------- real-clip fidelity
+
+
+def test_real_clip_replay_fidelity(tmp_path):
+    """Same gate on a real Bench2Drive clip (skips off-cluster). Real
+    experts accelerate/brake — this is what caught the schedule-speed
+    bias the synthetic constant-speed clips cannot see."""
+    import os
+    clip = Path(os.environ.get(
+        "B2D_CLIP_DIR",
+        f"/scratch/{os.environ.get('USER', '')}/ditto_av/data/"
+        "bench2drive/extracted/Accident_Town03_Route101_Weather23"))
+    if not (clip / "anno").is_dir():
+        pytest.skip("no extracted Bench2Drive clip available")
+    clips_to_npz([clip], tmp_path / "real.npz", with_route=True,
+                 with_waypoints=6, with_global=True)
+    log = GlobalLog([tmp_path / "real.npz"], device="cpu")
+    sim = EgoSim(log, SimParams(), RewardParams())
+    s, e = log.episodes[0]
+    assert e - s >= 60, "clip too short for the fidelity window"
+    frames = torch.tensor([s + 5])
+    xy, th, v = _expert_state(log, frames)
+    errs = []
+    for _ in range(40):
+        xy, th, v = sim.step_ego(log.wp[frames], xy, th, v)
+        frames = frames + 1
+        errs.append(float((log.ego[frames][:, 0:2] - xy).norm()))
+    assert np.mean(errs) < 0.3, f"real-clip mean err {np.mean(errs):.3f}"
+
+
 # ------------------------------------------------------ policy_v2 API
 
 
