@@ -215,5 +215,21 @@ reward-meaning diagnosis itself — report honestly.
 
 ## 8. Status ledger (newest first)
 
+- 2026-08-03 pm: M3+M4 IN FLIGHT (SESSION B): G1 selector script landed
+  (scripts/egosim_selector.py — 12 banked wp-family models, dev-10 truth
+  3.46-30.49, gate Spearman >= +0.4); v0.2 configs (b2d_v02 297-clip,
+  b2d_v02_mini 12-clip); mini pipeline end-to-end verified on login CPU
+  (data 150 s, clp trains, G2 json written); chain submitted:
+  10567541 (compute-p1: data ##glob1 297 + G1, self-committing) ->
+  10567542 (participation H100, afterok: clp bc8k+rl4k + G2). G3 diag
+  configs ready (diag_v02_clp_{rl,bc}.yaml). If G1 FAILS: scancel
+  10567542 and STOP per §4.
+- 2026-08-03 pm: M1+M2 DONE, G0 PASSED (84 tests): egosim core landed
+  (b114cde + 117b4e2, concurrent session) — ##glob1 global arrays,
+  batched log-replay sim (plan-schedule execution: two-stride v0
+  extrapolation + arc-fraction heading; REAL-clip replay fidelity
+  0.07-0.14 m over 4 s), OBB SAT collisions, time-tolerant ego-state
+  reward, TokenPolicy (3.24M params), clp trainers, ObsPolicyDriver
+  deployment path, run_b2d clp stage.
 - 2026-08-03: M0 — plan committed; v0.1 guidance files removed from main
   (preserved on saeed/ver0.1); code review §2 done.
