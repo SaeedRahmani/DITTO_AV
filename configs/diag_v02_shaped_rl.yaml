@@ -1,0 +1,7 @@
+# v0.2 G3 deployment: shaped-arm TokenPolicy (multi-scale kernel +
+# front-impact penalty); same deployment stack as diag_v02_clp_rl.
+run_config: /home/srahmani/ditto_out/b2d_v02_shaped_cpu.yaml
+policy: clp_rl
+stochastic: false
+action_repeat: 2
+stuck_recovery: true
