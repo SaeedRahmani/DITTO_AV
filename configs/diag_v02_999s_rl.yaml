@@ -1,0 +1,7 @@
+# 999-clip tight-shaped RL (penalty on top of tight kernel; G2 sweeps
+# the champion: perr 1.58 col 0.083 prog 0.718)
+run_config: /home/srahmani/ditto_out/b2d_v02_999s_cpu.yaml
+policy: clp_rl
+stochastic: false
+action_repeat: 2
+stuck_recovery: true
