@@ -215,6 +215,19 @@ reward-meaning diagnosis itself — report honestly.
 
 ## 8. Status ledger (newest first)
 
+- 2026-08-03 ~18:00 **G4 PARTIAL — gate smashed, and a first-class
+  finding.** v02rl dev-10 FULL: 56.89 / 100.0 / 30/30 (champion:
+  30.49 / 83.2 / 20/30) — every v0.2 arm crushes v0.1. BUT v02bc
+  A-half: 92.00 / 100.0 / 15/15, penalty 0.920 — plain BC on the
+  TokenPolicy beats pure-RL in CARLA (in-sim G2 said the opposite).
+  Reading: pure state-matching RL exploits the NON-REACTIVE replay
+  traffic (threads gaps that reactive traffic closes -> infractions,
+  penalty 0.569); the registered M6 ghost-traffic risk, observed.
+  Shaped arm (front-impact penalty) sits between on the canary
+  (3x3 84.36 / 100 / 9/9, penalty 0.844) — safety shaping recovers
+  much of the gap, matching G1's collision-transfers finding.
+  In flight: bcB (10569217), shaped d10 (10569623/24). Champion
+  candidate: v02bc or shaped, decided on full dev-10.
 - 2026-08-03 ~17:15: **G3 PASSED — best 3x3 results ever banked.**
   v02rl 57.25 / completion 100.0 / 9/9 full; v02bc 55.51 / 100.0 / 9/9
   (v0.1 best-ever 3x3: 48.98 composed, never 9/9 full; champion band
