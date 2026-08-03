@@ -1,0 +1,6 @@
+# 999-clip tight-pure RL deployment (G2: perr 1.8m, col 0.09 unshaped)
+run_config: /home/srahmani/ditto_out/b2d_v02_999t_cpu.yaml
+policy: clp_rl
+stochastic: false
+action_repeat: 2
+stuck_recovery: true

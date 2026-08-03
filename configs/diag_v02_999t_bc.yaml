@@ -1,0 +1,6 @@
+# 999-clip seq-BC deployment (the scale-up of the current CARLA leader)
+run_config: /home/srahmani/ditto_out/b2d_v02_999t_cpu.yaml
+policy: clp_bc
+stochastic: false
+action_repeat: 2
+stuck_recovery: true
