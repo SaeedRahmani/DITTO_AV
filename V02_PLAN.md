@@ -215,6 +215,13 @@ reward-meaning diagnosis itself — report honestly.
 
 ## 8. Status ledger (newest first)
 
+- 2026-08-03 late — 999s (tight-shaped) dev-10 FINAL 85.63/100% 30/30
+  (A 89.67 / B 81.60) vs 999t 83.60: nominal +2.03, inside seed noise
+  (v0.1 dev-10 spread +-2.3) — statistical tie at the top; G2's in-sim
+  sweep did partially transfer (A-half). Per the pre-registered rule
+  the SECOND 220 fired on 999s = the pure-vs-shaped ablation at
+  headline scale. Seeds (297 s1/s2 + 999t s1/s2, MIG) will calibrate.
+
 - 2026-08-03 eve — **220 FINAL (runs/bench220_v02_999t_rl): DS 75.88,
   completion 99.7%, 219/220 full routes, strict zero-infraction success
   48.2%** — 3.4x the v0.1 record (22.10/39.1%) on identical data +
