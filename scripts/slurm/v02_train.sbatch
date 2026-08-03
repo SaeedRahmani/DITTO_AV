@@ -20,8 +20,8 @@ export WANDB_MODE=offline WANDB_DIR=$HOME/ditto_out
 export XDG_CACHE_HOME=$HOME/ditto_out/cache
 PY=$HOME/envs/ditto_gpu/bin/python
 $PY -c "import torch; assert torch.cuda.is_available()"
-CONFIG=${1:-configs/b2d_v02_297.yaml}
-SUFFIX=${2:-v02_297}
+CONFIG=${1:-configs/b2d_v02.yaml}
+SUFFIX=${2:-v02}
 MANIFEST=${3:-manifests/b2d_clips.txt}
 RUN=$HOME/ditto_out/b2d_$SUFFIX
 mkdir -p $RUN
@@ -32,6 +32,9 @@ cfg = yaml.safe_load(open(sys.argv[1]))
 cfg["run_dir"] = sys.argv[2]
 cfg["device"] = "cuda"
 yaml.safe_dump(cfg, open(sys.argv[2] + "_config.yaml", "w"),
+               sort_keys=False)
+cfg["device"] = "cpu"  # CARLA eval agents run CPU torch
+yaml.safe_dump(cfg, open(sys.argv[2] + "_cpu.yaml", "w"),
                sort_keys=False)
 PYEOF
 for STAGE in data clp; do

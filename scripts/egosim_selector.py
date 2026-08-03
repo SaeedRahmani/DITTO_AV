@@ -95,9 +95,26 @@ def load_model(cfg_path: str, ckpt_dir: Path, policy_name: str,
     return cfg, wm, policy
 
 
+def launch_starts(log: GlobalLog, pool: torch.Tensor,
+                  n: int) -> torch.Tensor:
+    """Start frames where the expert is (nearly) stopped but moves off
+    within 2 s — the launch states where dev-10 actually differentiated
+    the banked models (41% of champion ticks were plan-GO-static)."""
+    speed = log.ego[:, 3]
+    ahead = torch.stack([speed[(pool + k).clamp(
+        max=len(speed) - 1)] for k in range(1, 21)])
+    mask = (speed[pool] < 1.5) & (ahead.max(dim=0).values > 2.0)
+    sel = pool[mask]
+    if len(sel) == 0:
+        return pool[:n]
+    step = max(1, len(sel) // n)
+    return sel[::step][:n]
+
+
 @torch.no_grad()
 def rollout_model(label, cfg, wm, policy, sim: EgoSim, log: GlobalLog,
-                  starts: torch.Tensor, horizon: int, device: str):
+                  starts: torch.Tensor, horizon: int, device: str,
+                  perturb=None, rng=None):
     """Deployment-semantics rollout: WM filter + wp head + tracker port.
 
     wp_head models: the WM action channel is the EXECUTED control
@@ -125,7 +142,7 @@ def rollout_model(label, cfg, wm, policy, sim: EgoSim, log: GlobalLog,
     reset[0] = True
     _, _, state = wm.observe(burn_obs, acts, reset, state)
 
-    xy, th, v = sim.reset(starts)
+    xy, th, v = sim.reset(starts, perturb, rng)
     frame = starts.clone()
     # first sim step's prev action = executed at the last burn-in frame
     prev_action = src[bidx[:, -1]]
@@ -170,7 +187,7 @@ def main():
     ap.add_argument("--data", default="runs/b2d_v02/data")
     ap.add_argument("--out", default="runs/egosim_selector")
     ap.add_argument("--windows", type=int, default=192)
-    ap.add_argument("--horizon", type=int, default=40)
+    ap.add_argument("--horizon", type=int, default=80)
     ap.add_argument("--device", default="cpu")
     ap.add_argument("--models", default=None,
                     help="comma-separated label filter (default: all)")
@@ -191,6 +208,16 @@ def main():
     gen.manual_seed(0)
     starts = pool[torch.randint(len(pool), (args.windows,),
                                 generator=gen)].to(device)
+    # three batteries mirror where dev-10 differentiates: clean cruise,
+    # launches (stopped expert about to move), recovery from
+    # perturbed poses (same-scene targets)
+    batteries = {
+        "clean": (starts, None),
+        "launch": (launch_starts(log, pool, args.windows // 2), None),
+        "divergent": (starts, {"frac": 1.0, "lat_sigma": 0.5,
+                               "yaw_sigma": 0.1, "v_sigma": 1.0}),
+    }
+    print({k: len(s) for k, (s, _) in batteries.items()})
 
     keep = set(args.models.split(",")) if args.models else None
     rows = []
@@ -201,11 +228,32 @@ def main():
             print(f"SKIP {label}: no checkpoint")
             continue
         cfg, wm, policy = load_model(cfg_path, ckpt_dir, pol, device)
-        m = rollout_model(label, cfg, wm, policy, sim, log, starts,
-                          args.horizon, device)
+        m = {"label": label}
+        for bat, (bstarts, perturb) in batteries.items():
+            rng = torch.Generator(device=device)
+            rng.manual_seed(1)
+            bm = rollout_model(label, cfg, wm, policy, sim, log,
+                               bstarts, args.horizon, device,
+                               perturb=perturb, rng=rng)
+            for k, v in bm.items():
+                if k != "label":
+                    m[f"{bat}_{k}"] = v
+        # primary: battery-mean of the late-half reward (early steps
+        # are on-manifold for everyone — uninformative)
+        m["sim_score"] = float(np.mean(
+            [m[f"{b}_sim_reward_late"] for b in batteries]))
+        m["sim_reward"] = float(np.mean(
+            [m[f"{b}_sim_reward"] for b in batteries]))
+        m["pos_err_final"] = float(np.mean(
+            [m[f"{b}_pos_err_final"] for b in batteries]))
+        m["collision_rate"] = float(np.mean(
+            [m[f"{b}_collision_rate"] for b in batteries]))
         m["d10_score"], m["d10_completion"] = d10s, d10c
         rows.append(m)
-        print(f"{label:14s} sim_r {m['sim_reward']:.3f} "
+        print(f"{label:14s} score {m['sim_score']:.3f} "
+              f"(cl {m['clean_sim_reward_late']:.3f} "
+              f"la {m['launch_sim_reward_late']:.3f} "
+              f"dv {m['divergent_sim_reward_late']:.3f}) "
               f"| err@H {m['pos_err_final']:.2f} m "
               f"| col {m['collision_rate']:.3f} "
               f"| dev10 {d10s:.2f}/{d10c:.1f}")
@@ -214,7 +262,7 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     res = {"windows": args.windows, "horizon": args.horizon,
            "burn_in": BURN_IN, "models": rows}
-    for metric in ("sim_reward", "sim_reward_late", "pos_err_final",
+    for metric in ("sim_score", "sim_reward", "pos_err_final",
                    "collision_rate"):
         x = np.array([r[metric] for r in rows])
         sgn = -1.0 if metric in ("pos_err_final", "collision_rate") else 1.0
@@ -226,11 +274,13 @@ def main():
 
     lines = ["# G1: egosim-as-selector validation", "",
              f"{len(rows)} banked wp-family models, {args.windows} val "
-             f"windows x {args.horizon} steps, burn-in {BURN_IN}", "",
-             "| model | sim reward | pos err@H | col rate | dev-10 |",
+             f"windows x {args.horizon} steps, burn-in {BURN_IN}; "
+             "batteries: clean / launch / divergent (score = "
+             "battery-mean late-half reward)", "",
+             "| model | sim score | pos err@H | col rate | dev-10 |",
              "|---|---|---|---|---|"]
-    for r in sorted(rows, key=lambda r: -r["sim_reward"]):
-        lines.append(f"| {r['label']} | {r['sim_reward']:.3f} "
+    for r in sorted(rows, key=lambda r: -r["sim_score"]):
+        lines.append(f"| {r['label']} | {r['sim_score']:.3f} "
                      f"| {r['pos_err_final']:.2f} "
                      f"| {r['collision_rate']:.3f} "
                      f"| {r['d10_score']:.2f}/{r['d10_completion']:.1f} |")
@@ -238,10 +288,10 @@ def main():
     for k, v in res.items():
         if k.startswith("spearman"):
             lines.append(f"- {k}: {v:+.3f}")
-    verdict = ("PASS" if res["spearman_sim_reward_vs_d10_score"] >= 0.4
+    verdict = ("PASS" if res["spearman_sim_score_vs_d10_score"] >= 0.4
                else "FAIL")
     lines += ["", f"**G1 VERDICT: {verdict}** "
-              "(gate: sim_reward vs dev-10 score >= +0.4; v0.1 latent "
+              "(gate: sim_score vs dev-10 score >= +0.4; v0.1 latent "
               "metric was -0.60 on the same question)"]
     (out / "selector.md").write_text("\n".join(lines) + "\n")
     print("\n".join(lines[-8:]))

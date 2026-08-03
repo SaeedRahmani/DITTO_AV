@@ -1,0 +1,7 @@
+# v0.2 clp deployment (G3+): TokenPolicy -> WaypointTracker + reverse
+# recovery (champion deployment stack, only the policy swapped).
+run_config: /home/srahmani/ditto_out/b2d_v02_297_cpu.yaml
+policy: clp_rl
+stochastic: false
+action_repeat: 2
+stuck_recovery: true

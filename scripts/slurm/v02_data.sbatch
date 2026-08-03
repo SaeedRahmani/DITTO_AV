@@ -16,7 +16,7 @@ set -euo pipefail
 module load 2024r1 python/3.10.12
 source /scratch/$USER/ditto_av/envs/ditto/bin/activate
 export OMP_NUM_THREADS=1 PYTHONUNBUFFERED=1 WANDB_MODE=disabled
-CONFIG=${1:-configs/b2d_v02_297.yaml}
+CONFIG=${1:-configs/b2d_v02.yaml}
 MANIFEST=${2:-manifests/b2d_clips.txt}
 cd /scratch/$USER/ditto_av/DITTO_AV
 python - "$CONFIG" <<'PYEOF'
