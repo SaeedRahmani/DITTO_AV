@@ -215,6 +215,15 @@ reward-meaning diagnosis itself — report honestly.
 
 ## 8. Status ledger (newest first)
 
+- 2026-08-03 ~16:30: **G2 PASSED (thesis-pure arm, job 10567542)** —
+  closed-loop RL beats its own BC init on held-out clips on EVERY
+  metric: collision 0.295->0.124 (-58%; the correlate G1 showed
+  transfers), pos_err@H 6.84->2.75 m, progress 0.52->0.68, reward
+  0.46->0.67; divergent-start gains equal or larger (recovery works,
+  the gen-4 poison is cured). First BC-beating on-policy result at
+  B2D scale in the project. runs/b2d_v02/results/clp_g2.json.
+  G3 3x3 submitted: job 10568836 (participation), v02rl vs v02bc,
+  routes 25381/25378/27494 x3. Shaped arm 10567642 still training.
 - 2026-08-03 pm (G1 VERDICT — strict gate FAILED, refined role
   adopted; SESSION A login cross-checks, 48-clip val split, 12 banked
   models, two protocols H=40 and H=80+3-battery;
