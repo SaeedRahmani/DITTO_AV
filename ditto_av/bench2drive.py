@@ -126,7 +126,8 @@ def load_clip(clip_dir: Path, n_neighbors: int = 6,
               radius: float = 60.0,
               with_route: bool = False,
               with_lights: bool = False,
-              with_waypoints: int = 0) -> Dict[str, np.ndarray]:
+              with_waypoints: int = 0,
+              with_global: bool = False) -> Dict[str, np.ndarray]:
     """Parse one clip directory (containing `anno/*.json.gz`)."""
     clip_dir = Path(clip_dir)
     frames = sorted((clip_dir / "anno").glob("*.json.gz"))
@@ -219,11 +220,101 @@ def load_clip(clip_dir: Path, n_neighbors: int = 6,
     if with_waypoints:
         wp = future_waypoints(raw, yaws, k=with_waypoints)
         out["wp"] = (wp / WP_SCALE).reshape(len(raw), -1).astype(np.float32)
+    if with_global:
+        out.update(global_frame_arrays(raw, yaws, tracks))
     return out
 
 
 WP_STRIDE = 5   # frames between waypoints (0.5 s at the 10 Hz anno rate)
 WP_SCALE = 20.0  # meters; keeps a 3 s horizon roughly within [-1, 1]
+
+GLOB_A_SLOTS = 32  # actor slots per frame in the global (egosim) arrays
+
+
+def global_frame_arrays(raw: List[dict], yaws: np.ndarray,
+                        tracks: List[Dict[str, np.ndarray]]):
+    """Per-frame WORLD-frame state for the v0.2 log-replay sim (egosim).
+
+    Everything the sim needs to rebuild the deployment observation from
+    an arbitrary (deviated) ego pose and to check collisions:
+      ego_glob   (T, 6): x, y, theta(compass), speed, ext_x, ext_y
+      act_glob   (T, A, 8): presence, x, y, vx_w, vy_w, yaw(compass-
+                 comparable CARLA yaw + pi/2? NO — raw anno yaw; see
+                 note), ext_x, ext_y — nearest-first, A=GLOB_A_SLOTS
+      route_glob (T, 6): near_xy, far_xy, near_cmd, far_cmd (world xy;
+                 NaN when the anno lacks the command point)
+      light_glob (T, 4): presence, trigger_xy, state (-1 none)
+
+    Yaw note: actor `rotation` is raw CARLA yaw; the obs features use
+    yaw_rel = actor_yaw - ego_theta with ego_theta = compass. That is
+    exactly how load_clip computes it (a fixed pi/2 offset cancels in
+    NEITHER — load_clip subtracts compass theta from CARLA yaw, and the
+    online featurizer receives raw CARLA yaw with ego_yaw = compass, so
+    both are offset the same way and the obs match; egosim stores the
+    raw anno yaw to reproduce the identical arithmetic).
+    """
+    T = len(raw)
+    A = GLOB_A_SLOTS
+    ego_glob = np.zeros((T, 6), dtype=np.float32)
+    act_glob = np.zeros((T, A, 8), dtype=np.float32)
+    route_glob = np.full((T, 6), np.nan, dtype=np.float32)
+    light_glob = np.zeros((T, 4), dtype=np.float32)
+    light_glob[:, 3] = -1.0
+    for t, fr in enumerate(raw):
+        ego_xy = _ego_xy(fr)
+        ego_ext = np.array([2.45, 1.06])
+        for b in fr.get("bounding_boxes", []):
+            if b.get("class") == "ego_vehicle":
+                ext = b.get("extent")
+                if ext is not None and np.isfinite(ext[:2]).all():
+                    ego_ext = np.asarray(ext[:2], dtype=np.float64)
+                break
+        ego_glob[t] = [ego_xy[0], ego_xy[1], float(yaws[t]),
+                       float(fr["speed"]), ego_ext[0], ego_ext[1]]
+
+        cands = []
+        for b in fr.get("bounding_boxes", []):
+            if b.get("class") not in ("vehicle", "walker", "bicycle"):
+                continue
+            pos = np.array(b["location"][:2], dtype=np.float64)
+            dist = float(np.linalg.norm(pos - ego_xy))
+            if dist < 1e-6:
+                continue
+            prev = tracks[t - 1].get(b["id"]) if t > 0 else None
+            vel_w = (pos - prev) * FPS if prev is not None else np.zeros(2)
+            if np.linalg.norm(vel_w) > V_MAX:
+                vel_w = np.zeros(2)
+            ext = b.get("extent") or [0.5, 0.5]
+            cands.append((dist, [1.0, pos[0], pos[1], vel_w[0], vel_w[1],
+                                 _yaw_rad(b["rotation"]),
+                                 float(ext[0]), float(ext[1])]))
+        cands.sort(key=lambda x: x[0])
+        for i, (_, row) in enumerate(cands[:A]):
+            act_glob[t, i] = row
+
+        for i, tag in enumerate(("near", "far")):
+            x, y = fr.get(f"x_command_{tag}"), fr.get(f"y_command_{tag}")
+            if x is not None and y is not None \
+                    and np.isfinite([x, y]).all():
+                route_glob[t, 2 * i:2 * i + 2] = [x, y]
+            route_glob[t, 4 + i] = float(int(
+                fr.get(f"command_{tag}", 4) or 4))
+
+        lights = [b for b in fr.get("bounding_boxes", [])
+                  if b.get("class") == "traffic_light"
+                  and b.get("affects_ego")]
+        if lights:
+            # mirror _light_block exactly: presence whenever an
+            # affecting light exists; trigger xy only when finite
+            b = min(lights, key=lambda b: b.get("distance", 0.0))
+            tv = b.get("trigger_volume_location")
+            has_tv = tv is not None and np.isfinite(tv[:2]).all()
+            light_glob[t] = [1.0,
+                             tv[0] if has_tv else np.nan,
+                             tv[1] if has_tv else np.nan,
+                             float(int(b.get("state", -1)))]
+    return {"ego_glob": ego_glob, "act_glob": act_glob,
+            "route_glob": route_glob, "light_glob": light_glob}
 
 
 def future_waypoints(raw: List[dict], yaws: np.ndarray,
@@ -252,15 +343,18 @@ def clips_to_npz(clip_dirs: List[Path], out_path: Path,
                  n_neighbors: int = 6,
                  with_route: bool = False,
                  with_lights: bool = False,
-                 with_waypoints: int = 0) -> Dict[str, np.ndarray]:
+                 with_waypoints: int = 0,
+                 with_global: bool = False) -> Dict[str, np.ndarray]:
     """Convert clips into one npz compatible with TrajectoryData.
 
     with_waypoints=k adds a "wp" array (n, k*2), scaled by WP_SCALE —
     the waypoint action target for the Phase-1 abstraction.
+    with_global adds the world-frame egosim arrays (global_frame_arrays).
     """
     parts = [load_clip(d, n_neighbors=n_neighbors, with_route=with_route,
                        with_lights=with_lights,
-                       with_waypoints=with_waypoints)
+                       with_waypoints=with_waypoints,
+                       with_global=with_global)
              for d in clip_dirs]
     data = {
         "obs": np.concatenate([p["obs"] for p in parts]),
@@ -269,6 +363,9 @@ def clips_to_npz(clip_dirs: List[Path], out_path: Path,
     }
     if with_waypoints:
         data["wp"] = np.concatenate([p["wp"] for p in parts])
+    if with_global:
+        for k in ("ego_glob", "act_glob", "route_glob", "light_glob"):
+            data[k] = np.concatenate([p[k] for p in parts])
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(out_path, **data)

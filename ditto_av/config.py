@@ -35,6 +35,10 @@ class EnvConfig:
     # also append the nearest relevant traffic light (presence, ego-frame
     # trigger volume, red/yellow/green one-hot): +6 dims -> extra_obs_dims 22
     light_obs: bool = False
+    # v0.2: store world-frame per-frame state (ego pose, actor tracks,
+    # route/light anchors) in the npz for the egosim log-replay world
+    # (##glob1 cache key; bench2drive.global_frame_arrays)
+    global_arrays: bool = False
 
     @property
     def obs_dim(self) -> int:
@@ -162,6 +166,54 @@ class BCConfig:
 
 
 @dataclass
+class CLPConfig:
+    """v0.2 closed-loop policy: token transformer + GRU trained in the
+    egosim log-replay world (V02_PLAN §3). BC stage pretrains the same
+    net on wp labels; RL stage refines it on-policy with the ego-state
+    matching reward and a KL anchor to the BC snapshot."""
+    # architecture (the scale knobs)
+    d_model: int = 192
+    n_layers: int = 3
+    n_heads: int = 4
+    gru_dim: int = 512
+    head_hidden: int = 256
+    head_layers: int = 2
+    # BC pretrain stage
+    bc_steps: int = 20000
+    bc_lr: float = 3e-4
+    bc_batch: int = 64
+    bc_seq: int = 24          # teacher-forced sequence length
+    # RL stage (egosim rollouts)
+    rl_steps: int = 8000
+    rl_batch: int = 64
+    horizon: int = 40         # sim steps per rollout (4 s at 10 Hz)
+    burn_in: int = 8          # logged-obs GRU warmup frames
+    gamma: float = 0.97
+    lam: float = 0.95
+    actor_lr: float = 1e-4
+    critic_lr: float = 3e-4
+    entropy_coef: float = 3e-3
+    target_tau: float = 0.01
+    bc_kl_coef: float = 0.1   # v0.1 settled: ~0.1 is load-bearing
+    grad_clip: float = 10.0
+    # divergent starts (recovery curriculum; same-scene targets)
+    divergent_frac: float = 0.25
+    lat_sigma: float = 0.5    # m
+    yaw_sigma: float = 0.1    # rad
+    v_sigma: float = 1.0      # m/s
+    # sim kinematics (egosim.SimParams; tracker-consistent defaults)
+    sim_v_max: float = 8.0
+    sim_a_max: float = 3.5
+    sim_dtheta_max: float = 0.35
+    # reward geometry (egosim.RewardParams)
+    reward_tau: int = 5
+    sigma_p: float = 1.0
+    sigma_yaw: float = 0.3
+    sigma_v: float = 2.0
+    collision_penalty: float = 0.0  # 0 = thesis-pure arm
+
+
+@dataclass
 class EvalConfig:
     n_episodes: int = 50
     seed: int = 10_000
@@ -180,6 +232,7 @@ class Config:
     wm: WMConfig = field(default_factory=WMConfig)
     ac: ACConfig = field(default_factory=ACConfig)
     bc: BCConfig = field(default_factory=BCConfig)
+    clp: CLPConfig = field(default_factory=CLPConfig)
     eval: EvalConfig = field(default_factory=EvalConfig)
 
     def dirs(self):

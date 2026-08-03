@@ -149,6 +149,39 @@ class ContinuousWMDriver:
         return a.cpu().numpy()
 
 
+class ObsPolicyDriver:
+    """v0.2 closed-loop driver: recurrent obs policy, no world model.
+
+    The TokenPolicy consumes the featurize_frame obs directly (its GRU
+    is the memory; no WM filter, no prev-action input) and emits the
+    waypoint plan tracked by WaypointTracker. Mirrors how the policy is
+    rolled in egosim during training — one policy.step per model tick.
+    """
+
+    def __init__(self, policy, device: str = "cpu",
+                 stochastic: bool = False):
+        self.policy = policy
+        self.device = device
+        self.stochastic = stochastic
+        self.reset()
+
+    def reset(self):
+        self.state = None
+
+    def set_executed(self, control):
+        pass  # no WM action channel in v0.2 deployment
+
+    @torch.no_grad()
+    def act(self, obs_vec: np.ndarray) -> np.ndarray:
+        obs_t = torch.as_tensor(obs_vec, dtype=torch.float32,
+                                device=self.device).view(1, -1)
+        emb = self.policy.encode(obs_t)
+        self.state = self.policy.step(emb, self.state)
+        a = self.policy.act(self.policy.features(emb, self.state),
+                            stochastic=self.stochastic)
+        return a[0].cpu().numpy()
+
+
 class RouteCursor:
     """Stateful pop-radius route follower for the near/far conditioning.
 
@@ -583,36 +616,54 @@ try:  # pragma: no cover - requires the carla package + leaderboard on path
                 return
             run_cfg = load_config(conf["run_config"])
             self._cfg = run_cfg
-            wm = load_world_model(run_cfg, run_cfg.env.obs_dim)
-            # the bc head trains with bc.* dims, the DITTO heads with
-            # ac.* (equal until the gen-3 capacity probe) — match the
-            # checkpoint being loaded, same dispatch as stage_eval
-            policy_name = conf.get("policy", "ditto_multi")
-            hid, lay = ((run_cfg.bc.hidden_dim, run_cfg.bc.layers)
-                        if policy_name == "bc"
-                        else (run_cfg.ac.hidden_dim, run_cfg.ac.layers))
-            policy = make_actor_critic(
-                True, run_cfg.wm.feature_dim, run_cfg.env.policy_action_dim,
-                hid, lay,
-                action_space=("waypoints" if run_cfg.env.wp_out
-                              else run_cfg.env.action_space))
-            # Phase-1 waypoint abstraction: the policy predicts future
-            # ego-frame waypoints; a PID tracker turns them into control.
-            # wp_head additionally keeps the WM on control actions and
-            # feeds back the EXECUTED control (set_executed below).
-            self._wp_mode = run_cfg.env.wp_out
-            self._wp_head = run_cfg.env.wp_head
-            self._tracker = WaypointTracker(**(conf.get("tracker") or {})) \
-                if self._wp_mode else None
             import torch as _torch
-            ckpt = (run_cfg.dirs()["ckpt"]
-                    / f"{policy_name}.pt")
-            policy.load_state_dict(_torch.load(ckpt, map_location="cpu"))
-            policy.eval()
-            self._driver = ContinuousWMDriver(
-                wm, policy, run_cfg.env.action_dim,
-                stochastic=bool(conf.get("stochastic", False)),
-                external_feedback=self._wp_head)
+            policy_name = conf.get("policy", "ditto_multi")
+            if policy_name.startswith("clp"):
+                # v0.2: recurrent obs policy trained in egosim — no WM
+                from .models.policy_v2 import make_token_policy
+                policy = make_token_policy(run_cfg)
+                ckpt = run_cfg.dirs()["ckpt"] / f"{policy_name}.pt"
+                policy.load_state_dict(_torch.load(ckpt,
+                                                   map_location="cpu"))
+                policy.eval()
+                self._wp_mode, self._wp_head = True, False
+                self._tracker = WaypointTracker(
+                    **(conf.get("tracker") or {}))
+                self._driver = ObsPolicyDriver(
+                    policy, stochastic=bool(conf.get("stochastic", False)))
+            else:
+                wm = load_world_model(run_cfg, run_cfg.env.obs_dim)
+                # the bc head trains with bc.* dims, the DITTO heads with
+                # ac.* (equal until the gen-3 capacity probe) — match the
+                # checkpoint being loaded, same dispatch as stage_eval
+                hid, lay = ((run_cfg.bc.hidden_dim, run_cfg.bc.layers)
+                            if policy_name == "bc"
+                            else (run_cfg.ac.hidden_dim,
+                                  run_cfg.ac.layers))
+                policy = make_actor_critic(
+                    True, run_cfg.wm.feature_dim,
+                    run_cfg.env.policy_action_dim, hid, lay,
+                    action_space=("waypoints" if run_cfg.env.wp_out
+                                  else run_cfg.env.action_space))
+                # Phase-1 waypoint abstraction: the policy predicts
+                # future ego-frame waypoints; a PID tracker turns them
+                # into control. wp_head additionally keeps the WM on
+                # control actions and feeds back the EXECUTED control
+                # (set_executed below).
+                self._wp_mode = run_cfg.env.wp_out
+                self._wp_head = run_cfg.env.wp_head
+                self._tracker = WaypointTracker(
+                    **(conf.get("tracker") or {})) \
+                    if self._wp_mode else None
+                ckpt = (run_cfg.dirs()["ckpt"]
+                        / f"{policy_name}.pt")
+                policy.load_state_dict(_torch.load(ckpt,
+                                                   map_location="cpu"))
+                policy.eval()
+                self._driver = ContinuousWMDriver(
+                    wm, policy, run_cfg.env.action_dim,
+                    stochastic=bool(conf.get("stochastic", False)),
+                    external_feedback=self._wp_head)
             self._with_route, self._with_lights = extra_obs_layout(
                 run_cfg.env.extra_obs_dims, run_cfg.env.light_obs)
             # set_global_plan can run before setup(); keep its state

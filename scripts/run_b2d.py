@@ -86,6 +86,7 @@ def stage_data(cfg, args):
                        + "##egobox1"  # ego pose from the exact ego box
                        + ("##lights1" if with_lights else "")
                        + (f"##wp{wp_k}" if wp_k else "")
+                       + ("##glob1" if cfg.env.global_arrays else "")
                        ).encode()).hexdigest()[:12]
     cache = Path(args.extracted).parent / "npz_cache"
     cache.mkdir(exist_ok=True)
@@ -99,10 +100,12 @@ def stage_data(cfg, args):
     else:
         tr = clips_to_npz(train, d["data"] / "b2d_train.npz",
                           with_route=with_route, with_lights=with_lights,
-                          with_waypoints=wp_k)
+                          with_waypoints=wp_k,
+                          with_global=cfg.env.global_arrays)
         va = clips_to_npz(val, d["data"] / "b2d_val.npz",
                           with_route=with_route, with_lights=with_lights,
-                          with_waypoints=wp_k)
+                          with_waypoints=wp_k,
+                          with_global=cfg.env.global_arrays)
         try:
             shutil.copy(d["data"] / "b2d_train.npz", ctr)
             shutil.copy(d["data"] / "b2d_val.npz", cva)
@@ -281,8 +284,51 @@ def stage_eval(cfg, args):
     print(f"saved {out} and {out.with_suffix('.md')}")
 
 
+def stage_clp(cfg, args):
+    """v0.2: closed-loop policy (BC pretrain + egosim RL + G2 verdict)."""
+    from ditto_av.egosim import GlobalLog
+    from ditto_av.models.policy_v2 import make_token_policy
+    from ditto_av.trainers.clp_trainer import (evaluate_in_sim,
+                                               sim_from_config,
+                                               train_clp_bc, train_clp_rl)
+    assert cfg.env.global_arrays, "stage clp needs env.global_arrays"
+    d = cfg.dirs()
+    log = GlobalLog([d["data"] / "b2d_train.npz"], device=cfg.device)
+    val_log = GlobalLog([d["data"] / "b2d_val.npz"], device=cfg.device)
+    print(f"egosim log: {log.obs.shape[0]} train / "
+          f"{val_log.obs.shape[0]} val frames, "
+          f"{len(log.episodes)}/{len(val_log.episodes)} clips")
+    if cfg.clp.bc_steps > 0 or not (d["ckpt"] / "clp_bc.pt").exists():
+        train_clp_bc(cfg, log, seed=cfg.seed)
+    train_clp_rl(cfg, log, seed=cfg.seed)
+
+    # G2 verdict: RL policy vs its own BC init, closed-loop on held-out
+    # clips, clean AND divergent starts (the recovery claim)
+    import torch as _torch
+    c = cfg.clp
+    sim = sim_from_config(cfg, val_log)
+    div = {"frac": 1.0, "lat_sigma": c.lat_sigma,
+           "yaw_sigma": c.yaw_sigma, "v_sigma": c.v_sigma}
+    verdict = {}
+    for name in ("clp_bc", "clp_rl"):
+        policy = make_token_policy(cfg).to(cfg.device)
+        policy.load_state_dict(_torch.load(d["ckpt"] / f"{name}.pt",
+                                           map_location=cfg.device))
+        policy.eval()
+        verdict[name] = {
+            "clean": evaluate_in_sim(policy, sim, val_log, c.horizon,
+                                     c.burn_in, seed=cfg.seed),
+            "divergent": evaluate_in_sim(policy, sim, val_log, c.horizon,
+                                         c.burn_in, perturb=div,
+                                         seed=cfg.seed)}
+        print(f"G2 {name}: {verdict[name]}")
+    out = d["results"] / "clp_g2.json"
+    out.write_text(json.dumps(verdict, indent=2))
+    print(f"saved {out}")
+
+
 STAGES = {"data": stage_data, "wm": stage_wm, "policies": stage_policies,
-          "eval": stage_eval}
+          "eval": stage_eval, "clp": stage_clp}
 
 
 def main():
@@ -302,7 +348,10 @@ def main():
     save_config(cfg, cfg.dirs()["run"] / "config.yaml")
     from ditto_av import wandb_util
     wandb_util.init(cfg, name=f"b2d_{Path(cfg.run_dir).name}")
-    stages = list(STAGES) if args.stage == "all" else [args.stage]
+    # "all" keeps the v0.1 four-stage meaning; the v0.2 clp stage is
+    # explicit-only (v0.2 jobs run --stage data then --stage clp)
+    stages = [s for s in STAGES if s != "clp"] if args.stage == "all" \
+        else [args.stage]
     for s in stages:
         t0 = time.time()
         print(f"\n===== stage: {s} =====")
