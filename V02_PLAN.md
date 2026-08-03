@@ -215,6 +215,17 @@ reward-meaning diagnosis itself — report honestly.
 
 ## 8. Status ledger (newest first)
 
+- 2026-08-03 night — **220 PAIR COMPLETE, v0.2 EXPERIMENTAL RECORD
+  CLOSED: pure 75.88/99.7%/99.5% vs shaped 76.10/99.5%/99.1% — dead
+  heat (+0.22).** Closing ablation: with the tight kernel at 999-clip
+  scale, collision shaping adds NOTHING — pure expert-state matching
+  suffices (shaping was worth +11.5 DS only in the wide-kernel 297
+  era). Headline stays the THESIS-PURE arm: DS 75.88, 3.4x the v0.1
+  record, above all published Bench2Drive baselines
+  (privileged-offline caveats; strict zero-infraction SR 48.2% vs
+  33.08 published best). Remaining: seed variance bars (999t s1/s2 on
+  MIG; 297 s1/s2 done, B aggregates) -> M7 paper rewrite.
+
 - 2026-08-03 late — 999s (tight-shaped) dev-10 FINAL 85.63/100% 30/30
   (A 89.67 / B 81.60) vs 999t 83.60: nominal +2.03, inside seed noise
   (v0.1 dev-10 spread +-2.3) — statistical tie at the top; G2's in-sim
