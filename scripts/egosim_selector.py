@@ -1,19 +1,21 @@
 #!/usr/bin/env python3
-"""G1: does the egosim reward rank banked v0.1 models like real CARLA?
+"""G1 gate: does the egosim reward rank real closed-loop drivers?
 
-Drives the wp-head model family (champion + seeds + probes + all gen-4
-DWP doses; dev-10 DS spread 3.46-30.49) through EgoSim with their full
-deployment semantics — WM posterior filter with the executed-control
-feedback (TorchWaypointTracker port), deterministic policy — on held-out
-val-split windows, and correlates the egosim metrics with the banked
-dev-10 driving scores.
+Drives the banked v0.1 wp-output models (known dev-10 truth, range
+3.46-30.49) through EgoSim with their full deployment semantics — RSSM
+posterior filter on the rebuilt obs, waypoint head, executed-control
+feedback through the torch tracker port — and rank-correlates the
+egosim score against the banked dev-10 numbers.
 
-v0.1's on-policy latent metric scored Spearman -0.60 on this question
-(runs/phase2_selector). V02_PLAN gate: clearly positive or DO NOT TRAIN.
+v0.1's on-policy latent metric scored Spearman -0.60 on this exact
+question (runs/phase2_selector). The v0.2 reward must score clearly
+POSITIVE or V02_PLAN says STOP — do not scale training on a reward
+that cannot rank known drivers.
 
-Usage:
-  python scripts/egosim_selector.py --npz /tmp/claude-601880/g1_val48.npz \
-      [--windows 192] [--horizon 40] [--device cpu] [--out runs/egosim_g1]
+Usage (needs the ##glob1 297-clip npz built by run_b2d --stage data
+with configs/b2d_v02.yaml):
+    python scripts/egosim_selector.py --data runs/b2d_v02/data \
+        --out runs/egosim_selector
 """
 from __future__ import annotations
 
@@ -22,8 +24,8 @@ import json
 import sys
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO))
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT))
 
 import numpy as np  # noqa: E402
 import torch  # noqa: E402
@@ -31,94 +33,127 @@ import torch  # noqa: E402
 torch.set_num_threads(4)
 
 from ditto_av.config import load_config  # noqa: E402
-from ditto_av.egosim import (EgoSim, GlobalLog, RewardParams,  # noqa: E402
-                             SimParams)
+from ditto_av.egosim import EgoSim, GlobalLog  # noqa: E402
 from ditto_av.models.nets import make_actor_critic  # noqa: E402
-from ditto_av.models.world_model import VectorWorldModel  # noqa: E402
 from ditto_av.tracker_torch import (TorchWaypointTracker,  # noqa: E402
                                     wp_to_vehicle_t)
+from ditto_av.trainers.clp_trainer import sim_from_config  # noqa: E402
+from ditto_av.trainers.wm_trainer import load_world_model  # noqa: E402
 
-CKPT_BASE = Path.home() / "ditto_out"
+HOME_OUT = Path.home() / "ditto_out"
 
-# label, run dir under ~/ditto_out, policy ckpt name, banked dev-10 DS
-# (sources: NEXT_STEPS.md @ saeed/ver0.1 + runs/carla_smoke ledgers)
+# label, train config, ckpt dir, policy file, dev-10 (score, completion)
+# dev-10 numbers are the banked champion-config (rec) runs; see
+# saeed/ver0.1 NEXT_STEPS + runs/carla_smoke/{gen3_wph_era,gen4_dwp}
 REGISTRY = [
-    ("wph champion s0", "b2d_gen3_wph",        "bc",       30.49),
-    ("wph s1",          "b2d_gen3_wph_s1",     "bc",       25.86),
-    ("wph s2",          "b2d_gen3_wph_s2",     "bc",       28.45),
-    ("wph cap512x3",    "b2d_gen3_wph_cap",    "bc",       20.40),
-    ("wph lw@4/2",      "b2d_gen3_wph_lw",     "bc",       19.72),
-    ("wph lw2",         "b2d_gen3_wph_lw2",    "bc",       15.64),
-    ("dwp v1 kl.1+div", "b2d_gen4_dwp",        "ditto_wp",  3.46),
-    ("dwp kl.3+div",    "b2d_gen4_dwp_k03",    "ditto_wp", 19.49),
-    ("dwp kl.3",        "b2d_gen4_dwp_k03nd",  "ditto_wp", 24.07),
-    ("dwp kl.3 es3k",   "b2d_gen4_dwp_k03nd3k", "ditto_wp", 13.31),
-    ("dwp kl1.0",       "b2d_gen4_dwp_k10nd",  "ditto_wp", 18.08),
-    ("wp-action BC",    "b2d_gen3_wp",         "bc",       19.27),
+    ("wph_bc_s0",   "configs/b2d_gen3_wph.yaml",
+     HOME_OUT / "b2d_gen3_wph", "bc", 30.49, 83.2),
+    ("wph_bc_s1",   "configs/b2d_gen3_wph_s1.yaml",
+     HOME_OUT / "b2d_gen3_wph_s1", "bc", 25.86, 73.0),
+    ("wph_bc_s2",   "configs/b2d_gen3_wph_s2.yaml",
+     HOME_OUT / "b2d_gen3_wph_s2", "bc", 28.45, 70.6),
+    ("wph_cap",     "configs/b2d_gen3_wph_cap.yaml",
+     HOME_OUT / "b2d_gen3_wph_cap", "bc", 20.40, 68.7),
+    ("wph_lw",      "configs/b2d_gen3_wph_lw.yaml",
+     HOME_OUT / "b2d_gen3_wph_lw", "bc", 19.72, 78.4),
+    ("wph_lw2",     "configs/b2d_gen3_wph_lw2.yaml",
+     HOME_OUT / "b2d_gen3_wph_lw2", "bc", 15.64, 75.2),
+    ("dwp_v1",      "configs/b2d_gen4_dwp.yaml",
+     HOME_OUT / "b2d_gen4_dwp", "ditto_wp", 3.46, 50.4),
+    ("dwp_k03",     "configs/b2d_gen4_dwp_k03.yaml",
+     HOME_OUT / "b2d_gen4_dwp_k03", "ditto_wp", 19.49, 70.8),
+    ("dwp_k03nd",   "configs/b2d_gen4_dwp_k03nd.yaml",
+     HOME_OUT / "b2d_gen4_dwp_k03nd", "ditto_wp", 24.07, 80.8),
+    ("dwp_es3k",    "configs/b2d_gen4_dwp_k03nd3k.yaml",
+     HOME_OUT / "b2d_gen4_dwp_k03nd3k", "ditto_wp", 13.31, 71.1),
+    ("dwp_k10nd",   "configs/b2d_gen4_dwp_k10nd.yaml",
+     HOME_OUT / "b2d_gen4_dwp_k10nd", "ditto_wp", 18.08, 60.5),
+    ("wp_action_bc", "configs/b2d_gen3_wp.yaml",
+     HOME_OUT / "b2d_gen3_wp", "bc", 16.37, 69.0),
 ]
 
-
-class BatchedWMWpDriver:
-    """Deployment ContinuousWMDriver semantics, batched for egosim.
-
-    wp_head runs (gen3_wph/gen4): the WM's action channel is the
-    EXECUTED control — the TorchWaypointTracker's reading of the plan
-    (training-consistent, same as DittoCarlaAgent.set_executed).
-    wp-as-action runs (gen3_wp): the raw 12-dim plan feeds back.
-    Recovery/creep/gap are deployment-side levers, absent here (the
-    imagination-has-no-wedges precedent) — noted in the verdict.
-    """
-
-    def __init__(self, wm, policy, wp_head: bool, action_dim: int,
-                 device: str):
-        self.wm, self.policy = wm, policy
-        self.wp_head = wp_head
-        self.action_dim = action_dim
-        self.device = device
-        self.tracker = TorchWaypointTracker()
-
-    def reset(self, batch: int):
-        self.state = self.wm.init_state(batch)
-        self.prev = torch.zeros(batch, self.action_dim,
-                                device=self.device)
-        self.first = True
-
-    @torch.no_grad()
-    def act(self, obs: torch.Tensor, speed: torch.Tensor) -> torch.Tensor:
-        B = obs.shape[0]
-        reset_t = torch.full((1, B), self.first, dtype=torch.bool,
-                             device=self.device)
-        feat, _, self.state = self.wm.observe(
-            obs.view(1, B, -1), self.prev.view(1, B, -1), reset_t,
-            self.state)
-        self.first = False
-        plan = self.policy.act(feat[0], stochastic=False)   # (B, 12)
-        if self.wp_head:
-            self.prev = self.tracker.act(wp_to_vehicle_t(plan), speed)
-        else:
-            self.prev = plan
-        return plan
+BURN_IN = 16
 
 
-def load_model(run: str, policy_name: str, device: str):
-    cfg = load_config(str(CKPT_BASE / run / "config.yaml"))
-    ckpt_dir = CKPT_BASE / run / "checkpoints"
-    wm = VectorWorldModel(cfg.env.obs_dim, cfg.env.action_dim,
-                          cfg.wm).to(device)
-    wm.load_state_dict(torch.load(ckpt_dir / "world_model.pt",
-                                  map_location=device))
+def load_model(cfg_path: str, ckpt_dir: Path, policy_name: str,
+               device: str):
+    cfg = load_config(cfg_path)
+    cfg.run_dir = str(ckpt_dir)
+    cfg.device = device
+    wm = load_world_model(cfg, cfg.env.obs_dim)
     wm.eval()
     hid, lay = ((cfg.bc.hidden_dim, cfg.bc.layers) if policy_name == "bc"
                 else (cfg.ac.hidden_dim, cfg.ac.layers))
     policy = make_actor_critic(
-        True, cfg.wm.feature_dim, cfg.env.policy_action_dim, hid, lay,
-        action_space=("waypoints" if cfg.env.wp_out
-                      else cfg.env.action_space)).to(device)
-    policy.load_state_dict(torch.load(ckpt_dir / f"{policy_name}.pt",
+        cfg.env.continuous, cfg.wm.feature_dim, cfg.env.policy_action_dim,
+        hid, lay, action_space=("waypoints" if cfg.env.wp_out
+                                else cfg.env.action_space)).to(device)
+    policy.load_state_dict(torch.load(ckpt_dir / "checkpoints"
+                                      / f"{policy_name}.pt",
                                       map_location=device))
     policy.eval()
-    assert cfg.env.wp_out, f"{run} is not a wp-output model"
     return cfg, wm, policy
+
+
+@torch.no_grad()
+def rollout_model(label, cfg, wm, policy, sim: EgoSim, log: GlobalLog,
+                  starts: torch.Tensor, horizon: int, device: str):
+    """Deployment-semantics rollout: WM filter + wp head + tracker port.
+
+    wp_head models: the WM action channel is the EXECUTED control
+    (tracker output) — training-consistent feedback, as deployed.
+    waypoints-action models (gen3_wp): the raw plan feeds back.
+    """
+    B = len(starts)
+    wp_head = cfg.env.wp_head
+    action_dim = cfg.env.action_dim
+    tracker = TorchWaypointTracker()
+    state = wm.init_state(B)
+
+    # burn-in on logged frames with logged executed actions
+    lo = log.ep_start[starts]
+    bidx = (starts.unsqueeze(1)
+            + torch.arange(-BURN_IN, 0, device=device)).clamp_min(
+                lo.unsqueeze(1))
+    burn_obs = log.obs[bidx].transpose(0, 1)               # (L, B, O)
+    # executed WM actions along the log: control actions for wp_head
+    # (the expert's executed controls), raw wp labels for wp-action WMs
+    src = log._action_t if wp_head else log.wp
+    acts = torch.zeros(BURN_IN, B, action_dim, device=device)
+    acts[1:] = src[bidx.T[:-1]]        # prev action = action at f_{t-1}
+    reset = torch.zeros(BURN_IN, B, dtype=torch.bool, device=device)
+    reset[0] = True
+    _, _, state = wm.observe(burn_obs, acts, reset, state)
+
+    xy, th, v = sim.reset(starts)
+    frame = starts.clone()
+    # first sim step's prev action = executed at the last burn-in frame
+    prev_action = src[bidx[:, -1]]
+    rews, cols, errs = [], [], []
+    for t in range(horizon):
+        obs = sim.build_obs(frame, xy, th, v).unsqueeze(0)  # (1, B, O)
+        act_in = prev_action.unsqueeze(0)
+        rst = torch.zeros(1, B, dtype=torch.bool, device=device)
+        feat, _, state = wm.observe(obs, act_in, rst, state)
+        plan = policy.act(feat[0], stochastic=False)        # (B, 12)
+        if wp_head:
+            control = tracker.act(wp_to_vehicle_t(plan), v)
+            prev_action = control
+        else:
+            prev_action = plan
+        xy, th, v = sim.step_ego(plan, xy, th, v)
+        frame = frame + 1
+        rews.append(sim.reward(frame, xy, th, v))
+        cols.append(sim.collisions(frame, xy, th))
+        errs.append((log.ego[frame][:, 0:2] - xy).norm(dim=-1))
+    rews = torch.stack(rews)
+    cols = torch.stack(cols)
+    errs = torch.stack(errs)
+    return {"label": label,
+            "sim_reward": float(rews.mean()),
+            "sim_reward_late": float(rews[horizon // 2:].mean()),
+            "pos_err_final": float(errs[-1].mean()),
+            "collision_rate": float(cols.any(0).float().mean())}
 
 
 def spearman(x, y):
@@ -132,79 +167,84 @@ def spearman(x, y):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--npz", required=True)
+    ap.add_argument("--data", default="runs/b2d_v02/data")
+    ap.add_argument("--out", default="runs/egosim_selector")
     ap.add_argument("--windows", type=int, default=192)
     ap.add_argument("--horizon", type=int, default=40)
     ap.add_argument("--device", default="cpu")
-    ap.add_argument("--out", default="runs/egosim_g1")
+    ap.add_argument("--models", default=None,
+                    help="comma-separated label filter (default: all)")
     args = ap.parse_args()
     device = args.device
 
-    log = GlobalLog([args.npz], device=device)
-    sim = EgoSim(log, SimParams(), RewardParams())
-    pool = log.window_starts(args.horizon, sim.r.tau + 1)
-    stride = max(1, len(pool) // args.windows)
-    starts = pool[::stride][:args.windows]
-    print(f"{log.obs.shape[0]} frames / {len(log.episodes)} clips; "
-          f"{len(starts)} windows x H={args.horizon}")
+    log = GlobalLog([Path(args.data) / "b2d_val.npz"], device=device)
+    # expert executed controls for wp_head burn-in
+    d = np.load(Path(args.data) / "b2d_val.npz")
+    log._action_t = torch.as_tensor(d["action"], dtype=torch.float32,
+                                    device=device)
+    base = load_config("configs/b2d_v02.yaml")
+    base.device = device
+    sim = sim_from_config(base, log)
 
+    pool = log.window_starts(args.horizon, max(sim.r.tau, 1))
+    gen = torch.Generator()
+    gen.manual_seed(0)
+    starts = pool[torch.randint(len(pool), (args.windows,),
+                                generator=gen)].to(device)
+
+    keep = set(args.models.split(",")) if args.models else None
     rows = []
-    for label, run, pol_name, dev10 in REGISTRY:
-        try:
-            cfg, wm, policy = load_model(run, pol_name, device)
-        except (FileNotFoundError, AssertionError) as e:
-            print(f"SKIP {label}: {e}")
+    for (label, cfg_path, ckpt_dir, pol, d10s, d10c) in REGISTRY:
+        if keep is not None and label not in keep:
             continue
-        driver = BatchedWMWpDriver(wm, policy, cfg.env.wp_head,
-                                   cfg.env.action_dim, device)
-        B = len(starts)
-        driver.reset(B)
-        xy, th, v = sim.reset(starts)
-        frames = starts.clone()
-        rew, col, err = [], [], []
-        for _ in range(args.horizon):
-            obs = sim.build_obs(frames, xy, th, v)
-            plan = driver.act(obs, v)
-            xy, th, v = sim.step_ego(plan, xy, th, v)
-            frames = frames + 1
-            rew.append(sim.reward(frames, xy, th, v))
-            col.append(sim.collisions(frames, xy, th))
-            err.append((log.ego[frames][:, 0:2] - xy).norm(dim=-1))
-        rew = torch.stack(rew)
-        col_rate = float(torch.stack(col).any(0).float().mean())
-        row = {"label": label, "run": run, "policy": pol_name,
-               "dev10_ds": dev10,
-               "sim_reward": float(rew.mean()),
-               "sim_collision": col_rate,
-               "sim_pos_err_final": float(torch.stack(err)[-1].mean())}
-        rows.append(row)
-        print(f"{label:18s} dev10 {dev10:5.2f} | r {row['sim_reward']:.4f}"
-              f" | col {col_rate:.3f} | perr {row['sim_pos_err_final']:.2f}")
+        if not (ckpt_dir / "checkpoints" / f"{pol}.pt").exists():
+            print(f"SKIP {label}: no checkpoint")
+            continue
+        cfg, wm, policy = load_model(cfg_path, ckpt_dir, pol, device)
+        m = rollout_model(label, cfg, wm, policy, sim, log, starts,
+                          args.horizon, device)
+        m["d10_score"], m["d10_completion"] = d10s, d10c
+        rows.append(m)
+        print(f"{label:14s} sim_r {m['sim_reward']:.3f} "
+              f"| err@H {m['pos_err_final']:.2f} m "
+              f"| col {m['collision_rate']:.3f} "
+              f"| dev10 {d10s:.2f}/{d10c:.1f}")
 
-    ds = np.array([r["dev10_ds"] for r in rows])
-    verdict = {
-        "n_models": len(rows),
-        "windows": len(starts), "horizon": args.horizon,
-        "npz": str(args.npz),
-        "spearman_reward_vs_dev10": spearman(
-            np.array([r["sim_reward"] for r in rows]), ds),
-        "spearman_negcol_vs_dev10": spearman(
-            -np.array([r["sim_collision"] for r in rows]), ds),
-        "spearman_negperr_vs_dev10": spearman(
-            -np.array([r["sim_pos_err_final"] for r in rows]), ds),
-        "note": "deployment recovery/gap levers absent in sim; dev-10 "
-                "ground truth uses each run's championed deployment",
-        "rows": rows,
-    }
-    print("\nG1 VERDICT: Spearman(sim reward, dev-10 DS) = "
-          f"{verdict['spearman_reward_vs_dev10']:+.3f} "
-          f"(neg-collision {verdict['spearman_negcol_vs_dev10']:+.3f}, "
-          f"neg-poserr {verdict['spearman_negperr_vs_dev10']:+.3f}) "
-          f"over {len(rows)} models  [v0.1 latent metric: -0.60]")
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
-    (out / "g1_verdict.json").write_text(json.dumps(verdict, indent=2))
-    print(f"saved {out / 'g1_verdict.json'}")
+    res = {"windows": args.windows, "horizon": args.horizon,
+           "burn_in": BURN_IN, "models": rows}
+    for metric in ("sim_reward", "sim_reward_late", "pos_err_final",
+                   "collision_rate"):
+        x = np.array([r[metric] for r in rows])
+        sgn = -1.0 if metric in ("pos_err_final", "collision_rate") else 1.0
+        res[f"spearman_{metric}_vs_d10_score"] = spearman(
+            sgn * x, np.array([r["d10_score"] for r in rows]))
+        res[f"spearman_{metric}_vs_d10_completion"] = spearman(
+            sgn * x, np.array([r["d10_completion"] for r in rows]))
+    (out / "selector.json").write_text(json.dumps(res, indent=2))
+
+    lines = ["# G1: egosim-as-selector validation", "",
+             f"{len(rows)} banked wp-family models, {args.windows} val "
+             f"windows x {args.horizon} steps, burn-in {BURN_IN}", "",
+             "| model | sim reward | pos err@H | col rate | dev-10 |",
+             "|---|---|---|---|---|"]
+    for r in sorted(rows, key=lambda r: -r["sim_reward"]):
+        lines.append(f"| {r['label']} | {r['sim_reward']:.3f} "
+                     f"| {r['pos_err_final']:.2f} "
+                     f"| {r['collision_rate']:.3f} "
+                     f"| {r['d10_score']:.2f}/{r['d10_completion']:.1f} |")
+    lines += ["", "Spearman (higher-is-better orientation):"]
+    for k, v in res.items():
+        if k.startswith("spearman"):
+            lines.append(f"- {k}: {v:+.3f}")
+    verdict = ("PASS" if res["spearman_sim_reward_vs_d10_score"] >= 0.4
+               else "FAIL")
+    lines += ["", f"**G1 VERDICT: {verdict}** "
+              "(gate: sim_reward vs dev-10 score >= +0.4; v0.1 latent "
+              "metric was -0.60 on the same question)"]
+    (out / "selector.md").write_text("\n".join(lines) + "\n")
+    print("\n".join(lines[-8:]))
 
 
 if __name__ == "__main__":

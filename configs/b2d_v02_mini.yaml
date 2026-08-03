@@ -1,0 +1,18 @@
+# 12-clip mini config: pipeline plumbing smoke only (login-node CPU).
+run_dir: runs/b2d_v02_mini
+seed: 0
+device: cpu
+env:
+  action_space: continuous
+  wp_head: true
+  extra_obs_dims: 16
+  light_obs: false
+  global_arrays: true
+clp:
+  bc_steps: 40
+  rl_steps: 10
+  bc_seq: 12
+  bc_batch: 16
+  rl_batch: 16
+  horizon: 20
+  burn_in: 4
