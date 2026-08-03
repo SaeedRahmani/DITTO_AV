@@ -1,0 +1,19 @@
+# v0.2 Stage-1 (Arm B): counterfactual closed-loop imitation on the
+# 297-clip set. No RSSM in the loop: TokenPolicy trains by sequence BC
+# then on-policy A2C inside egosim (log-replay scenes, kinematic ego,
+# ego-state-matching reward). Gates: G1 selector (scripts/
+# egosim_selector.py), G2 sim_eval, G3 3x3, G4 dev-10 (V02_PLAN §4).
+run_dir: runs/b2d_v02_s1
+seed: 1
+device: cpu
+env:
+  action_space: continuous
+  wp_head: true
+  extra_obs_dims: 16
+  light_obs: false
+  global_arrays: true
+clp:
+  bc_steps: 8000
+  rl_steps: 4000
+  bc_kl_coef: 0.1
+  divergent_frac: 0.25
