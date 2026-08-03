@@ -705,8 +705,21 @@ try:  # pragma: no cover - requires the carla package + leaderboard on path
             self._log_path = _os.environ.get("DITTO_AGENT_LOG")
 
         def sensors(self):
-            return [{"type": "sensor.speedometer", "id": "speed",
+            sens = [{"type": "sensor.speedometer", "id": "speed",
                      "reading_frequency": 20}]
+            # presentation-only chase camera (the policy never sees
+            # pixels — privileged vector planner). Enabled by
+            # DITTO_VIDEO_DIR; needs SAVE_PATH set in the job env so
+            # the harness allows the >3 m rig radius (Bench2Drive's
+            # own visualization affordance).
+            import os as _os
+            if _os.environ.get("DITTO_VIDEO_DIR"):
+                sens.append({"type": "sensor.camera.rgb",
+                             "x": -8.0, "y": 0.0, "z": 4.5,
+                             "roll": 0.0, "pitch": -18.0, "yaw": 0.0,
+                             "width": 960, "height": 540, "fov": 100,
+                             "id": "rgb_chase"})
+            return sens
 
         def set_global_plan(self, global_plan_gps, global_plan_world_coord):
             # the base class downsamples the stored plan to ~50 m spacing;
@@ -799,6 +812,13 @@ try:  # pragma: no cover - requires the carla package + leaderboard on path
 
         def run_step(self, input_data, timestamp):
             self._step += 1
+            import os as _os
+            vdir = _os.environ.get("DITTO_VIDEO_DIR")
+            if vdir and "rgb_chase" in input_data \
+                    and self._step % 2 == 0:
+                import cv2 as _cv2
+                _cv2.imwrite(f"{vdir}/{self._step:06d}.jpg",
+                             input_data["rgb_chase"][1][:, :, :3])
             if self._step % self._repeat:
                 return self._last
             if getattr(self, "_route_pid_conf", None) is not None:
