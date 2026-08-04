@@ -140,6 +140,18 @@ PRIORITY CLAIMS: arXiv 2512.18662 (Dec 2025).
 
 ## 9. Status ledger (newest first)
 
+- 2026-08-04: V3-M2 core landed: TrafficModel (ego-conditioned agent
+  transformer, invariant local features + ego-relative geometry,
+  Gaussian local-delta heads, rollout step API), build_scene_windows
+  (id-associated histories; caught+fixed a yaw/vy column bug via the
+  synthetic gates), 7 v0.3 tests green (tracks churn + featurize
+  invariance + overfit sanity). NEXT: W0 harness + ensemble training
+  on the 999 ##glob2 cache (job 10576942), gate ADE@4s <= 3.80 m.
+- 2026-08-04: V3-M1 DONE: act_id/act_cls (##glob2, deterministic
+  actor keys — string-id fixture assumption caught by tests),
+  tracks.py re-association + windows; 88 tests green; real-clip
+  validation consistent with the audit.
+
 - 2026-08-04: V3-A1/A2/A3 AUDIT DONE (runs/v03_audit, 24 clips, 6.4k
   frames, 83k actor-observations): IDs STABLE (1.8% gapped tracks,
   teleports 0.02%), median track 12 s, 84% >= 3 s -> A1 GATE PASSED,
