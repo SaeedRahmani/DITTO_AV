@@ -698,6 +698,7 @@ try:  # pragma: no cover - requires the carla package + leaderboard on path
             self._steer_gain = float(conf.get("steer_gain", 1.0))
             self._throttle_gain = float(conf.get("throttle_gain", 1.0))
             self._prev_xy: Dict[object, np.ndarray] = {}
+            self._ext_cache: Dict[object, tuple] = {}
             self._step = -1
             self._last = carla.VehicleControl()
             # per-model-tick behavior log (jsonl) for debugging closed-loop
@@ -850,6 +851,30 @@ try:  # pragma: no cover - requires the carla package + leaderboard on path
                                    np.array([loc.location.x,
                                              loc.location.y]),
                                    float(np.deg2rad(loc.rotation.yaw))))
+                    if vdir and a.id not in self._ext_cache:
+                        bb = getattr(a, "bounding_box", None)
+                        if bb is not None:
+                            self._ext_cache[a.id] = (
+                                float(bb.extent.x), float(bb.extent.y))
+            if vdir:
+                # per-tick world state for the paired 2D BEV rendering
+                # of the SAME run (render_bev_video.py)
+                import json as _json
+                try:
+                    with open(f"{vdir}/state.jsonl", "a") as f:
+                        f.write(_json.dumps({
+                            "step": self._step,
+                            "ego": [float(ego_xy[0]), float(ego_xy[1]),
+                                    float(ego_yaw - self._yaw_off),
+                                    float(ego_speed)],
+                            "actors": [
+                                [int(i), float(p[0]), float(p[1]),
+                                 float(y),
+                                 *self._ext_cache.get(i, (2.2, 1.0))]
+                                for i, p, y in actors],
+                        }) + "\n")
+                except OSError:
+                    pass
 
             route = None
             if self._with_route:
