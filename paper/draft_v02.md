@@ -180,14 +180,21 @@ training objective.
 
 | policy (identical net/data/tracker) | DS | completion | full routes |
 |---|---|---|---|
-| sequence BC (999 clips) | 71.48 | 87.0% | 24/30 |
-| + on-policy stage, pure reward | **83.60** | **100.0%** | **30/30** |
-| + on-policy stage, +collision penalty | **85.63** | **100.0%** | **30/30** |
-| seeds (s1/s2, both arms) | [SEEDS-TBD] | | |
+| sequence BC (999 clips, seed 0) | 71.48 | 87.0% | 24/30 |
+| + on-policy stage, pure reward (seed 0) | **83.60** | **100.0%** | **30/30** |
+| + on-policy stage, +collision penalty (seed 0) | **85.63** | **100.0%** | **30/30** |
+| pure, 3 seeds | 76.31 ± 7.54 (83.60/76.78/68.55) | 100.0% all | 90/90 |
+| shaped, 3 seeds | 78.39 ± 8.24 (85.63/80.13/69.42) | 100.0% all | 90/90 |
 
-The on-policy stage adds +12.1 DS [SEEDS-TBD: ±band] and removes all
-blocked/incomplete routes; pure-vs-shaped is a statistical tie
-(nominal +2.03, within the ±2.3 seed band of the v0.1-era protocol).
+At matched seed 0 the on-policy stage adds +12.1 DS over BC. Across
+seeds, the DS gap narrows to +4.8 (pure) / +6.9 (shaped) means against
+the single-seed BC row [BC seed bars: in progress], with large seed
+variance (±7.5–8.2) driven by penalty events. The *seed-robust* effect
+is completion: every RL seed completes 30/30 routes (180/180 seed-eval
+runs at 100%), while BC leaves 6/30 unfinished (blocked). Pure vs
+shaped is a statistical tie across seeds (Δmean +2.08 ≪ σ≈8),
+consistent with the 220-scale dead heat (75.88 vs 76.10) — the shaping
+redundancy claim survives seeding.
 
 **Official 220-route benchmark:**
 
@@ -241,8 +248,11 @@ divergence — reactivity is exactly what a learned world model must add
 map/lane input (lane discipline learned implicitly); single benchmark
 family (CARLA/Bench2Drive) and a single expert (Think2Drive); strict
 zero-infraction success is 48–50% — collisions with replayed-vs-live
-traffic mismatches dominate the residual; seed bars pending
-[SEEDS-TBD].
+traffic mismatches dominate the residual; dev-10 seed variance at this performance band is
+large (±7.5–8.2 DS over 3 full-pipeline seeds — penalty events, not
+completion), so single-seed dev-10 comparisons within ~8 DS are not
+individually conclusive; the 220-scale results and the
+completion/blocked contrast carry the load-bearing claims.
 
 ## 8. Conclusion
 

@@ -215,6 +215,16 @@ reward-meaning diagnosis itself — report honestly.
 
 ## 8. Status ledger (newest first)
 
+- 2026-08-04 — **G5 SEED BARS FINAL, v0.2 record CLOSED**: pure
+  76.31 ± 7.54 (83.60/76.78/68.55), shaped 78.39 ± 8.24
+  (85.63/80.13/69.42); Δmean +2.08 ≪ σ — pure-vs-shaped TIE confirmed
+  at seed level, matching the 220 dead heat. ALL 180 seed-eval runs at
+  100% completion — completion is the seed-robust property; DS
+  variance (±8) is penalty events. Deploy seed 0 of either arm;
+  headline system = the pure arm (thesis-clean). BC seed evals in
+  flight to complete the controlled claim's error bars; paper
+  draft_v02.md markers filled.
+
 - 2026-08-03 night — **220 PAIR COMPLETE, v0.2 EXPERIMENTAL RECORD
   CLOSED: pure 75.88/99.7%/99.5% vs shaped 76.10/99.5%/99.1% — dead
   heat (+0.22).** Closing ablation: with the tight kernel at 999-clip
