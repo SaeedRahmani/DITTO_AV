@@ -43,14 +43,14 @@ from ditto_av.models.policy_v2 import make_token_policy  # noqa: E402
 
 HOME_OUT = Path.home() / "ditto_out"
 
-# label, run-config (cpu), checkpoint, color — the current leaders
+# label, run-config (cpu), checkpoint, color — the final 999-scale trio
 MODELS = [
-    ("BC @297 (dev10 74.1)", HOME_OUT / "b2d_v02_cpu.yaml",
-     HOME_OUT / "b2d_v02/checkpoints/clp_bc.pt", "#d62728"),
-    ("shaped-RL @297 (68.4)", HOME_OUT / "b2d_v02_shaped_cpu.yaml",
-     HOME_OUT / "b2d_v02_shaped/checkpoints/clp_rl.pt", "#1f77b4"),
-    ("tight-RL @999 (d10 pending)", HOME_OUT / "b2d_v02_999t_cpu.yaml",
-     HOME_OUT / "b2d_v02_999t/checkpoints/clp_rl.pt", "#2ca02c"),
+    ("BC baseline (dev10 71.5)", HOME_OUT / "b2d_v02_999t_cpu.yaml",
+     HOME_OUT / "b2d_v02_999t/checkpoints/clp_bc.pt", "#d62728"),
+    ("DITTO-AV pure (83.6)", HOME_OUT / "b2d_v02_999t_cpu.yaml",
+     HOME_OUT / "b2d_v02_999t/checkpoints/clp_rl.pt", "#1f77b4"),
+    ("DITTO-AV shaped (85.6)", HOME_OUT / "b2d_v02_999s_cpu.yaml",
+     HOME_OUT / "b2d_v02_999s/checkpoints/clp_rl.pt", "#2ca02c"),
 ]
 EXPERT_C = "black"
 H = 80          # 8 s rollouts
