@@ -1,101 +1,157 @@
 # V03_PLAN.md — v0.3: a learned, reactive world model (branch saeed/v0.3)
 
-Decided with the author 2026-08-04. v0.2 continues on `main` (another
-session); v0.1 is frozen on `saeed/ver0.1`. This branch works ONLY in
-the worktree `/scratch/$USER/ditto_av/DITTO_AV_v03` — NEVER check
-saeed/v0.3 out in the main clone (`ditto_av/DITTO_AV`): running v0.2
-jobs read scripts/configs from that tree at runtime.
+Decided with the author 2026-08-04. v0.2 continues on `main` (other
+sessions); v0.1 frozen on `saeed/ver0.1`. Work ONLY in the worktree
+`/scratch/$USER/ditto_av/DITTO_AV_v03` — NEVER check saeed/v0.3 out in
+the main clone or the home clone (live v0.2 jobs read those trees).
+
+## 0. Prime directive: measure, don't assume
+
+Every design fact below is either (a) verified by a committed audit, or
+(b) carries an explicit gate that falsifies it. v0.2's record shows the
+method: two "obvious" integrator assumptions failed only on REAL data;
+all four generations of v0.1 died from one unmeasured assumption about
+what a latent encodes.
 
 ## 1. Goal
 
-v0.2 proved the mechanism (on-policy imitation in a replayed world, pure
-ego-state-matching reward: 220-route DS ~76, RL > same-net BC +12 dev-10)
-but its world is NON-REACTIVE: replayed traffic ignores the ego's
-deviations. v0.3 learns the one thing replay cannot do — REACTIONS —
-and nothing else:
+v0.2 proved the mechanism (on-policy imitation in a replayed world,
+pure ego-state-matching reward; 220-route DS ~76; RL > same-net BC
++12 dev-10) but its world is NON-REACTIVE: replayed traffic ignores the
+ego. v0.3 learns the ONE thing replay cannot provide — reactions:
 
-- Keep the factorization: ego = analytic kinematics (never learn what
-  you know). Learn a TRAFFIC MODEL: token-transformer over per-agent
-  history predicting other agents' next states, conditioned on the
-  ego's ACTUAL current pose — so traffic yields/brakes when our policy
-  deviates. This is the mature "sim agents" task (WOMD Sim Agents);
-  recipes exist. Data: the same ##glob1 arrays (act_glob world tracks),
-  999 clips, train/val split unchanged.
-- The policy recipe stays v0.2's (TokenPolicy, sequence-BC init,
-  A2C + ego-state-matching reward, tight kernel — shaping proven
-  redundant at 220 scale).
+- Keep the factorization. Ego = analytic kinematics (never learn what
+  you know). Learn a TRAFFIC MODEL: per-agent token transformer
+  predicting other agents' motion, conditioned on agent histories AND
+  the ego's actual current state, rolled out autoregressively to make
+  the egosim REACTIVE.
+- Policy recipe stays v0.2's (TokenPolicy, seq-BC init, A2C, tight
+  ego-state-matching kernel — shaping proven redundant at 220 scale).
+  v0.3's policy training = curriculum fine-tune of the v0.2 champion.
 
-## 2. Trust ladder (how the learned world earns its place)
+## 2. Phase A — ANALYSIS (all findings committed to runs/v03_audit/)
 
-- **W0 fidelity gate** (analogue of v0.2's G0): with the RECORDED ego
-  replayed, the traffic model must reproduce held-out logs within
-  tolerance (rollout ADE/FDE, collision-rate realism vs log). Never
-  train a policy in a world that fails W0.
-- **W1 non-exploitability**: ensemble of K traffic models; during
-  policy training, penalize/terminate rollouts where ensemble
-  disagreement spikes (MOPO-style pessimism). Structural answer to
-  v0.1's reward hacking: the policy cannot farm reward where the model
-  doesn't know.
-- **W2 curriculum**: start from the v0.2 champion policy; anneal
-  replay->reactive rollout ratio; KL-anchor to the replay-trained
-  policy. Reward stays ego-state matching to the same-scene expert.
-- **W3 external**: dev-10/220 CARLA gates as always — the learned
-  world NEVER grades itself (v0.1/v0.2's most-replicated lesson:
-  internal metrics do not rank closed-loop drivers).
+- **A1 trackability audit** (the assumption-killer): on real extracted
+  clips measure — actor-ID stability across frames (the anno `id`
+  field; v0.1's velocity finite-differencing relies on it but nobody
+  quantified it), track-length distribution, churn (enter/exit rates
+  of the annotation radius), per-class counts (vehicle/walker/bicycle),
+  slot-overflow rate (>32 actors), sampling-rate regularity, and
+  position-noise floor (per-track jerk). GATE: ids stable within
+  clips and median track length >= 3 s, else the model design changes
+  (association layer needed).
+- **A2 dynamics floor**: constant-velocity and constant-turn-rate
+  predictors on held-out clips — ADE/FDE at 1/2/4 s. These floors set
+  the W0 thresholds (no arbitrary numbers): the learned model must
+  beat CV at 4 s by a pre-registered margin (>=20% rollout ADE) or it
+  adds nothing over replay+extrapolation.
+- **A3 interaction evidence**: quantify ego-dependence of traffic —
+  lead-gap response statistics (follower decel vs gap/closing-speed),
+  yielding events near the ego path. Sets an upper bound on what
+  "reactive" can even learn from this data; if interactions are rare,
+  the reactivity dividend is small and we should know BEFORE building.
+- **A4 light context inventory**: what per-agent signal exists for
+  OTHER agents' stops (annos store all traffic_light boxes + states;
+  our arrays keep only the ego-affecting one). Decide evidence-based:
+  scene-level light tokens vs per-light tokens vs history-only.
+  Documented decision, not a silent assumption.
 
-## 3. What v0.3 buys (the paper deltas)
+## 3. Phase B — DATA (V3-M1)
 
-1. Removes ghost-traffic bias — negotiation/yielding become learnable.
-2. Divergent-start recovery becomes fully coherent (traffic responds).
-3. Horizons beyond clip end; scenario generation (traffic variations).
-4. Full-circle experiment: re-test DITTO's ORIGINAL latent reward
-   inside the factored (ego|traffic) latent — does latent matching work
-   once the state is factored? Closes the v0.1 question scientifically.
-5. M6 carry-over lever: tracker-port execution in egosim (quantified
-   4% backward-microstep executor gap in v0.2).
+- B1: additive adapter extension: `act_id` (stable per-slot actor id)
+  + `act_cls` (class) arrays; new cache key suffix `##glob2`. Shared
+  files touched additively only (merge safety with main).
+- B2: track-view utilities: slots -> ID-associated tracks; unit tests
+  against synthetic clips with known churn/AND the A1 audit numbers.
+- B3: caches: 12-clip mini (login) for tests; 999-clip rebuild via the
+  /tmp extraction job. Scratch inode rules as always.
 
-## 4. Honest novelty position (searched 2026-08-04)
+## 4. Phase C — TRAFFIC MODEL (V3-M2)
 
-Closed-loop training in log-replay sims is established (Urban Driver
-CoRL'21 = closest prior: differentiable replay sim + distance-to-expert
-loss; BC-SAC'22 = closed-loop RL+BC with hand-engineered safety reward;
-Waymax/nuPlan/GPUDrive = infra). Ours that holds: (a) pure state-
-matching reward suffices closed-loop (shaping-redundancy ablation);
-(b) the measured diagnosis of WHY latent-space DITTO fails in driving +
-the controlled fix; (c) Bench2Drive-220 evidence. v0.3 adds: gated
-reactive imagination with pessimism + the factored-latent DITTO retest.
-READ BEFORE CLAIMING PRIORITY: arXiv 2512.18662 (offline RL,
-photorealistic closed-loop envs, Dec 2025).
+- C1 architecture: tokens = agents (history-encoded, class-embedded,
+  agent-centric state encoding) + ego token (input-only) + light/route
+  context per A4; transformer trunk (~10-30M, config-scaled); heads
+  predict per-agent next-step delta distributions (Gaussian first, GMM
+  if A2 shows multimodality matters). Autoregressive rollout API
+  mirroring EgoSim's step contract.
+- C2 training: teacher-forced NLL, then rollout fine-tuning (closed-
+  loop training against compounding error — measure both variants; the
+  open!=closed lesson applies to the WORLD MODEL too).
+- C3 ensemble: K=4 (seed/bootstrap); calibrate a disagreement metric
+  on held-out data (percentile thresholds, committed).
+- C4 **W0 fidelity gate** (pre-registered): held-out rollout ADE @4s
+  >=20% better than CV; agent-agent collision rate within 2x of the
+  log's; speed/accel distribution overlap (W1-distance bands);
+  **reactivity probe**: inject a braking ego in front of followers —
+  modeled followers must decelerate (CV ghosts do not); report effect
+  size. FAIL any -> fix the model, never lower the gate.
 
-## 5. Coexistence rules (two branches, one cluster)
+## 5. Phase D — REACTIVE EGOSIM + POLICY (V3-M3)
 
-- Work ONLY in `DITTO_AV_v03/`; the main clone belongs to the v0.2
-  session. Same for `~/ditto_work/DITTO_AV` (home clone = main's).
-- SLURM lanes are shared: CLAIM stages in outputs/PIPELINE_STATUS.md
-  (tag entries "V03:"), read the last ~10 lines before every submit;
-  MIG = 1 job/user TOTAL (both branches count); >30 min pend =
-  re-audit lanes.
-- Run dirs / results / wandb names: prefix everything `v03_`
-  (~/ditto_out/b2d_v03_*, carla_results_v03*). Never reuse a v0.2 name.
-- npz caches are content-keyed — new layouts get new keys, no
-  clobbering; extractions still go to node-local /tmp (1M-inode rule).
-- Merging back: v0.3 mostly ADDS files (models/traffic.py, trainers,
-  configs). Keep edits to shared files (config.py, egosim.py) additive
-  (new fields/classes, no renames) so the eventual merge into main is
-  trivial.
+- D1: EgoSim reactive mode (additive code path): traffic from model
+  rollout (initialized from logged history) instead of log indexing;
+  obs builder unchanged; reward unchanged (ego-state matching vs the
+  same-scene expert — still valid under moderate divergence);
+  **W1 pessimism**: terminate/penalize rollouts where ensemble
+  disagreement crosses the calibrated threshold — the structural
+  anti-exploitation mechanism v0.1 lacked.
+- D2: sim-level fidelity: ego replaying expert actions in the REACTIVE
+  sim must reproduce logged trajectories statistically (the G0
+  analogue, on both synthetic and real clips; regression-tested).
+- D3: **W2 curriculum**: init from the v0.2 champion; anneal
+  replay->reactive batch ratio; KL anchor to the replay-trained
+  policy; in-sim eval in BOTH worlds every N steps (divergence between
+  the two eval verdicts is itself a diagnostic).
 
-## 6. First milestones
+## 6. Phase E — EXTERNAL GATES + SCIENCE (V3-M4)
 
-- V3-M0 (this commit): branch + worktree + plan.
-- V3-M1: traffic-model dataset views over ##glob1 (per-agent history
-  windows, ego-conditioned targets) + TrafficModel (token transformer,
-  ~10-30M) + W0 fidelity harness on held-out clips.
-- V3-M2: ensemble + disagreement stats; reactive EgoSim mode
-  (traffic states from model rollout instead of log index).
-- V3-M3: W2 curriculum fine-tune of the v0.2 champion; G-gates.
-- V3-M4: factored-latent DITTO retest; paper integration.
+- E1 **W3, the only verdicts that count**: 3x3 canary -> dev-10 vs the
+  v0.2 champion band (83.60-85.63; seed bars from main's G5) -> ONE
+  220 only for a clear dev-10 winner. The learned world NEVER grades
+  itself (most-replicated lesson of the whole project).
+- E2 reactivity-dividend analysis: per-scenario-family deltas
+  (interaction-heavy families should move most; divergent-start
+  recovery should improve; ghost-gap collisions should drop).
+- E3 full-circle experiment: factored-latent DITTO retest — latent
+  matching inside the (ego | learned-traffic) factorization; closes
+  the v0.1 question scientifically regardless of outcome.
+- E4 paper: v0.1 (why latent matching fails) -> v0.2 (replay world +
+  state matching suffices) -> v0.3 (when and why reactions pay).
 
-## 7. Status ledger (newest first)
+## 7. REVIEW protocol (continuous, not a phase)
 
-- 2026-08-04: V3-M0 — branch `saeed/v0.3` + worktree
-  `DITTO_AV_v03/` created from main @ a8a84b1; plan committed.
+- Tests-first per milestone (unit + fidelity regression; the synthetic
+  clips get churn/spawn cases); pre-registered gate numbers committed
+  BEFORE the runs they judge; every result lands in the ledger with
+  the job id; code-review + simplification pass at the end of C and D
+  before anything merges toward main; PIPELINE_STATUS claims tagged
+  "V03:"; all run/result names prefixed v03_; MIG budget shared with
+  main (1 job/user TOTAL).
+
+## 8. Honest novelty position (searched 2026-08-04)
+
+Closed-loop replay training exists (Urban Driver CoRL'21; BC-SAC'22;
+Waymax/nuPlan/GPUDrive infra); learned sim-agents exist (WOMD Sim
+Agents line). Ours that holds: pure state-matching reward sufficiency
+(shaping-redundancy ablation), the measured latent-failure diagnosis,
+Bench2Drive-220 evidence; v0.3 adds gated reactive imagination with
+ensemble pessimism + the factored-latent DITTO retest. READ BEFORE
+PRIORITY CLAIMS: arXiv 2512.18662 (Dec 2025).
+
+## 9. Status ledger (newest first)
+
+- 2026-08-04: V3-A1/A2/A3 AUDIT DONE (runs/v03_audit, 24 clips, 6.4k
+  frames, 83k actor-observations): IDs STABLE (1.8% gapped tracks,
+  teleports 0.02%), median track 12 s, 84% >= 3 s -> A1 GATE PASSED,
+  no association layer needed. Slot layout holds (p99 = 30 actors,
+  zero overflow of 32). Dynamics floors: CV ADE 0.84/2.12/5.02 m @
+  1/2/4 s, CTRV 4.75 @4s -> W0 gate pre-registered: learned rollout
+  ADE@4s <= 3.80 m (>=20% under CTRV). Interaction signal STRONG:
+  3,445 follower-behind-ego pairs, decel -2.40 m/s^2 when close vs
+  -0.13 far -> reactions are in the data; the reactivity dividend is
+  learnable. CAVEAT for B1: this 24-clip sample contains class
+  "vehicle" ONLY — verify walker/bicycle class strings on
+  pedestrian-scenario families before freezing act_cls.
+
+- 2026-08-04: V3-M0 — branch + worktree + this plan; Phase A audit
+  launched.
