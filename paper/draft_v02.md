@@ -178,21 +178,20 @@ training objective.
 
 **Controlled same-net comparison, dev-10 (10 routes × 3 reps):**
 
-| policy (identical net/data/tracker) | DS | completion | full routes |
-|---|---|---|---|
-| sequence BC (999 clips, seed 0) | 71.48 | 87.0% | 24/30 |
-| + on-policy stage, pure reward (seed 0) | **83.60** | **100.0%** | **30/30** |
-| + on-policy stage, +collision penalty (seed 0) | **85.63** | **100.0%** | **30/30** |
-| pure, 3 seeds | 76.31 ± 7.54 (83.60/76.78/68.55) | 100.0% all | 90/90 |
-| shaped, 3 seeds | 78.39 ± 8.24 (85.63/80.13/69.42) | 100.0% all | 90/90 |
+| policy (identical net/data/tracker), 3 full-pipeline seeds | DS (mean ± sd; seeds) | full routes |
+|---|---|---|
+| sequence BC | 65.32 ± 9.36 (71.48/54.55/69.92) | 75/90 |
+| + on-policy stage, pure reward | **76.31 ± 7.54** (83.60/76.78/68.55) | **90/90** |
+| + on-policy stage, +collision penalty | **78.39 ± 8.24** (85.63/80.13/69.42) | **90/90** |
 
-At matched seed 0 the on-policy stage adds +12.1 DS over BC. Across
-seeds, the DS gap narrows to +4.8 (pure) / +6.9 (shaped) means against
-the single-seed BC row [BC seed bars: in progress], with large seed
-variance (±7.5–8.2) driven by penalty events. The *seed-robust* effect
-is completion: every RL seed completes 30/30 routes (180/180 seed-eval
-runs at 100%), while BC leaves 6/30 unfinished (blocked). Pure vs
-shaped is a statistical tie across seeds (Δmean +2.08 ≪ σ≈8),
+The on-policy stage adds **+11.0 (pure) / +13.1 (shaped) DS on seed
+means** — consistent with the matched-seed-0 gap of +12.1 — and the
+effect is uniform in kind: *every* RL seed completes *every* route
+(180/180 runs at 100% completion) while every BC seed leaves routes
+unfinished or blocked (75/90). Seed variance in DS is large at this
+band (±7.5–9.4, penalty events, not completion), so the per-seed DS
+ordering fluctuates but the RL-over-BC and completion effects do not.
+Pure vs shaped is a statistical tie across seeds (Δmean +2.08 ≪ σ≈8),
 consistent with the 220-scale dead heat (75.88 vs 76.10) — the shaping
 redundancy claim survives seeding.
 

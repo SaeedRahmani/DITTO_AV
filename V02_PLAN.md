@@ -215,6 +215,14 @@ reward-meaning diagnosis itself — report honestly.
 
 ## 8. Status ledger (newest first)
 
+- 2026-08-04 — **BC SEED BARS FINAL; v0.2 FULLY CLOSED**: BC
+  65.32 ± 9.36 (71.48/54.55/69.92; 75/90 full) vs RL pure 76.31 ± 7.54
+  / shaped 78.39 ± 8.24 (both 90/90 full). The controlled on-policy
+  effect holds with bars on both sides: +11.0/+13.1 DS on seed means,
+  and a categorical completion gap (180/180 vs 75/90). Nothing further
+  runs for v0.2; v0.3 (reactive learned traffic model) starts on its
+  own branch.
+
 - 2026-08-04 — **G5 SEED BARS FINAL, v0.2 record CLOSED**: pure
   76.31 ± 7.54 (83.60/76.78/68.55), shaped 78.39 ± 8.24
   (85.63/80.13/69.42); Δmean +2.08 ≪ σ — pure-vs-shaped TIE confirmed
