@@ -1,92 +1,116 @@
 # DITTO-AV: Offline Imitation Learning with World Models for Autonomous Driving
 
-This repository adapts **DITTO** ([DeMoss et al., 2023](https://arxiv.org/abs/2302.03086),
-offline imitation learning inside a learned world model) to **autonomous
-driving**.
+Closed-loop imitation learning for driving, trained **entirely offline**. The
+policy is never rolled out in a simulator during training: it is trained
+on-policy inside a world built from the recorded logs themselves, and rewarded
+for staying close to what the expert did in that same scene. Built on **DITTO**
+([DeMoss et al., 2023](https://arxiv.org/abs/2302.03086)).
+
+**The problem.** Behavior cloning breaks under covariate shift — it never sees
+its own mistakes, so it never learns to recover. The usual fixes cost either an
+online simulator or a learned model of the entire scene, which the policy then
+exploits.
+
+**The approach.**
+
+1. **Factor the world.** The ego moves by analytic kinematics — never learn
+   what is already known. Everything exogenous (traffic, route, lights) comes
+   from the log, either replayed directly or advanced by a learned traffic
+   model.
+2. **Reward only what the agent controls.** A time-tolerant kernel matches the
+   simulated ego's state — position, heading, speed — against the expert's in
+   the same scene. No traffic enters the reward, so there is nothing to game.
+   Off the expert path, reward is earned by *returning* to it: the recovery
+   incentive behavior cloning cannot represent.
+3. **Let the simulator be the judge, never the trainer.** Bench2Drive
+   closed-loop in CARLA is the only verdict; the training world never grades
+   itself.
 
 ## Status — under active development
 
-Numbers below are the **current** measurements, not final ones; they are
-updated periodically as runs land. Scores are Bench2Drive closed-loop driving
-score (DS) in CARLA — the only verdict we count (in-sim reward never grades
-itself). Per-run ledgers with job ids: `V02_PLAN.md`, `V03_PLAN.md`,
-`V031_PLAN.md`.
+The numbers below are current measurements, not final results, and are updated
+periodically as runs land. Scores are Bench2Drive closed-loop **driving score
+(DS)** in CARLA. Full per-run ledgers with job ids live in `V02_PLAN.md`,
+`V03_PLAN.md`, and `V031_PLAN.md`.
 
-| line | what it changed | current headline | state |
+| line | training world | current DS | state |
 |---|---|---|---|
-| v0.1 | faithful DITTO: RSSM world model, reward = whole-latent match | DS 22.10 (220 routes) | frozen — lost to BC |
-| **v0.2** | **the recorded log is the world** (replayed traffic, analytic ego); reward = ego-state match | **DS 76.10 / 75.88 (220 routes)**, 85.63 / 83.60 (dev-10) | frozen — best so far |
-| v0.3 | **+ learned reactive traffic** (other agents respond to the ego) | DS 82.53 (dev-10); vehicle collisions 6 = lowest of any model here | frozen — reactivity dividend confirmed |
-| v0.3.1 | + static map geometry in the training world | DS 66.01 / 74.89 (dev-10) | closed — negative result, cause measured |
-| v0.3.2 | reward channels for motion smoothness | — | ongoing |
+| v0.1 | learned RSSM latent; reward = whole-latent match | 22.10 (220 routes) | frozen |
+| v0.2 | log replayed as the world; reward = ego-state match | 76.10 / 75.88 (220 routes); 85.63 / 83.60 (dev-10) | frozen |
+| v0.3 | v0.2 + learned reactive traffic model | 82.53 (dev-10) | frozen |
+| v0.3.1 | v0.3 + static map geometry | 66.01 / 74.89 (dev-10) | closed |
+| v0.3.2 | v0.3 + smoothness reward channels | in progress | active |
 
-**How they differ.** Each version changes *what the training world is made of*
-and *what the reward grades*. v0.1 dreamed the whole scene in a learned latent
-and graded that latent — which mostly graded traffic, not driving. v0.2 stopped
-dreaming: the logged clip replays as the world, the ego moves by analytic
-kinematics, and the reward grades only the ego's own state against the expert's
-in that same scene. v0.3 gives the replayed traffic its agency back with a
-learned per-agent model, so the world reacts to the ego.
+Two arms are reported where two seeds/configs were run. **dev-10** is the
+development gate: 10 Bench2Drive routes (A-half 3514, 3255, 26405, 25381,
+25378; B-half 25424, 2091, 27494, 17569, 28198) × 3 repetitions = 30 runs.
+**220 routes** is the full Bench2Drive closed-loop benchmark, run only on a
+model that has already cleared dev-10.
 
-**v0.2 vs. v0.3, concretely.** v0.3 wins exactly the failure class it targets —
-vehicle-to-vehicle collisions drop from 9/12 to 6 — but loses more elsewhere:
-its training world contains no static geometry, so driving boldly near walls is
-free in training and costs 7 layout collisions in CARLA (v0.2: 0–1). That is
-the whole gap. v0.3.1 tried to close it and could not: the offending objects
-(fences, props, vegetation) sit *on* drivable area and appear in no available
+### What separates the versions
+
+Each version changes what the training world is made of, and therefore what the
+reward can grade. v0.1 unrolled a learned RSSM latent and matched the whole
+latent, which mostly graded traffic rather than driving. v0.2 replays the
+logged clip as the world, moves the ego analytically, and grades only the ego's
+own state. v0.3 keeps that and returns agency to the traffic through a learned
+per-agent model, so other vehicles react to the ego.
+
+v0.2 and v0.3 differ almost entirely in *which* collisions they have:
+
+| dev-10 collisions | v0.2 | v0.3 |
+|---|---|---|
+| with vehicles | 9 / 12 | **6** |
+| with static layout | 0 / 1 | 7 |
+
+v0.3's reactive traffic reduces vehicle collisions by 33–50%. Its training
+world contains no static geometry, so driving close to walls costs nothing
+during training and costs 7 layout collisions in CARLA. v0.3.1 added map
+geometry to close that gap and did not: the objects actually hit (fences,
+props, vegetation) stand *on* drivable area and are absent from every available
 data source.
+
+### Videos
+
+Closed-loop CARLA rollouts on two dev-10 routes, same routes for both versions.
+`2d` is the bird's-eye state render, `3d` is the CARLA camera. These show
+in-development checkpoints, not a finished system.
+
+| route | v0.2 | v0.3 |
+|---|---|---|
+| 25378 (A-half) | [2d](docs/media/v02_route25378_2d.mp4) · [3d](docs/media/v02_route25378_3d.mp4) | [2d](docs/media/v03_route25378_2d.mp4) · [3d](docs/media/v03_route25378_3d.mp4) |
+| 2091 (B-half, urban junction) | [2d](docs/media/v02_route2091_2d.mp4) · [3d](docs/media/v02_route2091_3d.mp4) | [2d](docs/media/v03_route2091_2d.mp4) · [3d](docs/media/v03_route2091_3d.mp4) |
+
+<video src="https://github.com/SaeedRahmani/DITTO_AV/raw/main/docs/media/v03_route25378_3d.mp4" controls width="100%"></video>
 
 ### Next experiments (todo)
 
-- **E3 — factored-latent DITTO retest**: latent matching inside the
-  (ego | learned-traffic) factorization; closes the question v0.1 opened.
-- **v0.3.2 smoothness**: yaw-rate reward channel, then in-dream plan-churn
-  penalty / policy-side temporal-consistency loss.
-- **220-route run for v0.3's line**: only once a dev-10 gate is actually cleared.
-- **Paper**: v0.2 headline + v0.3 reactivity dividend + the v0.3.1 negative result.
-
-## The v0.1 approach (original framing)
-
-**Core idea.** Train an RSSM world model on offline driving logs. Then learn a
-policy *fully offline* by unrolling it inside the world model from expert
-start states and rewarding latent closeness to expert trajectories — on-policy
-imitation without a simulator, which corrects the covariate shift that breaks
-behavior cloning.
-
-**What's new vs. DITTO (the paper contribution).**
-
-1. **Multimodal nearest-mode matching** (`reward_mode: multi`). Driving is
-   multimodal: from the same blocked-lane state, one expert overtakes and
-   another slows down. DITTO's single-trajectory reward penalizes every valid
-   mode but the demonstrated one. We retrieve the K expert windows whose start
-   latent is nearest to the rollout's start and reward the *best-matching*
-   mode (max over K), so reproducing *any* expert behavior is rewarded.
-   Two stabilizers proved necessary in driving latent spaces: a
-   **contrastive baseline** (`n_negatives`) that subtracts the mean
-   similarity to random expert windows — raw latent similarity to *any*
-   plausible traffic state is ~0.9, leaving almost no signal — and a
-   **BC trust region** (`bc_init`, `bc_kl_coef`) that keeps imagination RL
-   from drifting into world-model exploits.
-2. **Vectorized world model.** Agent-centric kinematic features instead of
-   pixels: orders of magnitude cheaper, reproducible on CPU.
-3. **Driving-native evaluation.** Closed-loop collision rate / speed /
-   return, in-distribution and under traffic-density shift, against expert,
-   BC, and single-mode DITTO baselines.
+- **E3 — factored-latent retest**: latent matching inside the
+  (ego | learned-traffic) factorization, closing the question v0.1 opened.
+- **v0.3.2 smoothness**: yaw-rate reward channel, then an in-world plan-churn
+  penalty and a policy-side temporal-consistency loss.
+- **220-route run** for the v0.3 line, once a dev-10 gate is cleared.
+- **Paper** covering the v0.2 result, the v0.3 collision decomposition, and the
+  v0.3.1 negative result.
 
 ## Layout
 
 ```text
-ditto_av/            the package (new, self-contained)
-  envs.py            highway-env factory + vector featurizer
-  expert.py          scripted two-style (multimodal) expert
-  collect.py         demonstration collection
-  data.py            trajectory store, latent bank
-  rewards.py         max_cos, single/multi latent matching, lambda-returns
+ditto_av/            the package (self-contained)
+  egosim.py          the training world: log replay + analytic ego kinematics
+  reactive.py        learned traffic model, autoregressive rollout (v0.3+)
+  layout.py          static map geometry from OpenDRIVE; layout_torch.py = torch port
+  rewards.py         ego-state matching kernels, latent matching, lambda-returns
+  tracks.py          expert trajectory targets; tracker_torch.py = pure-pursuit tracker
   models/            RSSM (categorical latents), vector encoder/decoder, actor-critic
   trainers/          world-model, DITTO actor-critic, BC trainers
   evaluate.py        closed-loop evaluation harness
   bench2drive.py     Bench2Drive (CARLA) -> DITTO-AV data adapter
+  carla_agent.py     deployment agent for the CARLA leaderboard
+  envs.py            highway-env factory + vector featurizer (dev benchmark)
+  expert.py          scripted two-style (multimodal) expert for highway-env
 scripts/run_pipeline.py   A-to-Z pipeline
+scripts/slurm/            cluster jobs (training, CARLA eval, video rendering)
 configs/av.yaml           main experiment; configs/smoke.yaml for a 2-min test
 tests/                    pytest suite
 src/, paper/              original DITTO Atari code + paper (reference, untouched)
