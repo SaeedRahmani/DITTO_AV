@@ -51,63 +51,23 @@ development gate: 10 Bench2Drive routes (A-half 3514, 3255, 26405, 25381,
 **220 routes** is the full Bench2Drive closed-loop benchmark, run only on a
 model that has already cleared dev-10.
 
-### What separates the versions
-
-Each version changes what the training world is made of, and therefore what the
-reward can grade. v0.1 unrolled a learned RSSM latent and matched the whole
-latent, which mostly graded traffic rather than driving. v0.2 replays the
-logged clip as the world, moves the ego analytically, and grades only the ego's
-own state. v0.3 keeps that and returns agency to the traffic through a learned
-per-agent model, so other vehicles react to the ego.
-
-v0.2 and v0.3 differ almost entirely in *which* collisions they have:
-
-| dev-10 collisions | v0.2 | v0.3 |
-|---|---|---|
-| with vehicles | 9 / 12 | **6** |
-| with static layout | 0 / 1 | 7 |
-
-v0.3's reactive traffic reduces vehicle collisions by 33–50%. Its training
-world contains no static geometry, so driving close to walls costs nothing
-during training and costs 7 layout collisions in CARLA. v0.3.1 added road
-geometry to close that gap and did not: the objects actually hit are map
-furniture — fences, props, vegetation — standing *on* drivable area, which a
-lane-based drivability signal cannot express. That axis is now reopened, since
-CARLA does expose the collidable furniture offline even though the annotations
-and OpenDRIVE do not.
-
 ### Videos
 
 Closed-loop CARLA rollouts on dev-10 routes the policy completes cleanly — DS
-100, route completion 100%, no collisions. The bird's-eye render is the
-simulated state, the camera view is CARLA. These are in-development
-checkpoints, not a finished system; the routes that still fail are the ones in
-the collision table above. Full-quality mp4s for every route are in
+100, route completion 100%, no collisions. Bird's-eye renders are the simulated
+state, camera views are CARLA. Full-quality mp4s for every route are in
 [docs/media/](docs/media/).
 
-Construction obstacle on a two-way road, Town11:
-
-![Bird's-eye rollout, construction obstacle on a two-way road, Town11](docs/media/v03_route25424_2d.gif)
-
-![Camera rollout, construction obstacle on a two-way road, Town11](docs/media/v03_route25424_3d.gif)
-
-Yielding to an emergency vehicle, Town03:
-
-![Bird's-eye rollout, yielding to an emergency vehicle, Town03](docs/media/v03_route25378_2d.gif)
-
-Hazard at side lane, Town05:
-
-![Camera rollout, hazard at side lane, Town05](docs/media/v03_route25381_3d.gif)
-
-### Next experiments (todo)
-
-- **E3 — factored-latent retest**: latent matching inside the
-  (ego | learned-traffic) factorization, closing the question v0.1 opened.
-- **v0.3.2 smoothness**: yaw-rate reward channel, then an in-world plan-churn
-  penalty and a policy-side temporal-consistency loss.
-- **220-route run** for the v0.3 line, once a dev-10 gate is cleared.
-- **Paper** covering the v0.2 result, the v0.3 collision decomposition, and the
-  v0.3.1 negative result.
+<table>
+<tr>
+<td width="50%"><img src="docs/media/v03_route25424_2d.gif" width="100%" alt="Bird's-eye rollout, construction obstacle on a two-way road, Town11"><br><sub>Construction obstacle, two-way road — Town11</sub></td>
+<td width="50%"><img src="docs/media/v03_route25378_2d.gif" width="100%" alt="Bird's-eye rollout, yielding to an emergency vehicle, Town03"><br><sub>Yielding to an emergency vehicle — Town03</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="docs/media/v03_route25424_3d.gif" width="100%" alt="Camera rollout, construction obstacle on a two-way road, Town11"><br><sub>Construction obstacle, two-way road — Town11</sub></td>
+<td width="50%"><img src="docs/media/v03_route25381_3d.gif" width="100%" alt="Camera rollout, hazard at side lane, Town05"><br><sub>Hazard at side lane — Town05</sub></td>
+</tr>
+</table>
 
 ## Layout
 
