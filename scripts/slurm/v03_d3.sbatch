@@ -15,7 +15,7 @@ export OMP_NUM_THREADS=1 PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
 export WANDB_DISABLED=1 XDG_CACHE_HOME=$HOME/ditto_out/cache
 PY=$HOME/envs/ditto_gpu/bin/python
 $PY -c "import torch; assert torch.cuda.is_available()"
-cd /scratch/$USER/ditto_av/DITTO_AV_v03
+cd /scratch/$USER/ditto_av/DITTO_AV_v032
 $PY scripts/v03_train_reactive.py \
     --data $HOME/ditto_out/v03_w0c/data \
     --w0 $HOME/ditto_out/v03_w0c \

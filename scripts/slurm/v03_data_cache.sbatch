@@ -30,7 +30,7 @@ export OMP_NUM_THREADS=1
 export WANDB_DISABLED=1
 export PYTHONUNBUFFERED=1
 
-REPO=/scratch/$USER/ditto_av/DITTO_AV_v03
+REPO=/scratch/$USER/ditto_av/DITTO_AV_v032
 DATA=/scratch/$USER/ditto_av/data/bench2drive
 MANIFEST=$REPO/${1:-manifests/b2d_full.txt}
 TMP=/tmp/$SLURM_JOB_ID/bench2drive

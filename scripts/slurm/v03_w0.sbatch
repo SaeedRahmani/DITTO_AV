@@ -18,7 +18,7 @@ PY=$HOME/envs/ditto_gpu/bin/python
 $PY -c "import torch; assert torch.cuda.is_available()"
 RUN=$HOME/ditto_out/v03_w0c
 mkdir -p $RUN
-cd /scratch/$USER/ditto_av/DITTO_AV_v03
+cd /scratch/$USER/ditto_av/DITTO_AV_v032
 $PY - "$RUN" <<'PYEOF'
 import sys, yaml
 cfg = yaml.safe_load(open("configs/b2d_v02.yaml"))
