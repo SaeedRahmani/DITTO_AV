@@ -90,7 +90,28 @@ system.
 | 26405 | Town15 | static cut-in | [2d](docs/media/v02_route26405_2d.mp4) | [2d](docs/media/v03_route26405_2d.mp4) |
 | 17569 | Town12 | sequential lane change | [2d](docs/media/v02_route17569_2d.mp4) | [2d](docs/media/v03_route17569_2d.mp4) |
 
-<video src="https://github.com/SaeedRahmani/DITTO_AV/raw/main/docs/media/v03_route25424_3d.mp4" controls width="100%"></video>
+Four of the v0.3 clips play inline below; the rest are download links in the
+table above.
+
+**Bird's-eye (2d)** — left: construction obstacle on a two-way road (Town11);
+right: yielding to an emergency vehicle (Town03).
+
+<table>
+<tr>
+<td width="50%"><video src="https://github.com/SaeedRahmani/DITTO_AV/raw/main/docs/media/v03_route25424_2d.mp4" controls muted loop playsinline width="100%"></video></td>
+<td width="50%"><video src="https://github.com/SaeedRahmani/DITTO_AV/raw/main/docs/media/v03_route25378_2d.mp4" controls muted loop playsinline width="100%"></video></td>
+</tr>
+</table>
+
+**CARLA camera (3d)** — left: construction obstacle, two-way road (Town11);
+right: hazard at side lane (Town05).
+
+<table>
+<tr>
+<td width="50%"><video src="https://github.com/SaeedRahmani/DITTO_AV/raw/main/docs/media/v03_route25424_3d.mp4" controls muted loop playsinline width="100%"></video></td>
+<td width="50%"><video src="https://github.com/SaeedRahmani/DITTO_AV/raw/main/docs/media/v03_route25381_3d.mp4" controls muted loop playsinline width="100%"></video></td>
+</tr>
+</table>
 
 ### Next experiments (todo)
 
