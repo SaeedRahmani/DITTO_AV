@@ -100,7 +100,9 @@ gap and beat dev-10 85.63; then ONE 220 for the headline; then paper.
 ## 4. Ops quickstart (details: V03_PLAN §7; history: saeed/ver0.1)
 
 - Work in /scratch/$USER/ditto_av/DITTO_AV (main). The DITTO_AV_v03/
-  worktree holds frozen saeed/v0.3 — do not develop there.
+  worktree was REMOVED 2026-08-05 (its content is fully merged into
+  main and preserved on branch saeed/v0.3); ignore any older notes
+  that mention it.
 - Login nodes: edit/submit only; compute nodes have NO internet;
   scratch has a 1M-inode quota (extractions -> node-local /tmp).
 - Envs: ~/envs/ditto_gpu (GPU nodes), scratch venv ditto (login/CPU),
