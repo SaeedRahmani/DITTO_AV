@@ -83,6 +83,20 @@ S1/driving gates. 3x3 stays a canary, never a selector.
 
 ## 9. Ledger
 
+- 2026-08-05 AXIS-5 (EMA attribution) CLOSED — jobs 10582712 (d10A) /
+  10582713 (d10B), visual; earlier 10582601/02 burned by the sbatch
+  --export comma trap (documented in v032_carla_chain.sbatch).
+  UNCHANGED clp_rx + tracker ema 0.5: dev-10 A 89.67 (IDENTICAL to
+  clp_rx A, same 3 veh + 1 lay collisions) / B 62.60 (vs 75.40) ->
+  mean 76.14 vs 82.53. Vehicle collisions 12 vs 6 — the 0.2 s plan
+  lag DOUBLES vehicle collisions, all on the interaction-heavy B
+  routes, while completion stays 30/30. Steering DID smooth: flips
+  18.1 -> 13.2/100 (S1a-passing), |dsteer| p95 0.36 -> 0.23.
+  ATTRIBUTION: ~27% of steer flips are tracker-removable, but
+  test-time filtering spends the ENTIRE reactivity dividend (+6.4 DS)
+  to get them. Smoothness must come from consistent plans (Axis 1),
+  not filtering — the thesis-loyal route is now also the
+  empirically-forced one.
 - 2026-08-05 A0 CLOSED (login-CPU, no jobs; outputs/v032/a0_*.json).
   Exact lat churn of consecutive plans at wp1 (m, val): expert labels
   0.0126 / clp_bc 0.037 / clp_rl 0.166 / clp_rx 0.208 open-loop;
