@@ -55,7 +55,8 @@ def load_windows(npz_path: Path, cache: Path):
     np.savez_compressed(cache, frames=sw.frames, hist=sw.hist,
                         pred_mask=sw.pred_mask, pres_mask=sw.pres_mask,
                         cls=sw.cls, ego=sw.ego, light=sw.light,
-                        target=sw.target, ids=sw.ids)
+                        target=sw.target, ids=sw.ids,
+                        ego_hist=sw.ego_hist)
     return sw
 
 
@@ -66,7 +67,8 @@ def batch_tensors(sw, idx, device):
             torch.as_tensor(sw.ego[idx], device=device),
             torch.as_tensor(sw.light[idx], device=device),
             torch.as_tensor(sw.target[idx], device=device),
-            torch.as_tensor(sw.pred_mask[idx], device=device))
+            torch.as_tensor(sw.pred_mask[idx], device=device),
+            torch.as_tensor(sw.ego_hist[idx], device=device))
 
 
 def train_seed(sw, seed, steps, batch, device, lr=3e-4):
@@ -80,8 +82,8 @@ def train_seed(sw, seed, steps, batch, device, lr=3e-4):
           f"{n} train scenes")
     for step in range(1, steps + 1):
         idx = rng.integers(n, size=batch)
-        h, pr, cl, eg, li, tg, pm = batch_tensors(sw, idx, device)
-        loss = model.loss(h, pr, cl, eg, li, tg, pm.float())
+        h, pr, cl, eg, li, tg, pm, eh = batch_tensors(sw, idx, device)
+        loss = model.loss(h, pr, cl, eg, li, tg, pm.float(), eh)
         opt.zero_grad()
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), 10.0)
@@ -148,7 +150,7 @@ def rollout_finetune(model, sw, ch, steps, batch, device, K=15,
     for step in range(1, steps + 1):
         pick = rng.integers(M, size=batch)
         i0 = ch["i0"][pick]
-        h, pr, cl, eg, li, tg, pm = batch_tensors(sw, i0, device)
+        h, pr, cl, eg, li, tg, pm, eh = batch_tensors(sw, i0, device)
         hist = h
         tgt = torch.as_tensor(ch["tgt"][pick], device=device)
         val = torch.as_tensor(ch["val"][pick], device=device)
@@ -156,8 +158,11 @@ def rollout_finetune(model, sw, ch, steps, batch, device, K=15,
         lis = torch.as_tensor(ch["lig"][pick], device=device)
         loss = 0.0
         n = 0
+        ehb = eh.clone()
         for k in range(K):
-            d = model.dist(hist, pr, cl, egs[:, k], lis[:, k])
+            ehb = torch.cat([ehb[:, 1:], egs[:, k][:, None]], dim=1)
+            d = model.dist(hist, pr, cl, egs[:, k], lis[:, k],
+                           ego_hist=ehb)
             nxt = model.advance(hist[:, :, -1], d.base_dist.loc)
             hist = torch.cat([hist[:, :, 1:], nxt[:, :, None]], dim=2)
             m = val[:, k] & pm
@@ -172,9 +177,10 @@ def rollout_finetune(model, sw, ch, steps, batch, device, K=15,
         # (0.21 -> 0.04 m/s): with the logged ego always paired with
         # logged futures, ignoring the ego minimizes rollout loss.
         ti = rng.integers(len(sw.frames), size=batch)
-        th_, tpr, tcl, teg, tli, ttg, tpm = batch_tensors(sw, ti, device)
+        (th_, tpr, tcl, teg, tli, ttg, tpm,
+         teh) = batch_tensors(sw, ti, device)
         loss = loss + model.loss(th_, tpr, tcl, teg, tli, ttg,
-                                 tpm.float())
+                                 tpm.float(), teh)
         opt.zero_grad()
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), 10.0)
@@ -207,7 +213,7 @@ def fast_rollout_ade(models, val, device, n_scenes=256,
     disagree = []
     follower_dv = []
     for i0 in pick:
-        h, pr, cl, eg, li, tg, pm = batch_tensors(val, [i0], device)
+        h, pr, cl, eg, li, tg, pm, eh = batch_tensors(val, [i0], device)
         hist = h.clone()
         base_speed = None
         for k in range(1, ROLL + 1):
@@ -219,7 +225,10 @@ def fast_rollout_ade(models, val, device, n_scenes=256,
                 if i_k is not None else li
             if ego_override is not None:
                 eg_k = ego_override(k, eg_k.clone())
-            outs = [m.step(hist, pr, cl, eg_k, li_k) for m in models]
+            eh_k = torch.as_tensor(val.ego_hist[[i_k]], device=device) \
+                if i_k is not None else eh
+            outs = [m.step(hist, pr, cl, eg_k, li_k, ego_hist=eh_k)
+                    for m in models]
             nxt = outs[0]
             if len(outs) > 1:
                 stack = torch.stack([o[..., 0:2] for o in outs])
@@ -270,8 +279,11 @@ def fast_rollout_ade(models, val, device, n_scenes=256,
                     li_k2 = torch.as_tensor(val.light[[i_k2]],
                                             device=device) \
                         if i_k2 is not None else li
+                    eh_k2 = torch.as_tensor(
+                        val.ego_hist[[i_k2]], device=device) \
+                        if i_k2 is not None else eh
                     nn_ = models[0].step_mode(hh, pr, cl, eg_k2, li_k2,
-                                              mm)
+                                              mm, ego_hist=eh_k2)
                     hh = torch.cat([hh[:, :, 1:], nn_[:, :, None]],
                                    dim=2)
                 ids0m = val.ids[i0]
@@ -352,7 +364,7 @@ def reactivity_probe(models, val, device, n_scenes=128):
     print(f"reactivity probe: {len(picks)} scenes")
 
     def run(i0, a, override):
-        h, pr, cl, eg, li, tg, pm = batch_tensors(val, [i0], device)
+        h, pr, cl, eg, li, tg, pm, eh = batch_tensors(val, [i0], device)
         hist = h.clone()
         for k in range(1, 21):
             i_k = frame_to_i.get(int(frames[i0]) + k)
@@ -398,9 +410,9 @@ def main():
     
 
     tr = load_windows(Path(args.data) / "b2d_train.npz",
-                      out / "windows2_train.npz")
+                      out / "windows3_train.npz")
     va = load_windows(Path(args.data) / "b2d_val.npz",
-                      out / "windows2_val.npz")
+                      out / "windows3_val.npz")
 
     chains = None
     models = []

@@ -58,6 +58,12 @@ class SceneWindows:
     ids: np.ndarray           # (N, A) actor ids (-1 empty): slots
                               # re-sort per frame — cross-window
                               # comparisons MUST match by id
+    ego_hist: np.ndarray      # (N, H, 4) ego (x, y, theta, speed)
+                              # history — a memoryless per-step model
+                              # cannot distinguish a DECELERATING ego
+                              # from a slow one (round-3 reactivity
+                              # diagnosis); followers need to see the
+                              # braking onset
 
 
 def build_scene_windows(data, hist: int = 10) -> SceneWindows:
@@ -83,7 +89,7 @@ def build_scene_windows(data, hist: int = 10) -> SceneWindows:
                 slot_of[t][int(ids[t, a])] = a
 
     frames, H, PM, PR, CL, EG, LI, TG = [], [], [], [], [], [], [], []
-    IDS = []
+    IDS, EH = [], []
     for t in range(T):
         if t - hist + 1 < ep_start[t] or t + 1 >= ep_end[t]:
             continue
@@ -121,13 +127,16 @@ def build_scene_windows(data, hist: int = 10) -> SceneWindows:
             LI.append(light_g[t])
             TG.append(tg)
             IDS.append(ids[t].copy())
+            EH.append(ego_g[t - hist + 1:t + 1, :4].copy())
     return SceneWindows(np.array(frames), np.stack(H), np.stack(PM),
                         np.stack(PR), np.stack(CL), np.stack(EG),
-                        np.stack(LI), np.stack(TG), np.stack(IDS))
+                        np.stack(LI), np.stack(TG), np.stack(IDS),
+                        np.stack(EH))
 
 
 def featurize(hist: Tensor, pres: Tensor, cls: Tensor, ego: Tensor,
-              light: Tensor) -> Tuple[Tensor, Tensor]:
+              light: Tensor,
+              ego_hist: Tensor = None) -> Tuple[Tensor, Tensor]:
     """Model inputs from raw windows (batched, torch).
 
     hist (B, A, H, 7); ego (B, 4) [x, y, theta, speed]; light (B, 4).
@@ -163,11 +172,15 @@ def featurize(hist: Tensor, pres: Tensor, cls: Tensor, ego: Tensor,
         onehot,
     ], dim=-1)
     feat = feat * pres[..., None]
-    ctx = torch.cat([ego[:, 3:4] / 15.0, light], dim=-1)    # (B, 5)
+    if ego_hist is None:
+        espeed = ego[:, 3:4].expand(-1, H) / 15.0
+    else:
+        espeed = ego_hist[..., 3] / 15.0                    # (B, H)
+    ctx = torch.cat([espeed, light], dim=-1)                # (B, H+4)
     return feat, ctx
 
 
-CTX_DIM = 5  # ego speed + light (presence, tv_xy, state)
+CTX_DIM = 14  # ego speed HISTORY (H=10) + light (4)
 
 
 class TrafficModel(nn.Module):
@@ -190,12 +203,12 @@ class TrafficModel(nn.Module):
         self.register_buffer("t_scale",
                              torch.tensor([1.0, 0.2, 0.05]))
 
-    def modes(self, hist, pres, cls, ego, light):
+    def modes(self, hist, pres, cls, ego, light, ego_hist=None):
         """GMM heads: (mu (B,A,M,3), log_std (B,A,M,3),
         logits (B,A,M)). Futures at 4 s genuinely branch (regime
         decomposition 2026-08-04: error mass in cruising/launching =
         future behavior changes); a unimodal mean averages modes."""
-        feat, ctx = featurize(hist, pres, cls, ego, light)
+        feat, ctx = featurize(hist, pres, cls, ego, light, ego_hist)
         x = self.embed(feat)                                # (B, A, D)
         x = torch.cat([self.embed_ctx(ctx)[:, None], x], dim=1)
         pad = torch.cat([torch.zeros_like(pres[:, :1]), ~pres], dim=1)
@@ -207,10 +220,12 @@ class TrafficModel(nn.Module):
         log_std = out[..., 3:6].clamp(-5.0, 1.0)
         return mu, log_std, out[..., 6]
 
-    def dist(self, hist, pres, cls, ego, light) -> Independent:
+    def dist(self, hist, pres, cls, ego, light,
+             ego_hist=None) -> Independent:
         """Highest-probability mode as a Gaussian (rollout/back-compat
         path; training uses the winner-take-all loss over all modes)."""
-        mu, log_std, logits = self.modes(hist, pres, cls, ego, light)
+        mu, log_std, logits = self.modes(hist, pres, cls, ego, light,
+                                         ego_hist)
         b = torch.argmax(logits, dim=-1, keepdim=True)      # (B, A, 1)
         take = lambda t: torch.gather(
             t, 2, b[..., None].expand(-1, -1, 1, 3)).squeeze(2)
@@ -218,10 +233,11 @@ class TrafficModel(nn.Module):
                                   take(log_std).exp() * self.t_scale), 1)
 
     def loss(self, hist, pres, cls, ego, light, target,
-             pred_mask) -> Tensor:
+             pred_mask, ego_hist=None) -> Tensor:
         """Winner-take-all GMM loss: NLL of the best mode + mode-choice
         cross-entropy (standard MTP recipe)."""
-        mu, log_std, logits = self.modes(hist, pres, cls, ego, light)
+        mu, log_std, logits = self.modes(hist, pres, cls, ego, light,
+                                         ego_hist)
         std = log_std.exp() * self.t_scale
         t = target[:, :, None, :]                           # (B, A, 1, 3)
         nll = 0.5 * (((t - mu) / std) ** 2 + 2 * log_std
@@ -230,8 +246,17 @@ class TrafficModel(nn.Module):
         ce = torch.nn.functional.cross_entropy(
             logits.reshape(-1, self.n_modes), best.reshape(-1),
             reduction="none").view_as(best)
-        l = (best_nll + 0.5 * ce) * pred_mask
-        return l.sum() / pred_mask.sum().clamp_min(1)
+        # interaction weighting: 40% of samples are trivially-static
+        # agents (regime ADE 0.24) that dominate the gradient; reweight
+        # toward near-ego moving agents and decel/accel events
+        cur = hist[:, :, -1]
+        d_ego = (cur[..., 0:2] - ego[:, None, 0:2]).norm(dim=-1)
+        moving = cur[..., 2:4].norm(dim=-1) > 1.0
+        dv = (target[..., 0] - cur[..., 2:4].norm(dim=-1) * DT).abs()
+        w = (1.0 + 3.0 * ((d_ego < 15.0) & moving).float()
+             + 2.0 * (dv > 0.05).float())
+        l = (best_nll + 0.5 * ce) * pred_mask * w
+        return l.sum() / (pred_mask * w).sum().clamp_min(1)
 
     def advance(self, cur: Tensor, delta: Tensor) -> Tensor:
         """Integrate local deltas to world states (differentiable)."""
@@ -246,19 +271,19 @@ class TrafficModel(nn.Module):
 
     @torch.no_grad()
     def step_mode(self, hist, pres, cls, ego, light,
-                  mode: int) -> Tensor:
+                  mode: int, ego_hist=None) -> Tensor:
         """Rollout step following a FIXED mode index (minADE eval)."""
-        mu, _, _ = self.modes(hist, pres, cls, ego, light)
+        mu, _, _ = self.modes(hist, pres, cls, ego, light, ego_hist)
         return self.advance(hist[:, :, -1], mu[:, :, mode])
 
     @torch.no_grad()
     def step(self, hist, pres, cls, ego, light,
-             sample: bool = False) -> Tensor:
+             sample: bool = False, ego_hist=None) -> Tensor:
         """One rollout step: predict local deltas, integrate to world.
 
         hist (B, A, H, 7) -> next world states (B, A, 7): the caller
         shifts them into the history window for the next step.
         """
-        d = self.dist(hist, pres, cls, ego, light)
+        d = self.dist(hist, pres, cls, ego, light, ego_hist)
         delta = d.sample() if sample else d.base_dist.loc   # (B, A, 3)
         return self.advance(hist[:, :, -1], delta)

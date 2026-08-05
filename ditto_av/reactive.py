@@ -65,6 +65,8 @@ class ReactiveEgoSim(EgoSim):
         ids = torch.as_tensor(self.windows.ids[widx], device=dev)
         self._pred_ids = torch.where(self._pred, ids,
                                      torch.full_like(ids, -1))
+        self._ego_hist = torch.as_tensor(self.windows.ego_hist[widx],
+                                         device=dev)
         self._sync_buffer(starts)
         return xy, th, v
 
@@ -98,9 +100,12 @@ class ReactiveEgoSim(EgoSim):
         """Advance evolved agents one tick, conditioned on the SIM ego."""
         ego_state = torch.stack(
             [ego_xy[..., 0], ego_xy[..., 1], ego_theta, ego_v], dim=-1)
+        self._ego_hist = torch.cat(
+            [self._ego_hist[:, 1:], ego_state.float()[:, None]], dim=1)
         light = self.log.light[frames]
         outs = [m.step(self._hist, self._pred, self._cls,
-                       ego_state.float(), light) for m in self.models]
+                       ego_state.float(), light,
+                       ego_hist=self._ego_hist) for m in self.models]
         nxt = outs[0]
         if len(outs) > 1:
             stack = torch.stack([o[..., 0:2] for o in outs])
