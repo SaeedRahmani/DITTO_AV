@@ -16,6 +16,12 @@ existed; on FAIL fix the model or kill E3 — never these numbers):
 
 Usage: v031_e3_audit.py --data <dir> --wm-dir <v031_e3 run dir>
            --champion-cfg <yaml> [--n 512] [--burn 20] [--win 8]
+
+--probe (the ONE pre-registered refinement, ledger 2026-08-05 17:50):
+similarity is computed in the frozen wp-probe's projection h @ W
+(checkpoints/wp_probe.pt from v031_e3_probe.py) instead of raw h;
+same criteria, report -> results/a0_audit_probe.json. The raw-space
+FAIL record in a0_audit.json stands either way.
 """
 from __future__ import annotations
 
@@ -65,6 +71,7 @@ def main():
     ap.add_argument("--n", type=int, default=512)
     ap.add_argument("--burn", type=int, default=20)
     ap.add_argument("--win", type=int, default=8)
+    ap.add_argument("--probe", action="store_true")
     args = ap.parse_args()
 
     cfg = load_config(args.champion_cfg)
@@ -76,6 +83,10 @@ def main():
     log = GlobalLog([Path(args.data) / "b2d_val.npz"], device="cpu")
     wm = load_world_model(cfg, log.obs.shape[1])
     sim = sim_from_config(cfg, log)
+    W = None
+    if args.probe:
+        W = torch.load(Path(args.wm_dir) / "checkpoints"
+                       / "wp_probe.pt")["W"]
 
     T = args.burn + args.win
     pool = log.window_starts(T, 1)
@@ -89,7 +100,8 @@ def main():
     h_bank = observe_windows(wm, obs_log, log.wp, starts,
                              args.burn, args.win)
 
-    report = {"n": B, "burn": args.burn, "win": args.win, "arms": {}}
+    report = {"n": B, "burn": args.burn, "win": args.win,
+              "space": "probe" if args.probe else "raw", "arms": {}}
     means = []
     for off in OFFSETS:
         obs_arm = obs_log.clone()
@@ -102,7 +114,10 @@ def main():
                 fr, xy + off * lat, th, v)
         h_arm = observe_windows(wm, obs_arm, log.wp, starts,
                                 args.burn, args.win)
-        r = max_cos(h_arm[args.burn:], h_bank[args.burn:])
+        ha, hb = h_arm[args.burn:], h_bank[args.burn:]
+        if W is not None:
+            ha, hb = ha @ W, hb @ W
+        r = max_cos(ha, hb)
         m = float(r.mean())
         means.append(m)
         report["arms"][str(off)] = m
@@ -117,7 +132,8 @@ def main():
                        "2m<=0.75x": ok_c}
     verdict = ok_a and ok_b and ok_c
     report["verdict"] = "PASS" if verdict else "FAIL"
-    out = Path(args.wm_dir) / "results" / "a0_audit.json"
+    name = "a0_audit_probe.json" if args.probe else "a0_audit.json"
+    out = Path(args.wm_dir) / "results" / name
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(report, indent=2))
     print(f"E3-A0 {report['verdict']} "

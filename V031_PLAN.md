@@ -99,7 +99,29 @@ layout_viol metric (free diagnostics); keep layout_torch/LayoutQuery
 infra. Both-world in-sim reward canary IMPROVED in both arms while
 CARLA dropped — logged as another "sim never grades itself" instance.
 
-### NEXT: E3 — factored-latent DITTO retest (design, 2026-08-05)
+### E3: CLOSED as a measured negative (2026-08-05, no RL run needed)
+
+A0 audit chain (wm 10584612, frozen; scripts/v031_e3_audit.py):
+- RAW latent space: FAIL on dynamic range — 2 m ego offset moves
+  max_cos only 0.952->0.929 (0.976x, gate <=0.75x) where the state
+  kernel gives 0.135x. Monotone + control PASS (results/a0_audit.json).
+- Pre-registered refinement (ledger 17:50, the ONE allowed): ridge
+  wp-probe h->wp on train fits R^2 0.9597 — the latent LINEARLY
+  CONTAINS the expert plan — yet the audit in probe space on val
+  FAILS ALL THREE gates (control 0.7525<0.95: the sim obs path
+  destabilizes the wp-relevant subspace even at zero offset;
+  non-monotone at 4 m; 2 m drop 3% vs required 25%)
+  (results/a0_audit_probe.json).
+CONCLUSION (closes the v0.1 question, measured): even inside the
+(ego | shared-traffic) factorization that grants pure ego
+attribution, latent MATCHING has ~zero usable dynamic range for ego
+deviation — the information is present but the similarity channel
+cannot read it. v0.1's failure was not just the dreamed world: latent
+matching as a reward is dead on its own axis. Per pre-registration,
+both factorization axes dead -> E3 closes; ego-STATE matching stays
+the load-bearing reward. Next on main: the paper.
+
+### E3 design record (for the paper; audits above overrule step 4-5)
 
 The v0.1 question, isolated: v0.1 changed two things at once vs what
 works — the world (dreamed) and the reward (latent matching). v0.2/3
