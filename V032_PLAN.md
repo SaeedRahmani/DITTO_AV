@@ -83,6 +83,24 @@ S1/driving gates. 3x3 stays a canary, never a selector.
 
 ## 9. Ledger
 
+- 2026-08-05 AXIS-1 ROUND 1: job 10582600 (a100-small, 54 min),
+  sigma_yr 0.5, 3500 steps. Wobble HALVED but gate missed: S1b
+  yr_flips 24.2 (gate 7.1), ya_p95 12.24 (gate 5.7), churn 0.38 ->
+  0.215; old-currency G2 REGRESSED vs clp_rx (reactive 0.654 vs
+  0.685, perr 1.71 vs 1.38) -> does NOT go to CARLA (in-sim no-go).
+  Training telemetry: reward plateaus 0.22-0.28 from step 500 (init
+  0.092) — at sigma 0.5 the channel is a CLIFF: residual wobble
+  0.9-1.5 rad/s scores e^-1.6..e^-4.5 ~ 0, so no gradient through the
+  wobble region while the KL anchor (kl ~0.9) pins the wobbly init.
+- 2026-08-05 AXIS-1 ROUND 2 pre-registered BEFORE the run (same
+  axis, one refinement + capacity): sigma_yr 0.5 -> 1.0 (restores
+  slope: 1.5 rad/s costs 0.32, expert-band 0.5 costs 0.88) and steps
+  3500 -> 6000 (plateau-at-500 says optimization, given gradient,
+  needs room; D3's 3500 was tuned for the old objective).
+  Go/no-go to CARLA unchanged: old-currency reactive reward >= 0.68
+  AND the FULL S1b gate (yr_flips <= 7.1, ya_p95 <= 5.7). On a second
+  miss: stop tuning sigma, take the finding to Axis 2/3 (churn is the
+  quantity to price, not its yaw-rate shadow).
 - 2026-08-05 AXIS-5 (EMA attribution) CLOSED — jobs 10582712 (d10A) /
   10582713 (d10B), visual; earlier 10582601/02 burned by the sbatch
   --export comma trap (documented in v032_carla_chain.sbatch).
