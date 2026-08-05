@@ -83,6 +83,21 @@ S1/driving gates. 3x3 stays a canary, never a selector.
 
 ## 9. Ledger
 
+- 2026-08-05 AXIS-3 ROUND 3 (seed bars, jobs 10587612/13): w_cons 0.5
+  reactive by seed = 0.661 (s0) / 0.705 (s1) / 0.694 (s2) -> mean
+  0.6865 >= 0.68 bar; s1 AND s2 beat clp_rx's 0.685 outright with
+  churn ~0.07 (5x under rx's 0.38). Seed 0 was noise, as suspected.
+  DECISION per the committed rule: median seed = s2 (0.694) is the
+  CARLA candidate. S1b status for s2: ya_p95 3.17 PASS, yr_flips 11.3
+  vs 7.1 FAIL — NOT waived, recorded as failed. Note: even w_cons 1.0
+  with churn AT the execution floor flips 10.8, so residual flips are
+  closed-loop micro-corrections, not churn; the 7.1 number was pinned
+  from open-loop floors. The gate is NOT refined; the in-sim go/no-go
+  was lane economy, lanes are free, and the BINDING 1.4 gates are
+  CARLA-side — s2 goes to dev-10 A/B to be judged by those exactly as
+  pre-registered (DS >= 82.5, veh col <= 8, 30/30, S1a <= 14.8).
+  (w_cons 0.25 Pareto point 10587614 still running; completes the
+  curve, does not affect this decision.)
 - 2026-08-05 AXIS-3 ROUND 2: job 10586354, w_cons 0.5. MISS on both
   counts and NOT a clean Pareto slide: reactive 0.661 (was 0.657 at
   w_cons 1.0; bar 0.68) while smoothness gave ground (yr_flips 10.8
