@@ -86,7 +86,7 @@ def stage_data(cfg, args):
                        + "##egobox1"  # ego pose from the exact ego box
                        + ("##lights1" if with_lights else "")
                        + (f"##wp{wp_k}" if wp_k else "")
-                       + ("##glob1" if cfg.env.global_arrays else "")
+                       + ("##glob2" if cfg.env.global_arrays else "")
                        ).encode()).hexdigest()[:12]
     cache = Path(args.extracted).parent / "npz_cache"
     cache.mkdir(exist_ok=True)
