@@ -85,8 +85,26 @@ ego. v0.3 learns the ONE thing replay cannot provide — reactions:
   **reactivity probe**: inject a braking ego in front of followers —
   modeled followers must decelerate (CV ghosts do not); report effect
   size. FAIL any -> fix the model, never lower the gate.
+- C5 lever ladder on W0 FAIL (ordered, one at a time; amended
+  2026-08-04 BEFORE round-2 results, with round-1 evidence only):
+  (1) rollout fine-tuning [round-2, running]; (2) error decomposition
+  by regime (stopped/launching vs cruising vs turning) to pick between
+  (3a) multimodal heads (GMM) — 4 s futures at junctions genuinely
+  branch and a Gaussian mean averages modes (the SAME point-metric
+  lesson as v0.1); (3b) per-light scene context (A4) — other agents'
+  stops are unexplained by current inputs; (4) capacity/history.
+  PRE-REGISTERED metric note: mean point-ADE punishes correct-but-
+  different modes; if collision realism + reactivity + calibration
+  pass while mean-ADE fails AND the error decomposition shows
+  branching dominates, the gate criterion may be refined to
+  minADE-over-modes (standard sim-agents practice) — refinement must
+  be justified by the decomposition, never by the score alone.
 
 ## 5. Phase D — REACTIVE EGOSIM + POLICY (V3-M3)
+
+Schedule amendment 2026-08-04: D1/D2 are pure code + tests — build
+them IN PARALLEL with the W0 iterations (only D3 training requires a
+W0-passing model). Serializing them wastes wall-clock.
 
 - D1: EgoSim reactive mode (additive code path): traffic from model
   rollout (initialized from logged history) instead of log indexing;
