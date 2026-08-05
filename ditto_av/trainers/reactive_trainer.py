@@ -48,6 +48,7 @@ def _rollout(policy, sim, log, starts, horizon, burn_in,
     frame = starts.clone()
     dead = torch.zeros(len(starts), dtype=torch.bool, device=device)
     obs_l, act_l, rew_l, col_l, err_l, dis_l = [], [], [], [], [], []
+    off_l = []
     for _ in range(horizon):
         obs = sim.build_obs(frame, xy, th, v)
         emb = policy.encode(obs)
@@ -63,6 +64,15 @@ def _rollout(policy, sim, log, starts, horizon, burn_in,
         frame = frame + 1
         r = sim.reward(frame, xy, th, v)
         r = torch.where(dead, torch.zeros_like(r), r)   # W1 pessimism
+        off = sim.layout_off(frame, xy)
+        if off is not None:
+            off_l.append(off)
+            if sim.r.layout_penalty > 0:
+                # applied AFTER the W1 zeroing: pessimism distrusts the
+                # traffic model, but the static layout is exact geometry
+                # — leaving roads stays priced even in dead rollouts
+                r = r - sim.r.layout_penalty \
+                    * off.clamp(0.0, sim.r.layout_clip)
         obs_l.append(obs)
         act_l.append(a)
         rew_l.append(r)
@@ -72,14 +82,17 @@ def _rollout(policy, sim, log, starts, horizon, burn_in,
     return (burn_obs, torch.stack(obs_l), torch.stack(act_l),
             torch.stack(rew_l), final_obs, torch.stack(col_l),
             torch.stack(err_l), dead,
-            torch.stack(dis_l) if dis_l else None)
+            torch.stack(dis_l) if dis_l else None,
+            torch.stack(off_l) if off_l else None)
 
 
 def train_clp_reactive(cfg: Config, log: GlobalLog,
                        rsim: ReactiveEgoSim, champion_ckpt: Path,
                        out_dir: Path, seed: int = 0,
                        p_reactive_max: float = 0.5,
-                       w1_thresh: float = 0.25) -> TokenPolicy:
+                       w1_thresh: float = 0.25,
+                       layout=None, w_layout: float = 0.0
+                       ) -> TokenPolicy:
     torch.manual_seed(seed)
     c = cfg.clp
     device = cfg.device
@@ -97,6 +110,12 @@ def train_clp_reactive(cfg: Config, log: GlobalLog,
     a_opt = torch.optim.Adam(actor_params, lr=c.actor_lr)
     c_opt = torch.optim.Adam(policy.critic.parameters(), lr=c.critic_lr)
     replay_sim = sim_from_config(cfg, log)
+    if layout is not None:
+        # both worlds share the static layout; penalty weight is the
+        # v0.3.1 dose axis (0 = metric-only)
+        for s in (replay_sim, rsim):
+            s.layout = layout
+            s.r.layout_penalty = w_layout
 
     # reactive rollouts must start at frames with scene windows
     pool_all = log.window_starts(c.horizon, max(c.reward_tau, 1))
@@ -119,9 +138,9 @@ def train_clp_reactive(cfg: Config, log: GlobalLog,
                           generator=gen)
         starts = pool[i]
         (burn_obs, obs_seq, act_seq, rewards, final_obs, cols, errs,
-         dead, dis) = _rollout(policy, sim, log, starts, c.horizon,
-                               c.burn_in, reactive, w1_thresh,
-                               perturb, gen)
+         dead, dis, offs) = _rollout(policy, sim, log, starts,
+                                     c.horizon, c.burn_in, reactive,
+                                     w1_thresh, perturb, gen)
 
         with torch.no_grad():
             _, h0 = policy.unroll(burn_obs)
@@ -160,6 +179,8 @@ def train_clp_reactive(cfg: Config, log: GlobalLog,
         c_opt.step()
         policy.update_target(c.target_tau)
 
+        lviol = float((offs > 0).float().mean()) if offs is not None \
+            else float("nan")
         if step % 100 == 0 or step == 1:
             wandb_util.log(
                 {"step": step, "reward": float(rewards.mean()),
@@ -167,12 +188,14 @@ def train_clp_reactive(cfg: Config, log: GlobalLog,
                  "kl": float(kl), "entropy": float(entropy),
                  "dead_frac": float(dead.float().mean()),
                  "col": float(cols.any(0).float().mean()),
+                 "layout_viol": lviol,
                  "perr": float(errs[-1].mean())}, prefix="clp_rx")
         if step % 500 == 0 or step == 1:
             tag = "RX" if reactive else "RP"
             print(f"clp_rx {step:5d} [{tag} p={p_r:.2f}] "
                   f"r {rewards.mean():.3f} | perr {errs[-1].mean():.2f}"
                   f" | col {cols.any(0).float().mean():.3f} "
+                  f"| lviol {lviol:.3f} "
                   f"| dead {dead.float().mean():.2f} | kl {kl:.3f}")
 
     ckpt = out_dir / "clp_rx.pt"
@@ -183,14 +206,20 @@ def train_clp_reactive(cfg: Config, log: GlobalLog,
 
 @torch.no_grad()
 def eval_both_worlds(cfg, policy, log, rsim, w1_thresh=0.25,
-                     batch=192, seed=0):
+                     batch=192, seed=0, layout=None):
     """G2-style verdict in BOTH worlds (their divergence is itself a
-    diagnostic: big gaps = the reactive world changes the task)."""
+    diagnostic: big gaps = the reactive world changes the task).
+
+    layout attaches the violation METRIC only — eval reward stays pure
+    ego-state matching (layout_penalty is left at the sim default)."""
     c = cfg.clp
     device = cfg.device
     gen = torch.Generator(device=device)
     gen.manual_seed(seed)
     replay_sim = sim_from_config(cfg, log)
+    if layout is not None:
+        replay_sim.layout = layout
+        rsim.layout = layout
     pool_all = log.window_starts(c.horizon, max(c.reward_tau, 1))
     w_ok = torch.tensor(
         [int(f) in rsim.frame_to_w for f in pool_all.cpu()],
@@ -202,11 +231,16 @@ def eval_both_worlds(cfg, policy, log, rsim, w1_thresh=0.25,
             ("reactive", rsim, True, pool_r)):
         starts = pool[torch.randint(len(pool), (batch,), device=device,
                                     generator=gen)]
-        (_, _, _, rewards, _, cols, errs, dead, _) = _rollout(
+        (_, _, _, rewards, _, cols, errs, dead, _, offs) = _rollout(
             policy, sim, log, starts, c.horizon, c.burn_in, reactive,
             w1_thresh, stochastic=False)
         out[name] = {"reward": float(rewards.mean()),
                      "collision": float(cols.any(0).float().mean()),
                      "perr_final": float(errs[-1].mean()),
                      "dead_frac": float(dead.float().mean())}
+        if offs is not None:
+            # step-level rate + any-violation share of rollouts
+            out[name]["layout_viol"] = float((offs > 0).float().mean())
+            out[name]["layout_viol_any"] = float(
+                (offs > 0).any(0).float().mean())
     return out

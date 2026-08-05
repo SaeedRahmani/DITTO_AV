@@ -13,8 +13,9 @@ trajectories (gate: expert violation < 1% of frames).
 """
 from __future__ import annotations
 
+import re
 from pathlib import Path
-from typing import Dict, Tuple
+from typing import Dict, List, Tuple
 
 import numpy as np
 
@@ -71,6 +72,31 @@ class TownLayout:
             j = int(np.argmin(d))
             out[i] = d[j] - self.hw[cand[j]] - margin
         return out
+
+
+def manifest_towns(manifest: Path, val_every: int = 6
+                   ) -> Tuple[List[str], List[str]]:
+    """Per-episode town names for the (train, val) npz caches.
+
+    Mirrors run_b2d.split_clips exactly: sorted manifest names, every
+    `val_every`-th held out; clips_to_npz concatenates clips in that
+    order with one reset per clip, so episode i of each npz IS clip i
+    of the corresponding split. Town10HD matches as Town10 (= the
+    layout npz name).
+    """
+    names = sorted(ln.strip().removesuffix(".tar.gz")
+                   for ln in Path(manifest).read_text().splitlines()
+                   if ln.strip())
+    towns = []
+    for n in names:
+        m = re.search(r"Town\d+", n)
+        assert m, f"no TownNN in clip name {n!r}"
+        towns.append(m.group(0))
+    train = [t for i, t in enumerate(towns)
+             if i % val_every != val_every - 1]
+    val = [t for i, t in enumerate(towns)
+           if i % val_every == val_every - 1]
+    return train, val
 
 
 _cache: Dict[str, TownLayout] = {}

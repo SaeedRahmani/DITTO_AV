@@ -123,6 +123,11 @@ class RewardParams:
     # ego being rear-ended by replayed (non-reactive) traffic is a
     # ghost artifact, not the policy's fault
     penalty_ignore_rear: bool = True
+    # v0.3.1: static-layout penalty, w * clamp(off_drivable, 0, clip).
+    # The clip bounds the "no lane within 8 m" sentinel (99 m) so one
+    # lost rollout cannot dominate the normalized advantages.
+    layout_penalty: float = 0.0
+    layout_clip: float = 3.0        # m
 
 
 def _rot_world_to_ego(theta: Tensor) -> Tensor:
@@ -144,6 +149,9 @@ class EgoSim:
         self.log = log
         self.p = sim or SimParams()
         self.r = rew or RewardParams()
+        # v0.3.1: optional layout_torch.LayoutQuery, attached by the
+        # caller (needs the manifest split, which config-land lacks)
+        self.layout = None
 
     # ---------------- observation (mirrors featurize_frame) -----------
 
@@ -341,6 +349,15 @@ class EgoSim:
         return _obb_overlap_any(xy, ego_yaw, ego_ext,
                                 act[..., 1:3], act[..., 5], act[..., 6:8],
                                 cand)
+
+    # ---------------- static layout (v0.3.1) ---------------------------
+
+    def layout_off(self, frame: Tensor, xy: Tensor) -> Optional[Tensor]:
+        """(B,) signed clearance beyond the lane edge (positive =
+        off-drivable), or None when no layout is attached."""
+        if self.layout is None:
+            return None
+        return self.layout.off(frame, xy)
 
     # ---------------- rollout starts ----------------------------------
 

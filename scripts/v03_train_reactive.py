@@ -47,6 +47,14 @@ def main():
     ap.add_argument("--n-ensemble", type=int, default=2)
     ap.add_argument("--p-reactive", type=float, default=0.5)
     ap.add_argument("--device", default="cuda")
+    # v0.3.1: static layout in the training world. --manifest ties
+    # npz episode order to towns (must be the manifest the caches were
+    # built from); --w-layout 0 = metric-only, >0 = penalty arm.
+    ap.add_argument("--manifest",
+                    default=str(REPO / "manifests" / "b2d_full999.txt"))
+    ap.add_argument("--layout-dir", default=None,
+                    help="Town*_lanes.npz dir; empty string disables")
+    ap.add_argument("--w-layout", type=float, default=0.0)
     args = ap.parse_args()
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -71,10 +79,23 @@ def main():
     rsim = ReactiveEgoSim(log, sw, models, raw["act_id"],
                           rsim_p.p, rsim_p.r)
 
+    lay = lay_val = None
+    if args.layout_dir != "":
+        from ditto_av.layout import LAYOUT_DIR, manifest_towns
+        from ditto_av.layout_torch import LayoutQuery
+        ldir = Path(args.layout_dir) if args.layout_dir else LAYOUT_DIR
+        tr_towns, va_towns = manifest_towns(Path(args.manifest))
+        lay = LayoutQuery(tr_towns, log.episodes, len(log.obs),
+                          device, ldir)
+        lay_val = (va_towns, ldir)
+        print(f"layout: {len(set(tr_towns))} towns, "
+              f"w_layout={args.w_layout}")
+
     policy = train_clp_reactive(cfg, log, rsim, Path(args.champion),
                                 out, seed=cfg.seed,
                                 p_reactive_max=args.p_reactive,
-                                w1_thresh=W1_THRESH)
+                                w1_thresh=W1_THRESH,
+                                layout=lay, w_layout=args.w_layout)
 
     # both-world verdict on held-out clips
     vlog = GlobalLog([Path(args.data) / "b2d_val.npz"], device=device)
@@ -83,8 +104,13 @@ def main():
     vsim_p = sim_from_config(cfg, vlog)
     vrsim = ReactiveEgoSim(vlog, vsw, models, vraw["act_id"],
                            vsim_p.p, vsim_p.r)
+    vlay = None
+    if lay_val is not None:
+        va_towns, ldir = lay_val
+        vlay = LayoutQuery(va_towns, vlog.episodes, len(vlog.obs),
+                           device, ldir)
     report = {"clp_rx": eval_both_worlds(cfg, policy, vlog, vrsim,
-                                         W1_THRESH)}
+                                         W1_THRESH, layout=vlay)}
     # champion baseline rows
     from ditto_av.models.policy_v2 import make_token_policy
     champ = make_token_policy(cfg).to(device)
@@ -92,7 +118,7 @@ def main():
                                      map_location=device))
     champ.eval()
     report["champion"] = eval_both_worlds(cfg, champ, vlog, vrsim,
-                                          W1_THRESH)
+                                          W1_THRESH, layout=vlay)
     (out / "d3_report.json").write_text(json.dumps(report, indent=2))
     print(json.dumps(report, indent=2))
 
