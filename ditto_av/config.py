@@ -215,6 +215,8 @@ class CLPConfig:
     p2_weight: float = 0.3
     sigma_yawrate: float = 0.0  # rad/s; v0.3.2 motion-quality channel
     #                             (0 = v0.3 behavior)
+    w_churn: float = 0.0  # v0.3.2 axis-2: reward penalty per meter of
+    #                       plan churn in reactive rollouts (0 = off)
     collision_penalty: float = 0.0  # 0 = thesis-pure arm
     penalty_ignore_rear: bool = True  # ghost rear-ends don't count
 

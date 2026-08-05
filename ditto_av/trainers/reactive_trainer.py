@@ -33,7 +33,7 @@ from .. import wandb_util
 @torch.no_grad()
 def _rollout(policy, sim, log, starts, horizon, burn_in,
              reactive: bool, w1_thresh: float, perturb=None, rng=None,
-             stochastic=True):
+             stochastic=True, w_churn: float = 0.0):
     device = starts.device
     lo = log.ep_start[starts]
     bidx = (starts.unsqueeze(1)
@@ -48,12 +48,22 @@ def _rollout(policy, sim, log, starts, horizon, burn_in,
     frame = starts.clone()
     dead = torch.zeros(len(starts), dtype=torch.bool, device=device)
     obs_l, act_l, rew_l, col_l, err_l, dis_l = [], [], [], [], [], []
+    prev_plan = prev_pxy = prev_pth = None
     for _ in range(horizon):
         obs = sim.build_obs(frame, xy, th, v)
         emb = policy.encode(obs)
         h = policy.step(emb, h)
         d = policy.dist(policy.features(emb, h))
         a = d.sample() if stochastic else d.base_dist.loc
+        churn = None
+        if w_churn > 0.0:
+            from ..bench2drive import WP_SCALE
+            from ..consistency import plan_churn_lat
+            plan_m = policy.clamp(a).view(len(starts), -1, 2) * WP_SCALE
+            if prev_plan is not None:
+                churn = plan_churn_lat(prev_plan, plan_m, prev_pxy, xy,
+                                       prev_pth, th)
+            prev_plan, prev_pxy, prev_pth = plan_m, xy, th
         th_prev = th
         xy, th, v = sim.step_ego(policy.clamp(a), xy, th, v)
         if reactive:
@@ -64,6 +74,8 @@ def _rollout(policy, sim, log, starts, horizon, burn_in,
         frame = frame + 1
         r = sim.reward(frame, xy, th, v,
                        yaw_rate=_wrap(th - th_prev) / DT)
+        if churn is not None:
+            r = r - w_churn * churn
         r = torch.where(dead, torch.zeros_like(r), r)   # W1 pessimism
         obs_l.append(obs)
         act_l.append(a)
@@ -123,7 +135,8 @@ def train_clp_reactive(cfg: Config, log: GlobalLog,
         (burn_obs, obs_seq, act_seq, rewards, final_obs, cols, errs,
          dead, dis) = _rollout(policy, sim, log, starts, c.horizon,
                                c.burn_in, reactive, w1_thresh,
-                               perturb, gen)
+                               perturb, gen,
+                               w_churn=getattr(c, "w_churn", 0.0))
 
         with torch.no_grad():
             _, h0 = policy.unroll(burn_obs)
