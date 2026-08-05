@@ -55,6 +55,9 @@ class SceneWindows:
     ego: np.ndarray           # (N, 4) x, y, theta, speed
     light: np.ndarray         # (N, 4) presence, tv_xy, state
     target: np.ndarray        # (N, A, 3) dx_fwd, dy_left, dyaw @ t+1
+    ids: np.ndarray           # (N, A) actor ids (-1 empty): slots
+                              # re-sort per frame — cross-window
+                              # comparisons MUST match by id
 
 
 def build_scene_windows(data, hist: int = 10) -> SceneWindows:
@@ -80,6 +83,7 @@ def build_scene_windows(data, hist: int = 10) -> SceneWindows:
                 slot_of[t][int(ids[t, a])] = a
 
     frames, H, PM, PR, CL, EG, LI, TG = [], [], [], [], [], [], [], []
+    IDS = []
     for t in range(T):
         if t - hist + 1 < ep_start[t] or t + 1 >= ep_end[t]:
             continue
@@ -116,9 +120,10 @@ def build_scene_windows(data, hist: int = 10) -> SceneWindows:
             EG.append(ego_g[t, :4])
             LI.append(light_g[t])
             TG.append(tg)
+            IDS.append(ids[t].copy())
     return SceneWindows(np.array(frames), np.stack(H), np.stack(PM),
                         np.stack(PR), np.stack(CL), np.stack(EG),
-                        np.stack(LI), np.stack(TG))
+                        np.stack(LI), np.stack(TG), np.stack(IDS))
 
 
 def featurize(hist: Tensor, pres: Tensor, cls: Tensor, ego: Tensor,

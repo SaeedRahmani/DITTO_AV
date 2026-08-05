@@ -55,7 +55,7 @@ def load_windows(npz_path: Path, cache: Path):
     np.savez_compressed(cache, frames=sw.frames, hist=sw.hist,
                         pred_mask=sw.pred_mask, pres_mask=sw.pres_mask,
                         cls=sw.cls, ego=sw.ego, light=sw.light,
-                        target=sw.target)
+                        target=sw.target, ids=sw.ids)
     return sw
 
 
@@ -131,16 +131,19 @@ def fast_rollout_ade(models, val, device, n_scenes=256,
                     stack.std(dim=0).norm(dim=-1)[0, pm[0]].mean()))
             hist = torch.cat([hist[:, :, 1:], nxt[:, :, None]], dim=2)
             if k in ades and i_k is not None:
-                logged = torch.as_tensor(val.hist[[i_k]][:, :, -1],
-                                         device=device)
-                # same-slot same-actor guard via positions at k=0 is
-                # implicit: slots are nearest-sorted per frame, so only
-                # compare agents predicted at i0 AND present at i_k
-                m_ = pm & torch.as_tensor(val.pres_mask[[i_k]],
-                                          device=device)
-                if m_.any():
-                    err = (nxt[..., 0:2] - logged[..., 0:2]).norm(dim=-1)
-                    ades[k] += err[m_].tolist()
+                # ID-MATCHED comparison: slot layouts re-sort per
+                # frame; matching by slot compares DIFFERENT actors
+                # (the first W0 run's 91 m ADE artifact).
+                ids0 = val.ids[i0]
+                slot_k = {int(v): b
+                          for b, v in enumerate(val.ids[i_k]) if v >= 0}
+                logged = val.hist[i_k][:, -1, 0:2]
+                nxt_np = nxt[0, :, 0:2].cpu().numpy()
+                for a in np.where(pm[0].cpu().numpy())[0]:
+                    b = slot_k.get(int(ids0[a]))
+                    if b is not None:
+                        ades[k].append(float(np.linalg.norm(
+                            nxt_np[a] - logged[b])))
         # proximity events at final step (model) vs log
         i_R = frame_to_i.get(int(frames[i0]) + ROLL)
         if i_R is not None:
@@ -240,9 +243,9 @@ def main():
     
 
     tr = load_windows(Path(args.data) / "b2d_train.npz",
-                      out / "windows_train.npz")
+                      out / "windows2_train.npz")
     va = load_windows(Path(args.data) / "b2d_val.npz",
-                      out / "windows_val.npz")
+                      out / "windows2_val.npz")
 
     models = []
     for s in range(args.seeds):
