@@ -1,7 +1,7 @@
 # V03_PLAN.md — v0.3: a learned, reactive world model (branch saeed/v0.3)
 
 Decided with the author 2026-08-04. v0.2 continues on `main` (other
-sessions); v0.1 frozen on `saeed/ver0.1`. Work ONLY in the worktree
+sessions); v0.1 frozen on `saeed/v0.1`. Work ONLY in the worktree
 `/scratch/$USER/ditto_av/DITTO_AV_v03` — NEVER check saeed/v0.3 out in
 the main clone or the home clone (live v0.2 jobs read those trees).
 

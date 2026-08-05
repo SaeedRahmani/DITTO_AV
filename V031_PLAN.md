@@ -2,8 +2,8 @@
 
 Written 2026-08-05 as the session handoff. This file + `V03_PLAN.md`
 (ops digest in its §7; findings in its §9 ledger) are the guides for
-continuing on `main`. Historical records: `saeed/ver0.1` (v0.1 +
-DELFTBLUE.md/NEXT_STEPS.md), `saeed/v0_2` (v0.2), `saeed/v0.3` (v0.3).
+continuing on `main`. Historical records: `saeed/v0.1` (v0.1 +
+DELFTBLUE.md/NEXT_STEPS.md), `saeed/v0.2` (v0.2), `saeed/v0.3` (v0.3).
 
 ## 0. Project in one paragraph
 
@@ -23,8 +23,8 @@ LAYOUT (7 layout collisions vs 1). v0.3.1 = fix exactly that.
 
 | line | branch | state |
 |---|---|---|
-| v0.1 | saeed/ver0.1 | frozen; DS 22.10 @220 |
-| v0.2 | saeed/v0_2 | frozen; champions 999t/999s (dev-10 83.60/85.63, 220 75.88/76.10, seeds ±7.5-9.4); paper draft in paper/ |
+| v0.1 | saeed/v0.1 | frozen; DS 22.10 @220 |
+| v0.2 | saeed/v0.2 | frozen; champions 999t/999s (dev-10 83.60/85.63, 220 75.88/76.10, seeds ±7.5-9.4); paper draft in paper/ |
 | v0.3 | saeed/v0.3 | frozen; W0 campaign PASSED (minADE 2.79, react 0.567), clp_rx dev-10 82.53, dividend + layout-gap banked |
 | v0.3.1 | **main** (HEAD) | ONGOING — M1 done (below) |
 
@@ -95,7 +95,7 @@ gap and beat dev-10 85.63; then ONE 220 for the headline; then paper.
   include the failure modes (churn, curvature, braking experts).
 - One axis per iteration; every result -> ledger with job id.
 
-## 4. Ops quickstart (details: V03_PLAN §7; history: saeed/ver0.1)
+## 4. Ops quickstart (details: V03_PLAN §7; history: saeed/v0.1)
 
 - Work in /scratch/$USER/ditto_av/DITTO_AV (main). The DITTO_AV_v03/
   worktree was REMOVED 2026-08-05 (its content is fully merged into
