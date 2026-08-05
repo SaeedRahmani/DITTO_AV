@@ -99,6 +99,51 @@ layout_viol metric (free diagnostics); keep layout_torch/LayoutQuery
 infra. Both-world in-sim reward canary IMPROVED in both arms while
 CARLA dropped — logged as another "sim never grades itself" instance.
 
+### v0.3.1-R: REOPENED 2026-08-06 (user request) — furniture axis
+
+Review verdict on the W3 FAIL — three distinct errors, not one:
+1. WRONG GEOMETRY: the premise (missing static world) was right but
+   lane-union off-drivable is not what CARLA charges for — the events
+   are map-furniture clips (fence/prop/vegetation) ON drivable area.
+   Independently confirmed by v0.3.2: pure smoothness got layout
+   7 -> 0 with zero map data (wobble corner-clipping mechanism), at
+   the cost of veh 6 -> 12 (global prior taxes reactivity).
+2. WRONG DELIVERY: reward-side penalty through normalized A2C
+   advantages on stochastic rollouts — v0.3.2 axis-2 measured this
+   channel pricing exploration noise (10x mean churn); the veh-col
+   explosion in BOTH w=0.5 arms (6 -> 21/24, two seeds agreeing) is
+   the same channel failing. Working channel (v0.3.2 axis-3):
+   differentiable auxiliary loss on the mean plan.
+3. PREMATURELY CLOSED DATA QUESTION: "no data source has these
+   objects" covered only annos+xodr. CARLA exposes the actual
+   collidable furniture offline: world.get_environment_objects /
+   get_level_bbs per CityObjectLabel (verified in the eval venv) —
+   one server job dumps world-frame OBBs per town.
+
+FIX (synthesis): differentiable PLAN-CLEARANCE aux loss against real
+furniture boxes — mean predicted waypoints -> world frame; penalize
+relu(margin - dist to nearest box). Local (active only near actual
+objects), targeted (prices exactly the charged events), not through
+advantages, no global smoothness tax. Complementary to v0.3.2's
+proximity-gated consistency (their lane, do not duplicate).
+
+Stage A gates (PRE-REGISTERED before the dump lands):
+  A1 coverage: all 4 measured dev-10 collision points (2091 fences
+     x2 T12, 3514 prop T13, 27494 vegetation T04) fall inside an
+     extracted box inflated by <= 0.3 m, using non-Building labels.
+  A2 expert fidelity: < 1% of expert frames (train and val) within
+     MARGIN of any furniture box, with MARGIN chosen as the largest
+     value in {0.5, 0.3, 0.2} that passes; if even 0.2 fails, boxes
+     are over-merged -> refine by label/source subset ONCE, justified
+     in the ledger; if still failing, the axis dies here.
+  A3 discrimination: at the collision points the clearance signal
+     must read <= 0 (inside margin) where the LANE query read
+     -0.3..-1.5 m (the blindness being fixed).
+Stage B (only if A passes): loss + metric, w_furn dose axis start
+0.5 in LOSS space (not reward). Stage C: ONE D3 arm (init 999s),
+dev-10 A/B x3 gate: DS > 85.63 nominal AND layout <= 2 AND veh <= 8;
+band-clear (> +2.3) for a headline claim.
+
 ### E3: CLOSED as a measured negative (2026-08-05, no RL run needed)
 
 A0 audit chain (wm 10584612, frozen; scripts/v031_e3_audit.py):
