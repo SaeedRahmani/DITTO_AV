@@ -99,14 +99,51 @@ layout_viol metric (free diagnostics); keep layout_torch/LayoutQuery
 infra. Both-world in-sim reward canary IMPROVED in both arms while
 CARLA dropped — logged as another "sim never grades itself" instance.
 
-### NEXT
-- E3: factored-latent DITTO retest — latent matching inside the
-  (ego | learned-traffic) factorization; closes the v0.1 question.
-- Paper v0.3/v0.3.1 (findings ledger in V03_PLAN §9): the v0.3
-  reactivity dividend + the v0.3.1 negative result (what static
-  geometry can and cannot buy in a log-replay world) are both
-  publishable findings. Headline stays v0.2 220 76.10 / v0.3 dev-10
-  82.53 with the collision decomposition story.
+### NEXT: E3 — factored-latent DITTO retest (design, 2026-08-05)
+
+The v0.1 question, isolated: v0.1 changed two things at once vs what
+works — the world (dreamed) and the reward (latent matching). v0.2/3
+fixed both. E3 keeps the v0.3 world EXACTLY and swaps ONLY the reward
+back to latent matching (one axis). The factorization is inherent to
+this world: at matched frames sim and expert share the SAME traffic
+(replayed or same evolved buffer), so a latent difference is
+ego-attributable by construction — the property v0.1's dreamed
+full-scene latent lacked (gen-4 finding: similarity to any plausible
+traffic 0.85-0.92).
+
+Recipe (reuses v0.1 machinery, all still on main):
+1. Train VectorWorldModel on the 999-split b2d_train obs/wp stream
+   (wm_trainer.train_world_model; frozen after).
+2. Latent lane: teacher-force the log through the posterior
+   (build_latent_bank pattern) -> per-frame expert h_t. In rollouts,
+   run the frozen wm alongside the policy on the SIM obs/action
+   stream; reward_t = max_cos(h_sim_t, h_exp_{t+-d}) max over
+   |d|<=tau (the same time tolerance as the state kernel), replacing
+   sim.reward. No negatives to start (shared traffic should remove
+   the generic-driving floor — verify in the audit).
+3. E3-A0 offline audit BEFORE the RL run (measure-before-building):
+   (a) expert replay scores ~1; (b) ego-deviation sensitivity — 
+   rebuild obs at laterally offset ego (0.5/1/2/4 m) at the same
+   frames: latent reward must fall monotonically with offset and
+   the matched-vs-mismatched window gap must be large where the
+   state kernel's is (if the latent cannot see a 1 m ego offset
+   through shared traffic, E3 dies here and that IS the v0.1 answer,
+   measured).
+4. E3-L arm: D3 protocol unchanged (init 999s champion, reactive
+   p_r 0.5, W1 pessimism, KL anchor, 3500 steps) with the latent
+   reward. Direct counterpart: clp_rx (state reward, same protocol,
+   dev-10 82.53).
+5. GATE (pre-registered): dev-10 A/B x3. |E3L - 82.53| <= 2.3 (seed
+   sigma) => latent matching ~ state matching in a factored world
+   (v0.1's failure was the world/latent content, not latent matching
+   per se); < 80.23 => explicit state matching is load-bearing;
+   > 85.63 => upgrade candidate (then seeds + 220 per M2 step 5).
+
+Also NEXT: paper v0.3/v0.3.1 (findings ledger in V03_PLAN §9): the
+reactivity dividend + the v0.3.1 negative result (what static
+geometry can and cannot buy in a log-replay world) are both
+publishable. Headline stays v0.2 220 76.10 / v0.3 dev-10 82.53 with
+the collision decomposition story.
 
 ## 3. Rules that keep this project honest (do not relax)
 
