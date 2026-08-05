@@ -72,16 +72,23 @@ data source.
 
 ### Videos
 
-Closed-loop CARLA rollouts on two dev-10 routes, same routes for both versions.
-`2d` is the bird's-eye state render, `3d` is the CARLA camera. These show
-in-development checkpoints, not a finished system.
+Closed-loop CARLA rollouts, same routes rendered for both versions. `2d` is the
+bird's-eye state render, `3d` is the CARLA camera. These are the dev-10 routes
+that both versions complete cleanly — **DS 100, route completion 100%, no
+collisions** — spanning five towns and five scenario types. The routes that
+still fail are the ones in the collision table above; these clips show what the
+policy does when it works, on in-development checkpoints rather than a finished
+system.
 
-| route | v0.2 | v0.3 |
-|---|---|---|
-| 25378 (A-half) | [2d](docs/media/v02_route25378_2d.mp4) · [3d](docs/media/v02_route25378_3d.mp4) | [2d](docs/media/v03_route25378_2d.mp4) · [3d](docs/media/v03_route25378_3d.mp4) |
-| 2091 (B-half, urban junction) | [2d](docs/media/v02_route2091_2d.mp4) · [3d](docs/media/v02_route2091_3d.mp4) | [2d](docs/media/v03_route2091_2d.mp4) · [3d](docs/media/v03_route2091_3d.mp4) |
+| route | town | scenario | v0.2 | v0.3 |
+|---|---|---|---|---|
+| 25378 | Town03 | yield to emergency vehicle | [2d](docs/media/v02_route25378_2d.mp4) · [3d](docs/media/v02_route25378_3d.mp4) | [2d](docs/media/v03_route25378_2d.mp4) · [3d](docs/media/v03_route25378_3d.mp4) |
+| 25381 | Town05 | hazard at side lane | [2d](docs/media/v02_route25381_2d.mp4) · [3d](docs/media/v02_route25381_3d.mp4) | [2d](docs/media/v03_route25381_2d.mp4) · [3d](docs/media/v03_route25381_3d.mp4) |
+| 25424 | Town11 | construction obstacle, two-way road | [2d](docs/media/v02_route25424_2d.mp4) · [3d](docs/media/v02_route25424_3d.mp4) | [2d](docs/media/v03_route25424_2d.mp4) · [3d](docs/media/v03_route25424_3d.mp4) |
+| 26405 | Town15 | static cut-in | [2d](docs/media/v02_route26405_2d.mp4) | [2d](docs/media/v03_route26405_2d.mp4) |
+| 17569 | Town12 | sequential lane change | [2d](docs/media/v02_route17569_2d.mp4) | [2d](docs/media/v03_route17569_2d.mp4) |
 
-<video src="https://github.com/SaeedRahmani/DITTO_AV/raw/main/docs/media/v03_route25378_3d.mp4" controls width="100%"></video>
+<video src="https://github.com/SaeedRahmani/DITTO_AV/raw/main/docs/media/v03_route25424_3d.mp4" controls width="100%"></video>
 
 ### Next experiments (todo)
 
