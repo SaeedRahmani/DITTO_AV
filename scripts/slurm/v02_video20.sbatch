@@ -24,7 +24,7 @@ B2D=$BASE/Bench2Drive
 SIF=$BASE/carla_0915.sif
 [ -s "$SIF" ] || { echo "CARLA SIF missing"; exit 1; }
 OUT=$BASE/outputs
-VID=$OUT/videos20
+VID=${VID:-$OUT/videos20}
 mkdir -p $VID
 export XDG_CACHE_HOME=$BASE/cache
 export PYTHONPATH=$B2D/leaderboard:$B2D/scenario_runner:$BASE/carla_pythonapi:$REPO
