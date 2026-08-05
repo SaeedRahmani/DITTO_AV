@@ -83,6 +83,26 @@ S1/driving gates. 3x3 stays a canary, never a selector.
 
 ## 9. Ledger
 
+- 2026-08-06 AXIS-3 CARLA VERDICT (jobs 10587720 d10A / 10587721
+  d10B, s2 arm): DS A 84.0 / B 81.6 -> mean 82.80 (gate >= 82.5
+  PASS; clp_rx 82.53). Completion 30/30 PASS. S1a steer flips
+  6.7/100 (gate <= 14.8; clp_rx 18.1; the EXPERT ITSELF 9.8) PASS —
+  the arm drives SMOOTHER THAN THE EXPERT; |dsteer| p95 0.058 (rx
+  0.36), wp1 churn proxy 0.046 = label level. LAYOUT COLLISIONS
+  7 -> 0: the v0.3.1 objective, achieved with ZERO map data — the
+  wobble itself was the furniture-hitting mechanism, not missing
+  layout knowledge (reframes the v0.3.1 negative). VEHICLE
+  collisions 6 -> 12 FAIL (gate <= 8): the reactivity dividend
+  halved — same count as the EMA arm's 12, but at DS 82.8 vs EMA's
+  76.1. VERDICT: arm NOT banked (one gate failed; the mission says
+  the dividend is not for sale). BANKED FINDINGS: (1) differentiable
+  mean-plan consistency is the mechanism that kills the jiggle and it
+  transfers to CARLA in full; (2) smoothness eliminates layout
+  collisions without any map data; (3) the smoothness-reactivity
+  trade-off is real on BOTH routes (filter and training both took
+  veh 6 -> 12): part of the reactivity lives in constant replanning.
+  OPEN: w_cons 0.25 (commitment relaxed) probes whether veh <= 8 is
+  reachable with S1a intact — huge slack available (6.7 vs 14.8).
 - 2026-08-05 AXIS-3 ROUND 3 (seed bars, jobs 10587612/13): w_cons 0.5
   reactive by seed = 0.661 (s0) / 0.705 (s1) / 0.694 (s2) -> mean
   0.6865 >= 0.68 bar; s1 AND s2 beat clp_rx's 0.685 outright with
