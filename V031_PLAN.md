@@ -56,23 +56,24 @@ gap and beat dev-10 85.63; then ONE 220 for the headline; then paper.
   (<1% pre-registered), 8/11 towns exactly 0.000% (residual =
   Town06/12/13 parking-style frames).
 
-### NEXT (M2 — the actual fix; est. one work session)
-1. Torch layout query: port TownLayout.off_drivable to torch (the
-   numpy grid-hash structure is designed for this) and give EgoSim an
-   optional per-episode layout handle. Episode->town mapping: derive
-   clip names from the manifest split (sorted names, VAL_EVERY=6 —
-   see the validation snippet pattern in git history of this work) and
-   regex Town\d+; NOTE Town11 has clips in train only.
-2. Sim signal: per-step ego off-drivable clearance ->
-   (a) metric logged in rollouts (layout_violation rate), and
-   (b) penalty arm: reward -= w_layout * relu(off) (start w=0.5,
-   dose axis) — mirror how collision_penalty is wired in
-   egosim.RewardParams (penalty flags live there).
-3. Rerun D3 (scripts/v03_train_reactive.py + slurm/v03_d3.sbatch —
-   both already on main via the 73c0e0f merge) with the layout signal
-   on, init from clp_rx or from the 999s champion (run BOTH arms if
-   lanes allow: layout-on fine-tune of each; ~2 h/job on
-   participation H100).
+### DONE (M2 steps 1-3, commit 20e6873, 2026-08-05)
+1. Torch layout query: ditto_av/layout_torch.py (TownLayoutTorch ==
+   numpy exactly, tests pin it) + LayoutQuery per-frame town dispatch
+   from layout.manifest_towns (sorted manifest, VAL_EVERY=6; Town10HD
+   regexes to Town10; Town11 train-only — confirmed in the gate).
+2. Sim signal: EgoSim.layout handle + layout_off; RewardParams
+   layout_penalty/layout_clip (clip 3 m bounds the 99 m "no lane"
+   sentinel); reactive _rollout logs layout_viol and applies the
+   penalty AFTER W1 zeroing (geometry stays exact where the traffic
+   model is distrusted); eval_both_worlds reports layout_viol[_any]
+   metric-only. Gate through the FULL sim path PASSED:
+   train 0.438% / val 0.532% expert off-drivable (scripts/
+   v031_layout_gate.py; M1 raw-clip number was 0.53%).
+3. D3 rerun SUBMITTED (w_layout 0.5, participation): 10581924 init
+   clp_rx -> ~/ditto_out/v031_d3_rx; 10581925 init 999s champion ->
+   ~/ditto_out/v031_d3_s (slurm/v031_d3.sbatch <init> <out>).
+
+### NEXT (M2 remainder)
 4. W3 re-gate: dev-10 A/B (carla_eval_chain.sbatch, routes
    A=3514,3255,26405,25381,25378 B=25424,2091,27494,17569,28198, x3;
    diag config pattern: configs/diag_v03_rx.yaml). GATE: beat 85.63
