@@ -95,6 +95,88 @@ def train_seed(sw, seed, steps, batch, device, lr=3e-4):
 
 
 @torch.no_grad()
+
+def build_chains(sw, K=15, max_chains=30000, stride=2):
+    """Rollout-training chains: for scenes with K consecutive windows,
+    ID-MATCHED logged positions per step (+ ego/light sequences).
+    Returns dict of arrays over M chains."""
+    frames = sw.frames
+    frame_to_i = {int(f): i for i, f in enumerate(frames)}
+    A = sw.ids.shape[1]
+    idx0, TGT, VAL, EGO, LIG = [], [], [], [], []
+    for i0 in range(0, len(frames), stride):
+        if not all(int(frames[i0]) + k in frame_to_i
+                   for k in range(1, K + 1)):
+            continue
+        tgt = np.full((K, A, 2), np.nan, dtype=np.float32)
+        val = np.zeros((K, A), dtype=bool)
+        eg = np.zeros((K, 4), dtype=np.float32)
+        li = np.zeros((K, 4), dtype=np.float32)
+        ids0 = sw.ids[i0]
+        for k in range(1, K + 1):
+            i_k = frame_to_i[int(frames[i0]) + k]
+            eg[k - 1] = sw.ego[i_k]
+            li[k - 1] = sw.light[i_k]
+            slot_k = {int(v): b for b, v in enumerate(sw.ids[i_k])
+                      if v >= 0}
+            for a in np.where(sw.pred_mask[i0])[0]:
+                b = slot_k.get(int(ids0[a]))
+                if b is not None:
+                    tgt[k - 1, a] = sw.hist[i_k][b, -1, 0:2]
+                    val[k - 1, a] = True
+        idx0.append(i0)
+        TGT.append(tgt)
+        VAL.append(val)
+        EGO.append(eg)
+        LIG.append(li)
+        if len(idx0) >= max_chains:
+            break
+    print(f"chains: {len(idx0)} (K={K})")
+    return {"i0": np.array(idx0), "tgt": np.stack(TGT),
+            "val": np.stack(VAL), "ego": np.stack(EGO),
+            "lig": np.stack(LIG)}
+
+
+def rollout_finetune(model, sw, ch, steps, batch, device, K=15,
+                     lr=1e-4, seed=0):
+    """Closed-loop fine-tuning: differentiable K-step unroll, Huber on
+    ID-matched logged positions — attacks the teacher-forced/rollout
+    gap that failed W0 v1 (ADE@4s 7.62 vs floor 4.75)."""
+    rng = np.random.default_rng(1000 + seed)
+    opt = torch.optim.Adam(model.parameters(), lr=lr)
+    M = len(ch["i0"])
+    for step in range(1, steps + 1):
+        pick = rng.integers(M, size=batch)
+        i0 = ch["i0"][pick]
+        h, pr, cl, eg, li, tg, pm = batch_tensors(sw, i0, device)
+        hist = h
+        tgt = torch.as_tensor(ch["tgt"][pick], device=device)
+        val = torch.as_tensor(ch["val"][pick], device=device)
+        egs = torch.as_tensor(ch["ego"][pick], device=device)
+        lis = torch.as_tensor(ch["lig"][pick], device=device)
+        loss = 0.0
+        n = 0
+        for k in range(K):
+            d = model.dist(hist, pr, cl, egs[:, k], lis[:, k])
+            nxt = model.advance(hist[:, :, -1], d.base_dist.loc)
+            hist = torch.cat([hist[:, :, 1:], nxt[:, :, None]], dim=2)
+            m = val[:, k] & pm
+            if m.any():
+                err = nxt[..., 0:2] - tgt[:, k]
+                loss = loss + torch.nn.functional.huber_loss(
+                    err[m], torch.zeros_like(err[m]), delta=2.0)
+                n += 1
+        loss = loss / max(n, 1)
+        opt.zero_grad()
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), 10.0)
+        opt.step()
+        if step % 500 == 0 or step == 1:
+            print(f"  rf seed {seed} step {step:5d} | loss "
+                  f"{float(loss):.4f}")
+    return model
+
+@torch.no_grad()
 def fast_rollout_ade(models, val, device, n_scenes=256,
                      ego_override=None):
     """ADE via track-consistent windows: roll the model from window i0
@@ -235,6 +317,8 @@ def main():
     ap.add_argument("--seeds", type=int, default=4)
     ap.add_argument("--steps", type=int, default=25000)
     ap.add_argument("--batch", type=int, default=48)
+    ap.add_argument("--rollout-steps", type=int, default=4000)
+    ap.add_argument("--rollout-k", type=int, default=15)
     ap.add_argument("--device", default="cuda")
     args = ap.parse_args()
     out = Path(args.out)
@@ -247,16 +331,30 @@ def main():
     va = load_windows(Path(args.data) / "b2d_val.npz",
                       out / "windows2_val.npz")
 
+    chains = None
     models = []
     for s in range(args.seeds):
         ck = out / "checkpoints" / f"traffic_s{s}.pt"
+        ck_rf = out / "checkpoints" / f"traffic_s{s}_rf.pt"
         m = TrafficModel(hist=HIST).to(device)
-        if ck.exists():
-            m.load_state_dict(torch.load(ck, map_location=device))
-            print(f"seed {s}: loaded existing ckpt")
+        if ck_rf.exists():
+            m.load_state_dict(torch.load(ck_rf, map_location=device))
+            print(f"seed {s}: loaded fine-tuned ckpt")
         else:
-            m = train_seed(tr, s, args.steps, args.batch, device)
-            torch.save(m.state_dict(), ck)
+            if ck.exists():
+                m.load_state_dict(torch.load(ck, map_location=device))
+                print(f"seed {s}: loaded teacher-forced ckpt")
+            else:
+                m = train_seed(tr, s, args.steps, args.batch, device)
+                torch.save(m.state_dict(), ck)
+            if args.rollout_steps > 0:
+                if chains is None:
+                    chains = build_chains(tr, K=args.rollout_k)
+                m.train()
+                m = rollout_finetune(m, tr, chains, args.rollout_steps,
+                                     max(8, args.batch // 3), device,
+                                     K=args.rollout_k, seed=s)
+                torch.save(m.state_dict(), ck_rf)
         m.eval()
         models.append(m)
 

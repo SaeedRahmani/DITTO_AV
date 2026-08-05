@@ -31,5 +31,5 @@ $PY scripts/run_b2d.py --config ${RUN}_config.yaml --stage data \
     --manifest manifests/b2d_full999.txt --trust-manifest \
     --extracted /scratch/$USER/ditto_av/data/bench2drive/extracted
 $PY scripts/v03_train_traffic.py --data $RUN/data --out $RUN \
-    --seeds 4 --steps 25000 --batch 48 --device cuda
+    --seeds 4 --steps 25000 --batch 48 --rollout-steps 4000 --rollout-k 15 --device cuda
 echo "V03_W0_DONE"

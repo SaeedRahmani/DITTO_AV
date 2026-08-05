@@ -140,6 +140,17 @@ PRIORITY CLAIMS: arXiv 2512.18662 (Dec 2025).
 
 ## 9. Status ledger (newest first)
 
+- 2026-08-04 eve: W0 round-1 verdicts: (a) first FAIL was an EVAL BUG
+  (slot-vs-id matching produced a 91 m ADE artifact; fixed, windows
+  cache v2); (b) corrected verdict = HONEST FAIL: teacher-forced model
+  rolls out at ADE 1.35/3.58/7.62 m @1/2/4 s — WORSE than the CV floor
+  (0.84/2.12/5.02): the open!=closed lesson hit the world model, as
+  pre-registered. Proximity realism PASSES (1.2x log); reactivity
+  positive but under gate (0.21 m/s mean, skewed). LEVER APPLIED:
+  differentiable K-step rollout fine-tuning vs ID-matched logged
+  positions (smoke: toy ADE@4s 3.75 -> 3.20 with 60 steps). Round-2
+  job fine-tunes all 4 seeds + re-gates. Gate numbers UNCHANGED.
+
 - 2026-08-04: V3-M2 core landed: TrafficModel (ego-conditioned agent
   transformer, invariant local features + ego-relative geometry,
   Gaussian local-delta heads, rollout step API), build_scene_windows

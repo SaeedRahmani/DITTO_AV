@@ -206,6 +206,17 @@ class TrafficModel(nn.Module):
         nll = -d.log_prob(target)                           # (B, A)
         return (nll * pred_mask).sum() / pred_mask.sum().clamp_min(1)
 
+    def advance(self, cur: Tensor, delta: Tensor) -> Tensor:
+        """Integrate local deltas to world states (differentiable)."""
+        yaw0 = cur[..., 4]
+        c, s = torch.cos(yaw0), torch.sin(yaw0)
+        dx_w = c * delta[..., 0] - s * delta[..., 1]
+        dy_w = s * delta[..., 0] + c * delta[..., 1]
+        return torch.stack([
+            cur[..., 0] + dx_w, cur[..., 1] + dy_w,
+            dx_w / DT, dy_w / DT, yaw0 + delta[..., 2],
+            cur[..., 5], cur[..., 6]], dim=-1)
+
     @torch.no_grad()
     def step(self, hist, pres, cls, ego, light,
              sample: bool = False) -> Tensor:
@@ -216,15 +227,4 @@ class TrafficModel(nn.Module):
         """
         d = self.dist(hist, pres, cls, ego, light)
         delta = d.sample() if sample else d.base_dist.loc   # (B, A, 3)
-        cur = hist[:, :, -1]
-        yaw0 = cur[..., 4]
-        c, s = torch.cos(yaw0), torch.sin(yaw0)
-        dx_w = c * delta[..., 0] - s * delta[..., 1]
-        dy_w = s * delta[..., 0] + c * delta[..., 1]
-        nxt = cur.clone()
-        nxt[..., 0] = cur[..., 0] + dx_w
-        nxt[..., 1] = cur[..., 1] + dy_w
-        nxt[..., 2] = dx_w / DT
-        nxt[..., 3] = dy_w / DT
-        nxt[..., 4] = yaw0 + delta[..., 2]
-        return nxt
+        return self.advance(hist[:, :, -1], delta)
