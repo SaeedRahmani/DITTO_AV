@@ -90,26 +90,26 @@ system.
 | 26405 | Town15 | static cut-in | [2d](docs/media/v02_route26405_2d.mp4) | [2d](docs/media/v03_route26405_2d.mp4) |
 | 17569 | Town12 | sequential lane change | [2d](docs/media/v02_route17569_2d.mp4) | [2d](docs/media/v03_route17569_2d.mp4) |
 
-Four of the v0.3 clips play inline below; the rest are download links in the
-table above.
+Four v0.3 rollouts preview inline below (GitHub strips `<video>` tags, so these
+are looping GIFs — the table above links the full-quality mp4s).
 
-**Bird's-eye (2d)** — left: construction obstacle on a two-way road (Town11);
-right: yielding to an emergency vehicle (Town03).
+**Bird's-eye (2d).** Left: construction obstacle on a two-way road, Town11.
+Right: yielding to an emergency vehicle, Town03.
 
 <table>
 <tr>
-<td width="50%"><video src="https://github.com/SaeedRahmani/DITTO_AV/raw/main/docs/media/v03_route25424_2d.mp4" controls muted loop playsinline width="100%"></video></td>
-<td width="50%"><video src="https://github.com/SaeedRahmani/DITTO_AV/raw/main/docs/media/v03_route25378_2d.mp4" controls muted loop playsinline width="100%"></video></td>
+<td width="50%"><img src="docs/media/v03_route25424_2d.gif" width="100%" alt="v0.3 bird's-eye, construction obstacle on a two-way road, Town11"></td>
+<td width="50%"><img src="docs/media/v03_route25378_2d.gif" width="100%" alt="v0.3 bird's-eye, yielding to an emergency vehicle, Town03"></td>
 </tr>
 </table>
 
-**CARLA camera (3d)** — left: construction obstacle, two-way road (Town11);
-right: hazard at side lane (Town05).
+**CARLA camera (3d).** Left: construction obstacle, two-way road, Town11.
+Right: hazard at side lane, Town05.
 
 <table>
 <tr>
-<td width="50%"><video src="https://github.com/SaeedRahmani/DITTO_AV/raw/main/docs/media/v03_route25424_3d.mp4" controls muted loop playsinline width="100%"></video></td>
-<td width="50%"><video src="https://github.com/SaeedRahmani/DITTO_AV/raw/main/docs/media/v03_route25381_3d.mp4" controls muted loop playsinline width="100%"></video></td>
+<td width="50%"><img src="docs/media/v03_route25424_3d.gif" width="100%" alt="v0.3 camera view, construction obstacle, Town11"></td>
+<td width="50%"><img src="docs/media/v03_route25381_3d.gif" width="100%" alt="v0.3 camera view, hazard at side lane, Town05"></td>
 </tr>
 </table>
 
