@@ -213,6 +213,8 @@ class CLPConfig:
     sigma_v: float = 2.0
     sigma_p2: float = 4.0     # broad kernel component (0 = off)
     p2_weight: float = 0.3
+    sigma_yawrate: float = 0.0  # rad/s; v0.3.2 motion-quality channel
+    #                             (0 = v0.3 behavior)
     collision_penalty: float = 0.0  # 0 = thesis-pure arm
     penalty_ignore_rear: bool = True  # ghost rear-ends don't count
 

@@ -23,7 +23,8 @@ import torch
 import torch.nn.functional as F
 
 from ..config import Config
-from ..egosim import EgoSim, GlobalLog, RewardParams, SimParams
+from ..egosim import (DT, EgoSim, GlobalLog, RewardParams, SimParams,
+                      _wrap)
 from ..models.policy_v2 import TokenPolicy, make_token_policy
 from ..rewards import lambda_return
 from .. import wandb_util
@@ -42,6 +43,7 @@ def sim_from_config(cfg: Config, log: GlobalLog) -> EgoSim:
         RewardParams(tau=c.reward_tau, sigma_p=c.sigma_p,
                      sigma_yaw=c.sigma_yaw, sigma_v=c.sigma_v,
                      sigma_p2=c.sigma_p2, p2_weight=c.p2_weight,
+                     sigma_yawrate=c.sigma_yawrate,
                      collision_penalty=c.collision_penalty,
                      penalty_ignore_rear=c.penalty_ignore_rear))
 
@@ -130,9 +132,11 @@ def _rollout(policy: TokenPolicy, sim: EgoSim, log: GlobalLog,
             feat = policy.features(emb, h)
             d = policy.dist(feat)
             a = d.sample() if stochastic else d.base_dist.loc
+            th_prev = th
             xy, th, v = sim.step_ego(policy.clamp(a), xy, th, v)
             frame = frame + 1
-            r = sim.reward(frame, xy, th, v)
+            r = sim.reward(frame, xy, th, v,
+                           yaw_rate=_wrap(th - th_prev) / DT)
             col = sim.collisions(frame, xy, th)
             if sim.r.collision_penalty > 0:
                 col_pen = sim.collisions(

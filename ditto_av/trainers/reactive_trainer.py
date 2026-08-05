@@ -22,7 +22,7 @@ import torch
 import torch.nn.functional as F
 
 from ..config import Config
-from ..egosim import EgoSim, GlobalLog
+from ..egosim import DT, EgoSim, GlobalLog, _wrap
 from ..models.policy_v2 import TokenPolicy, make_token_policy
 from ..reactive import ReactiveEgoSim
 from ..rewards import lambda_return
@@ -54,6 +54,7 @@ def _rollout(policy, sim, log, starts, horizon, burn_in,
         h = policy.step(emb, h)
         d = policy.dist(policy.features(emb, h))
         a = d.sample() if stochastic else d.base_dist.loc
+        th_prev = th
         xy, th, v = sim.step_ego(policy.clamp(a), xy, th, v)
         if reactive:
             sim.step_traffic(frame, xy, th, v)
@@ -61,7 +62,8 @@ def _rollout(policy, sim, log, starts, horizon, burn_in,
                 dead = dead | (sim.last_disagreement > w1_thresh)
                 dis_l.append(sim.last_disagreement)
         frame = frame + 1
-        r = sim.reward(frame, xy, th, v)
+        r = sim.reward(frame, xy, th, v,
+                       yaw_rate=_wrap(th - th_prev) / DT)
         r = torch.where(dead, torch.zeros_like(r), r)   # W1 pessimism
         obs_l.append(obs)
         act_l.append(a)

@@ -79,6 +79,13 @@ class GlobalLog:
             ep_start[s:e] = s
         self.ep_end = torch.as_tensor(ep_end, device=device)
         self.ep_start = torch.as_tensor(ep_start, device=device)
+        # per-frame expert yaw rate (backward diff, 0 at episode
+        # starts) — reward targets for RewardParams.sigma_yawrate
+        th = self.ego[:, 2]
+        yr = torch.zeros_like(th)
+        yr[1:] = _wrap(th[1:] - th[:-1]) / DT
+        yr[torch.as_tensor(starts, device=device)] = 0.0
+        self.ego_yawrate = yr
 
     def window_starts(self, horizon: int, margin: int) -> Tensor:
         """All frame indices t with [t, t + horizon + margin] in-episode."""
@@ -118,6 +125,13 @@ class RewardParams:
     # 1 m kernel floors out exactly where recovery must be learned)
     sigma_p2: float = 4.0     # m; 0 disables the broad component
     p2_weight: float = 0.3    # weight of the broad component
+    # v0.3.2 axis-1: price MOTION QUALITY, not just position — match
+    # the expert's yaw-rate profile. A0 showed the policy wobbles at
+    # 8x the expert's yaw accel while out-rewarding label replay:
+    # oscillation lived entirely in this unpriced dimension. 0 = off
+    # (v0.3 behavior); active only when the caller passes the sim
+    # ego's yaw rate to reward().
+    sigma_yawrate: float = 0.0  # rad/s
     collision_penalty: float = 0.0  # 0 = thesis-pure arm
     # only front/side impacts count for the penalty: a slower-than-log
     # ego being rear-ended by replayed (non-reactive) traffic is a
@@ -291,13 +305,18 @@ class EgoSim:
     # ---------------- reward ------------------------------------------
 
     def reward(self, frame: Tensor, xy: Tensor, theta: Tensor,
-               speed: Tensor) -> Tensor:
+               speed: Tensor, yaw_rate: Optional[Tensor] = None
+               ) -> Tensor:
         """Time-tolerant ego-state match against the same-scene expert.
 
         r = max_{|d| <= tau} exp(-1/2 [ |dxy|^2/s_p^2 + dth^2/s_y^2
-                                        + dv^2/s_v^2 ])  in [0, 1].
-        Expert replay scores ~1 by construction; off the expert path
-        the gradient points back to it — the recovery incentive.
+                                        + dv^2/s_v^2 (+ dyr^2/s_yr^2) ])
+        in [0, 1]. Expert replay scores ~1 by construction; off the
+        expert path the gradient points back to it — the recovery
+        incentive. yaw_rate (B,): the sim ego's realized yaw rate this
+        tick; adds the motion-quality channel when sigma_yawrate > 0
+        (matched inside the same time-tolerant window, so a
+        time-shifted but expert-shaped turn still scores).
         """
         r = self.r
         offs = torch.arange(-r.tau, r.tau + 1, device=frame.device)
@@ -311,6 +330,9 @@ class EgoSim:
         dv = (ex[..., 3] - speed.unsqueeze(1)).abs()
         rest = -0.5 * ((dth / r.sigma_yaw) ** 2
                        + (dv / r.sigma_v) ** 2)
+        if r.sigma_yawrate > 0.0 and yaw_rate is not None:
+            dyr = self.log.ego_yawrate[idx] - yaw_rate.unsqueeze(1)
+            rest = rest - 0.5 * (dyr / r.sigma_yawrate) ** 2
         kern = torch.exp(-0.5 * (dxy / r.sigma_p) ** 2 + rest)
         if r.sigma_p2 > 0.0:
             broad = torch.exp(-0.5 * (dxy / r.sigma_p2) ** 2 + rest)
