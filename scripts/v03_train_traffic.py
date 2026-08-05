@@ -189,6 +189,11 @@ def fast_rollout_ade(models, val, device, n_scenes=256,
           if all(int(f) + k in frame_to_i for k in (10, 20, ROLL))]
     pick = ok[:: max(1, len(ok) // n_scenes)][:n_scenes]
     ades = {10: [], 20: [], ROLL: []}
+    # error decomposition @4s by log-behavior regime (lever picker):
+    #   stopped (<0.5 m/s), launching (stopped->moving), cruising
+    #   (straight), turning (|yaw rate| > 0.05 rad/frame)
+    regime_err = {"stopped": [], "launching": [], "cruising": [],
+                  "turning": []}
     prox_m = prox_l = n_prox = 0
     disagree = []
     follower_dv = []
@@ -224,8 +229,22 @@ def fast_rollout_ade(models, val, device, n_scenes=256,
                 for a in np.where(pm[0].cpu().numpy())[0]:
                     b = slot_k.get(int(ids0[a]))
                     if b is not None:
-                        ades[k].append(float(np.linalg.norm(
-                            nxt_np[a] - logged[b])))
+                        e = float(np.linalg.norm(nxt_np[a] - logged[b]))
+                        ades[k].append(e)
+                        if k == ROLL:
+                            h0 = val.hist[i0][a]
+                            v0 = float(np.linalg.norm(h0[-1, 2:4]))
+                            vk = float(np.linalg.norm(
+                                val.hist[i_k][b, -1, 2:4]))
+                            dy = abs(float(h0[-1, 4] - h0[0, 4]))
+                            if v0 < 0.5 and vk < 0.5:
+                                regime_err["stopped"].append(e)
+                            elif v0 < 0.5 <= vk:
+                                regime_err["launching"].append(e)
+                            elif dy > 0.5:
+                                regime_err["turning"].append(e)
+                            else:
+                                regime_err["cruising"].append(e)
         # proximity events at final step (model) vs log
         i_R = frame_to_i.get(int(frames[i0]) + ROLL)
         if i_R is not None:
@@ -248,6 +267,9 @@ def fast_rollout_ade(models, val, device, n_scenes=256,
             pass
     out = {f"ade_{k//10}s": float(np.mean(v)) for k, v in ades.items()
            if v}
+    out["regimes_4s"] = {
+        r: {"n": len(v), "ade": float(np.mean(v)) if v else None}
+        for r, v in regime_err.items()}
     out["prox_rate_model"] = prox_m / max(n_prox, 1)
     out["prox_rate_log"] = prox_l / max(n_prox, 1)
     if disagree:
