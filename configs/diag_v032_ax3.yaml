@@ -1,0 +1,9 @@
+# v0.3.2 axis-3 (mean-plan consistency, w_cons 0.5, seed 2) — the arm
+# CARLA proved: dev-10 82.80, steer flips 6.7/100, layout collisions 0.
+# Pinned to its own run dir so the shared b2d_v032_sm "current arm"
+# slot cannot swap the checkpoint under it.
+run_config: /home/srahmani/ditto_out/b2d_v032_ax3_cpu.yaml
+policy: clp_rx
+stochastic: false
+action_repeat: 2
+stuck_recovery: true
