@@ -158,6 +158,22 @@ PRIORITY CLAIMS: arXiv 2512.18662 (Dec 2025).
 
 ## 9. Status ledger (newest first)
 
+- 2026-08-05 — **W3 dev-10 verdict (clp_rx): DS 82.53/100% 30/30 —
+  gate NOT cleared (band 83.60-85.63, sigma 2.3: statistical tie with
+  pure, nominally below shaped). THE REACTIVITY DIVIDEND IS CONFIRMED:
+  vehicle collisions 6 = best of any model ever (shaped 9, pure 12,
+  -40..50%) — exactly the interaction-failure class reactive training
+  targets. The offset: collisions_layout 7 (vs 1/0) concentrated on
+  the urban B-half (75.40 vs 81.60) — STRUCTURAL cause: the training
+  world models/replays only VEHICLES; static layout (walls, poles)
+  does not exist in the state, so boldness near obstacles is free in
+  training and punished in CARLA. E2 delivered. NEXT DECISION: (a)
+  bank v0.3 as-is (dividend confirmed + methodology + the layout-gap
+  finding = complete honest chapter) or (b) v0.3.1: add static
+  layout/map geometry to the world state (new data lane: OpenDRIVE
+  extraction) — the same no-map limitation that has surfaced at every
+  version now binds the TRAINING WORLD itself.
+
 - 2026-08-05 — **W0 PASSED (pre-registered refined criterion), round
   4 of 4**: minADE-over-modes@4s 2.79 <= 3.80, proximity 1.36x <= 2x,
   reactivity 0.567 > 0.3 (from 0.06 — the round-4 EGO-HISTORY fix:
