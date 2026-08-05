@@ -54,6 +54,8 @@ def main():
     ap.add_argument("--w-churn", type=float, default=0.0)
     ap.add_argument("--w-consistency", type=float, default=0.0)
     ap.add_argument("--steps", type=int, default=3500)
+    ap.add_argument("--seed", type=int, default=-1,
+                    help="override cfg.seed (training seed)")
     ap.add_argument("--n-ensemble", type=int, default=2)
     ap.add_argument("--p-reactive", type=float, default=0.5)
     ap.add_argument("--device", default="cuda")
@@ -68,6 +70,8 @@ def main():
     cfg.clp.sigma_yawrate = args.sigma_yawrate   # TRAIN sims only
     cfg.clp.w_churn = args.w_churn               # rollout-only term
     cfg.clp.w_consistency = args.w_consistency   # actor aux loss
+    if args.seed >= 0:
+        cfg.seed = args.seed
 
     log = GlobalLog([Path(args.data) / "b2d_train.npz"], device=device)
     raw = np.load(Path(args.data) / "b2d_train.npz")

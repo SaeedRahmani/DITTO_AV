@@ -83,6 +83,22 @@ S1/driving gates. 3x3 stays a canary, never a selector.
 
 ## 9. Ledger
 
+- 2026-08-05 AXIS-3 ROUND 2: job 10586354, w_cons 0.5. MISS on both
+  counts and NOT a clean Pareto slide: reactive 0.661 (was 0.657 at
+  w_cons 1.0; bar 0.68) while smoothness gave ground (yr_flips 10.8
+  -> 14.7, churn 0.05 -> 0.074; ya_p95 4.35 still passes). kl stayed
+  1.11 — halving the weight did not return the policy to the ~0.85
+  trust region. Halving the knob moved smoothness, not driving: the
+  ~0.02-0.03 reactive shortfall may not be weight-driven at all.
+- 2026-08-05 AXIS-3 ROUND 3 pre-registered BEFORE the runs — measure
+  before more knob-turning: (a) SEED BARS for the w_cons 0.5 recipe
+  (seeds 1, 2 vs the existing seed 0) to learn whether 0.661 vs the
+  0.68 bar is signal or training-seed noise (v0.2 G5 precedent: DS
+  seed-varies, completion is robust; in-sim reward variance never
+  measured); (b) one more Pareto point w_cons 0.25 seed 0. Decision
+  rule, committed now: if mean(3 seeds) reactive >= 0.68, the
+  MEDIAN-reactive seed (not max — no cherry-picking) goes to CARLA
+  provided ITS S1b passes; else iterate/bank per what the bars show.
 - 2026-08-05 AXIS-3 ROUND 1: job 10585878 (participation), w_cons
   1.0, 6000 steps. MECHANISM VALIDATED: churn 0.38 -> 0.050 (floor
   0.043), ya_p95 24.6 -> 2.80 (GATE PASSED, at the label-replay
