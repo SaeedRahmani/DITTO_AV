@@ -2,7 +2,50 @@
 
 This repository adapts **DITTO** ([DeMoss et al., 2023](https://arxiv.org/abs/2302.03086),
 offline imitation learning inside a learned world model) to **autonomous
-driving**, with a new multimodal latent-matching objective.
+driving**.
+
+## Status — under active development
+
+Numbers below are the **current** measurements, not final ones; they are
+updated periodically as runs land. Scores are Bench2Drive closed-loop driving
+score (DS) in CARLA — the only verdict we count (in-sim reward never grades
+itself). Per-run ledgers with job ids: `V02_PLAN.md`, `V03_PLAN.md`,
+`V031_PLAN.md`.
+
+| line | what it changed | current headline | state |
+|---|---|---|---|
+| v0.1 | faithful DITTO: RSSM world model, reward = whole-latent match | DS 22.10 (220 routes) | frozen — lost to BC |
+| **v0.2** | **the recorded log is the world** (replayed traffic, analytic ego); reward = ego-state match | **DS 76.10 / 75.88 (220 routes)**, 85.63 / 83.60 (dev-10) | frozen — best so far |
+| v0.3 | **+ learned reactive traffic** (other agents respond to the ego) | DS 82.53 (dev-10); vehicle collisions 6 = lowest of any model here | frozen — reactivity dividend confirmed |
+| v0.3.1 | + static map geometry in the training world | DS 66.01 / 74.89 (dev-10) | closed — negative result, cause measured |
+| v0.3.2 | reward channels for motion smoothness | — | ongoing |
+
+**How they differ.** Each version changes *what the training world is made of*
+and *what the reward grades*. v0.1 dreamed the whole scene in a learned latent
+and graded that latent — which mostly graded traffic, not driving. v0.2 stopped
+dreaming: the logged clip replays as the world, the ego moves by analytic
+kinematics, and the reward grades only the ego's own state against the expert's
+in that same scene. v0.3 gives the replayed traffic its agency back with a
+learned per-agent model, so the world reacts to the ego.
+
+**v0.2 vs. v0.3, concretely.** v0.3 wins exactly the failure class it targets —
+vehicle-to-vehicle collisions drop from 9/12 to 6 — but loses more elsewhere:
+its training world contains no static geometry, so driving boldly near walls is
+free in training and costs 7 layout collisions in CARLA (v0.2: 0–1). That is
+the whole gap. v0.3.1 tried to close it and could not: the offending objects
+(fences, props, vegetation) sit *on* drivable area and appear in no available
+data source.
+
+### Next experiments (todo)
+
+- **E3 — factored-latent DITTO retest**: latent matching inside the
+  (ego | learned-traffic) factorization; closes the question v0.1 opened.
+- **v0.3.2 smoothness**: yaw-rate reward channel, then in-dream plan-churn
+  penalty / policy-side temporal-consistency loss.
+- **220-route run for v0.3's line**: only once a dev-10 gate is actually cleared.
+- **Paper**: v0.2 headline + v0.3 reactivity dividend + the v0.3.1 negative result.
+
+## The v0.1 approach (original framing)
 
 **Core idea.** Train an RSSM world model on offline driving logs. Then learn a
 policy *fully offline* by unrolling it inside the world model from expert
@@ -76,8 +119,8 @@ from ditto_av.bench2drive import clips_to_npz
 clips_to_npz([Path("clips/AccidentTwoWays_..._Weather10")], "runs/b2d/data/expert.npz")
 ```
 
-See `PAPER_PLAN.md` for the paper roadmap, experiment matrix, and how this
-scales to the full Bench2Drive closed-loop benchmark.
+See `V02_PLAN.md`, `V03_PLAN.md`, and `V031_PLAN.md` for the plans, experiment
+matrices, pre-registered gates, and status ledgers of each version.
 
 ## Performance note
 
