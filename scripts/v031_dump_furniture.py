@@ -63,9 +63,16 @@ def _collect(w, seen, cen, ext, yaw, lab, src):
             src.append(1)
 
 
-def dump_town(client, town_npz: str, town_carla: str, out: Path):
+def dump_town(client, town_npz: str, town_carla: str, out: Path,
+              band: str = "0:1"):
     import carla
     import time
+    bi, bn = (int(v) for v in band.split(":"))
+    dst = out / (f"{town_npz}_furniture.npz" if bn == 1 else
+                 f"{town_npz}_furniture_band{bi}of{bn}.npz")
+    if dst.exists():
+        print(f"{dst.name}: exists, skip")
+        return
     w = client.load_world(town_carla)
     cen, ext, yaw, lab, src = [], [], [], [], []
     seen: set = set()
@@ -77,7 +84,9 @@ def dump_town(client, town_npz: str, town_carla: str, out: Path):
         spec = w.get_spectator()
         xs = np.arange(lo[0], hi[0] + SWEEP_STEP, SWEEP_STEP)
         ys = np.arange(lo[1], hi[1] + SWEEP_STEP, SWEEP_STEP)
-        print(f"{town_npz}: sweeping {len(xs)}x{len(ys)} stops")
+        xs = np.array_split(xs, bn)[bi]     # band = contiguous x cols
+        print(f"{town_npz} band {bi}/{bn}: sweeping "
+              f"{len(xs)}x{len(ys)} stops")
         for x in xs:
             for y in ys:
                 # skip stops far from any lane (no road, no furniture
@@ -93,35 +102,77 @@ def dump_town(client, town_npz: str, town_carla: str, out: Path):
     else:
         _collect(w, seen, cen, ext, yaw, lab, src)
     np.savez_compressed(
-        out / f"{town_npz}_furniture.npz",
+        dst,
         center=np.array(cen, dtype=np.float32),
         extent=np.array(ext, dtype=np.float32),
         yaw=np.array(yaw, dtype=np.float32),
         label=np.array(lab, dtype=np.int16),
         source=np.array(src, dtype=np.int8),   # 0=env_obj 1=level_bbs
         labels=np.array(LABELS))
-    print(f"{town_npz}: {len(cen)} boxes "
+    print(f"{dst.name}: {len(cen)} boxes "
           f"({sum(1 for s in src if s == 0)} env / "
           f"{sum(1 for s in src if s == 1)} level)")
 
 
+def merge_bands(town: str, out: Path):
+    """Merge band npzs into the final per-town file (rounded-key
+    dedup across band overlaps)."""
+    parts = sorted(out.glob(f"{town}_furniture_band*.npz"))
+    assert parts, f"no band files for {town}"
+    cen, ext, yaw, lab, src = [], [], [], [], []
+    seen = set()
+    for p in parts:
+        d = np.load(p)
+        for i in range(len(d["center"])):
+            k = (int(d["label"][i]), int(d["source"][i]),
+                 round(float(d["center"][i, 0]), 1),
+                 round(float(d["center"][i, 1]), 1),
+                 round(float(d["center"][i, 2]), 1),
+                 round(float(d["extent"][i, 0]), 1))
+            if k in seen:
+                continue
+            seen.add(k)
+            cen.append(d["center"][i]); ext.append(d["extent"][i])
+            yaw.append(d["yaw"][i]); lab.append(d["label"][i])
+            src.append(d["source"][i])
+    np.savez_compressed(
+        out / f"{town}_furniture.npz",
+        center=np.array(cen, dtype=np.float32),
+        extent=np.array(ext, dtype=np.float32),
+        yaw=np.array(yaw, dtype=np.float32),
+        label=np.array(lab, dtype=np.int16),
+        source=np.array(src, dtype=np.int8),
+        labels=np.load(parts[0])["labels"])
+    print(f"{town}: merged {len(parts)} bands -> {len(cen)} boxes")
+
+
 def main():
-    import carla
     ap = argparse.ArgumentParser()
-    ap.add_argument("--port", type=int, required=True)
+    ap.add_argument("--port", type=int)
     ap.add_argument("--out", required=True)
     ap.add_argument("--towns", default=",".join(sorted(TOWNS)))
+    ap.add_argument("--band", default="0:1")
+    ap.add_argument("--merge", action="store_true",
+                    help="merge band files (no server needed)")
     args = ap.parse_args()
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
+    if args.merge:
+        for t in args.towns.split(","):
+            if (out / f"{t}_furniture.npz").exists():
+                print(f"{t}: final exists, skip")
+                continue
+            merge_bands(t, out)
+        return
+    import carla
     c = carla.Client("localhost", args.port)
-    c.set_timeout(300.0)
+    c.set_timeout(600.0)
     print("server:", c.get_server_version())
     for t in args.towns.split(","):
         if (out / f"{t}_furniture.npz").exists():
             print(f"{t}: exists, skip")
             continue
-        dump_town(c, t, TOWNS[t], out)
+        dump_town(c, t, TOWNS[t], out, args.band)
     print("FURNITURE_DUMP_DONE")
 
 
