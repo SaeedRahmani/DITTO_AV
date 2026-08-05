@@ -44,5 +44,6 @@ done
 [ $boot_ok -eq 1 ] || { echo "V031_FURNITURE_BOOT_FAILED"; exit 1; }
 
 $VENVPY /scratch/$USER/ditto_av/DITTO_AV/scripts/v031_dump_furniture.py \
-    --port $PORT --out /scratch/$USER/ditto_av/data/layout/furniture
+    --port $PORT --out /scratch/$USER/ditto_av/data/layout/furniture \
+    ${TOWNS:+--towns $TOWNS}
 echo "V031_FURNITURE_DONE"

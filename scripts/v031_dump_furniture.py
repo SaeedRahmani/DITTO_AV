@@ -29,13 +29,21 @@ TOWNS = {f"Town{n:02d}": f"Town{n:02d}" for n in
 TOWNS["Town10"] = "Town10HD"
 
 
-def dump_town(client, town_npz: str, town_carla: str, out: Path):
+# large streamed maps: furniture lives in tiles that only load near an
+# actor; sweep the spectator over the road bbox to stream them all
+SWEEP_TOWNS = {"Town11", "Town12", "Town13", "Town15"}
+SWEEP_STEP = 1200.0     # m between spectator stops
+SWEEP_SETTLE = 4.0      # s to let tiles stream in per stop
+
+
+def _collect(w, seen, cen, ext, yaw, lab, src):
     import carla
-    w = client.load_world(town_carla)
-    cen, ext, yaw, lab, src = [], [], [], [], []
     for li, lname in enumerate(LABELS):
         clab = getattr(carla.CityObjectLabel, lname)
         for o in w.get_environment_objects(clab):
+            if ("e", o.id) in seen:
+                continue
+            seen.add(("e", o.id))
             b = o.bounding_box
             cen.append([b.location.x, b.location.y, b.location.z])
             ext.append([b.extent.x, b.extent.y, b.extent.z])
@@ -43,11 +51,47 @@ def dump_town(client, town_npz: str, town_carla: str, out: Path):
             lab.append(li)
             src.append(0)
         for b in w.get_level_bbs(clab):
+            k = ("l", li, round(b.location.x, 1), round(b.location.y, 1),
+                 round(b.location.z, 1), round(b.extent.x, 1))
+            if k in seen:
+                continue
+            seen.add(k)
             cen.append([b.location.x, b.location.y, b.location.z])
             ext.append([b.extent.x, b.extent.y, b.extent.z])
             yaw.append(b.rotation.yaw)
             lab.append(li)
             src.append(1)
+
+
+def dump_town(client, town_npz: str, town_carla: str, out: Path):
+    import carla
+    import time
+    w = client.load_world(town_carla)
+    cen, ext, yaw, lab, src = [], [], [], [], []
+    seen: set = set()
+    if town_npz in SWEEP_TOWNS:
+        lanes = np.load(Path("/scratch/srahmani/ditto_av/data/layout")
+                        / f"{town_npz}_lanes.npz")["lanes"]
+        lo = lanes[:, :2].min(axis=0) - 200
+        hi = lanes[:, :2].max(axis=0) + 200
+        spec = w.get_spectator()
+        xs = np.arange(lo[0], hi[0] + SWEEP_STEP, SWEEP_STEP)
+        ys = np.arange(lo[1], hi[1] + SWEEP_STEP, SWEEP_STEP)
+        print(f"{town_npz}: sweeping {len(xs)}x{len(ys)} stops")
+        for x in xs:
+            for y in ys:
+                # skip stops far from any lane (no road, no furniture
+                # we care about; keeps the sweep and RAM bounded)
+                d = np.abs(lanes[:, :2] - [x, y]).max(axis=1).min()
+                if d > SWEEP_STEP:
+                    continue
+                spec.set_transform(carla.Transform(
+                    carla.Location(x=float(x), y=float(y), z=200.0),
+                    carla.Rotation(pitch=-90.0)))
+                time.sleep(SWEEP_SETTLE)
+                _collect(w, seen, cen, ext, yaw, lab, src)
+    else:
+        _collect(w, seen, cen, ext, yaw, lab, src)
     np.savez_compressed(
         out / f"{town_npz}_furniture.npz",
         center=np.array(cen, dtype=np.float32),
