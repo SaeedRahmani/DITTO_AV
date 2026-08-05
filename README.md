@@ -1,30 +1,34 @@
 # DITTO-AV: Offline Imitation Learning with World Models for Autonomous Driving
 
-Closed-loop imitation learning for driving, trained **entirely offline**. The
-policy is never rolled out in a simulator during training: it is trained
-on-policy inside a world built from the recorded logs themselves, and rewarded
-for staying close to what the expert did in that same scene. Built on **DITTO**
-([DeMoss et al., 2023](https://arxiv.org/abs/2302.03086)).
+This repository adapts **DITTO** ([DeMoss et al., 2023](https://arxiv.org/abs/2302.03086),
+offline imitation learning inside a learned world model) to **autonomous
+driving**, with a driving-native factorization of the world and its reward.
 
-**The problem.** Behavior cloning breaks under covariate shift — it never sees
-its own mistakes, so it never learns to recover. The usual fixes cost either an
-online simulator or a learned model of the entire scene, which the policy then
-exploits.
+**Core idea.** Build a world model from offline driving logs. Then learn a
+policy *fully offline* by unrolling it inside that world from expert start
+states and rewarding closeness to expert trajectories — on-policy imitation
+without a simulator, which corrects the covariate shift that breaks behavior
+cloning.
 
-**The approach.**
+**What's new vs. DITTO (the paper contribution).**
 
-1. **Factor the world.** The ego moves by analytic kinematics — never learn
-   what is already known. Everything exogenous (traffic, route, lights) comes
-   from the log, either replayed directly or advanced by a learned traffic
-   model.
-2. **Reward only what the agent controls.** A time-tolerant kernel matches the
-   simulated ego's state — position, heading, speed — against the expert's in
-   the same scene. No traffic enters the reward, so there is nothing to game.
-   Off the expert path, reward is earned by *returning* to it: the recovery
-   incentive behavior cloning cannot represent.
-3. **Let the simulator be the judge, never the trainer.** Bench2Drive
-   closed-loop in CARLA is the only verdict; the training world never grades
-   itself.
+1. **Factored world, not a generated one.** The ego is advanced by analytic
+   kinematics — never learn what is already known — while everything exogenous
+   (traffic, route, lights) comes from the log, either replayed directly or
+   advanced by a learned per-agent traffic model. Only the part replay cannot
+   provide, how other agents react to the ego, is ever learned, which is also
+   the only part the policy could exploit.
+2. **Ego-state matching reward.** A time-tolerant kernel (`tau`) scores the
+   simulated ego against the expert's own trajectory in position, heading and
+   speed (`sigma_p`, `sigma_yaw`, `sigma_v`). Traffic never enters the reward,
+   so it grades driving rather than the scene. Two components proved necessary:
+   a **broad second position kernel** (`sigma_p2`, `p2_weight`) because a
+   single tight kernel floors out exactly where recovery must be learned, and
+   **rear-impact rejection** (`penalty_ignore_rear`) so a slower-than-log ego
+   rear-ended by non-reactive replayed traffic is not charged for it.
+3. **Driving-native evaluation.** Closed-loop Bench2Drive in CARLA — driving
+   score, route completion, and the per-class collision decomposition — against
+   same-network BC baselines. The training world never grades itself.
 
 ## Status — under active development
 
@@ -74,44 +78,26 @@ and OpenDRIVE do not.
 
 ### Videos
 
-Closed-loop CARLA rollouts, same routes rendered for both versions. `2d` is the
-bird's-eye state render, `3d` is the CARLA camera. These are the dev-10 routes
-that both versions complete cleanly — **DS 100, route completion 100%, no
-collisions** — spanning five towns and five scenario types. The routes that
-still fail are the ones in the collision table above; these clips show what the
-policy does when it works, on in-development checkpoints rather than a finished
-system.
+Closed-loop CARLA rollouts on dev-10 routes the policy completes cleanly — DS
+100, route completion 100%, no collisions. The bird's-eye render is the
+simulated state, the camera view is CARLA. These are in-development
+checkpoints, not a finished system; the routes that still fail are the ones in
+the collision table above. Full-quality mp4s for every route are in
+[docs/media/](docs/media/).
 
-| route | town | scenario | v0.2 | v0.3 |
-|---|---|---|---|---|
-| 25378 | Town03 | yield to emergency vehicle | [2d](docs/media/v02_route25378_2d.mp4) · [3d](docs/media/v02_route25378_3d.mp4) | [2d](docs/media/v03_route25378_2d.mp4) · [3d](docs/media/v03_route25378_3d.mp4) |
-| 25381 | Town05 | hazard at side lane | [2d](docs/media/v02_route25381_2d.mp4) · [3d](docs/media/v02_route25381_3d.mp4) | [2d](docs/media/v03_route25381_2d.mp4) · [3d](docs/media/v03_route25381_3d.mp4) |
-| 25424 | Town11 | construction obstacle, two-way road | [2d](docs/media/v02_route25424_2d.mp4) · [3d](docs/media/v02_route25424_3d.mp4) | [2d](docs/media/v03_route25424_2d.mp4) · [3d](docs/media/v03_route25424_3d.mp4) |
-| 26405 | Town15 | static cut-in | [2d](docs/media/v02_route26405_2d.mp4) | [2d](docs/media/v03_route26405_2d.mp4) |
-| 17569 | Town12 | sequential lane change | [2d](docs/media/v02_route17569_2d.mp4) | [2d](docs/media/v03_route17569_2d.mp4) |
+Construction obstacle on a two-way road, Town11:
 
-Four v0.3 rollouts preview inline below (GitHub strips `<video>` tags, so these
-are looping GIFs — the table above links the full-quality mp4s).
+![Bird's-eye rollout, construction obstacle on a two-way road, Town11](docs/media/v03_route25424_2d.gif)
 
-**Bird's-eye (2d).** Left: construction obstacle on a two-way road, Town11.
-Right: yielding to an emergency vehicle, Town03.
+![Camera rollout, construction obstacle on a two-way road, Town11](docs/media/v03_route25424_3d.gif)
 
-<table>
-<tr>
-<td width="50%"><img src="docs/media/v03_route25424_2d.gif" width="100%" alt="v0.3 bird's-eye, construction obstacle on a two-way road, Town11"></td>
-<td width="50%"><img src="docs/media/v03_route25378_2d.gif" width="100%" alt="v0.3 bird's-eye, yielding to an emergency vehicle, Town03"></td>
-</tr>
-</table>
+Yielding to an emergency vehicle, Town03:
 
-**CARLA camera (3d).** Left: construction obstacle, two-way road, Town11.
-Right: hazard at side lane, Town05.
+![Bird's-eye rollout, yielding to an emergency vehicle, Town03](docs/media/v03_route25378_2d.gif)
 
-<table>
-<tr>
-<td width="50%"><img src="docs/media/v03_route25424_3d.gif" width="100%" alt="v0.3 camera view, construction obstacle, Town11"></td>
-<td width="50%"><img src="docs/media/v03_route25381_3d.gif" width="100%" alt="v0.3 camera view, hazard at side lane, Town05"></td>
-</tr>
-</table>
+Hazard at side lane, Town05:
+
+![Camera rollout, hazard at side lane, Town05](docs/media/v03_route25381_3d.gif)
 
 ### Next experiments (todo)
 
