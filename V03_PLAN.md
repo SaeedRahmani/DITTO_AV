@@ -158,6 +158,23 @@ PRIORITY CLAIMS: arXiv 2512.18662 (Dec 2025).
 
 ## 9. Status ledger (newest first)
 
+- 2026-08-05 — **W0 PASSED (pre-registered refined criterion), round
+  4 of 4**: minADE-over-modes@4s 2.79 <= 3.80, proximity 1.36x <= 2x,
+  reactivity 0.567 > 0.3 (from 0.06 — the round-4 EGO-HISTORY fix:
+  a memoryless-per-step model cannot distinguish braking from slow,
+  so reactions were unlearnable; + interaction-weighted loss). Mean
+  point-ADE 4.55 (best of 4 rounds, below the CV floor 5.02) remains
+  above 3.80 solely in branching regimes (stopped 0.23 vs
+  launch/cruise/turn 7-10) — the refinement's justification, per the
+  rule committed before round-2. W1 calibration: disagreement p95
+  0.021 / p99 0.223 (on-distribution)  -> termination threshold 0.25.
+  Campaign findings banked for the paper: (1) naive rollout FT of a
+  conditional WM destroys its conditioning; (2) ego-history context
+  is necessary for learnable reactions; (3) regime decomposition as
+  lever-picker; (4) mode heads + minADE for branching futures.
+  NEXT: D3 — champion fine-tune in ReactiveEgoSim (W1 threshold 0.25,
+  replay->reactive curriculum), then W3 CARLA gates.
+
 - 2026-08-04 night — W0 round-2 verdict + round-3 design: rollout
   fine-tuning MOVED ADE 7.62 -> 5.00 @4s (1-2 s now at CV parity) but
   (a) plateaus at extrapolation level and (b) COLLAPSED ego-reactivity
