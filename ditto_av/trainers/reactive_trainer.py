@@ -49,8 +49,13 @@ def _rollout(policy, sim, log, starts, horizon, burn_in,
     dead = torch.zeros(len(starts), dtype=torch.bool, device=device)
     obs_l, act_l, rew_l, col_l, err_l, dis_l = [], [], [], [], [], []
     prev_plan = prev_pxy = prev_pth = None
+    pxy_l, pth_l = [], []
     for _ in range(horizon):
         obs = sim.build_obs(frame, xy, th, v)
+        # emission pose of this tick's plan (pre-step) — constants for
+        # the mean-plan consistency loss's motion compensation
+        pxy_l.append(xy)
+        pth_l.append(th)
         emb = policy.encode(obs)
         h = policy.step(emb, h)
         d = policy.dist(policy.features(emb, h))
@@ -86,7 +91,8 @@ def _rollout(policy, sim, log, starts, horizon, burn_in,
     return (burn_obs, torch.stack(obs_l), torch.stack(act_l),
             torch.stack(rew_l), final_obs, torch.stack(col_l),
             torch.stack(err_l), dead,
-            torch.stack(dis_l) if dis_l else None)
+            torch.stack(dis_l) if dis_l else None,
+            torch.stack(pxy_l), torch.stack(pth_l))
 
 
 def train_clp_reactive(cfg: Config, log: GlobalLog,
@@ -133,10 +139,10 @@ def train_clp_reactive(cfg: Config, log: GlobalLog,
                           generator=gen)
         starts = pool[i]
         (burn_obs, obs_seq, act_seq, rewards, final_obs, cols, errs,
-         dead, dis) = _rollout(policy, sim, log, starts, c.horizon,
-                               c.burn_in, reactive, w1_thresh,
-                               perturb, gen,
-                               w_churn=getattr(c, "w_churn", 0.0))
+         dead, dis, pxy, pth) = _rollout(
+             policy, sim, log, starts, c.horizon,
+             c.burn_in, reactive, w1_thresh, perturb, gen,
+             w_churn=getattr(c, "w_churn", 0.0))
 
         with torch.no_grad():
             _, h0 = policy.unroll(burn_obs)
@@ -160,6 +166,23 @@ def train_clp_reactive(cfg: Config, log: GlobalLog,
             a_dist = anchor.dist(afeats)
         kl = torch.distributions.kl.kl_divergence(dist, a_dist).mean()
         actor_loss = actor_loss + c.bc_kl_coef * kl
+        w_cons = getattr(c, "w_consistency", 0.0)
+        if w_cons > 0.0:
+            # v0.3.2 axis-3: differentiable consistency of the MEAN
+            # plans along the visited states — sampled-churn pricing
+            # (axis 2) drowned in exploration noise (~2.4 m sampled vs
+            # 0.2 m mean churn); this term sees the mean directly.
+            from ..bench2drive import WP_SCALE
+            from ..consistency import plan_churn_lat
+            T, B = pxy.shape[0], pxy.shape[1]
+            mu = dist.base_dist.loc.view(T, B, -1, 2) * WP_SCALE
+            ch = plan_churn_lat(
+                mu[:-1].reshape((T - 1) * B, -1, 2),
+                mu[1:].reshape((T - 1) * B, -1, 2),
+                pxy[:-1].reshape(-1, 2), pxy[1:].reshape(-1, 2),
+                pth[:-1].reshape(-1), pth[1:].reshape(-1))
+            cons = ch.mean()
+            actor_loss = actor_loss + w_cons * cons
 
         values = policy.value(feats.detach())
         critic_loss = 0.5 * F.mse_loss(values, returns.detach())
@@ -217,7 +240,7 @@ def eval_both_worlds(cfg, policy, log, rsim, w1_thresh=0.25,
             ("reactive", rsim, True, pool_r)):
         starts = pool[torch.randint(len(pool), (batch,), device=device,
                                     generator=gen)]
-        (_, _, _, rewards, _, cols, errs, dead, _) = _rollout(
+        (_, _, _, rewards, _, cols, errs, dead, _, _, _) = _rollout(
             policy, sim, log, starts, c.horizon, c.burn_in, reactive,
             w1_thresh, stochastic=False)
         out[name] = {"reward": float(rewards.mean()),

@@ -83,6 +83,24 @@ S1/driving gates. 3x3 stays a canary, never a selector.
 
 ## 9. Ledger
 
+- 2026-08-05 AXIS-2 ROUND 1: job 10584355 (participation), w_churn
+  0.5 on SAMPLED plans, sigma_yr 0, 6000 steps. THIRD MISS at the
+  same plateau (S1b yr_flips 26.8 / ya_p95 14.6 / churn 0.208), old
+  currency ~tied (reactive 0.681 vs 0.685). ROOT CAUSE FOUND in the
+  telemetry: training reward sat at -0.96 -> the penalty measured
+  ~2.4 m/tick of SAMPLED churn = exploration noise, 10x the mean
+  policy's 0.2 m. All three arms priced signals that exploration
+  noise drowns; the mean policy's indecision was never
+  gradient-visible. AXIS 2 (sampled-reward form) CLOSED.
+- 2026-08-05 AXIS-3 ROUND 1 pre-registered BEFORE the run: price the
+  MEAN plans directly — differentiable consistency loss on
+  dist.base_dist.loc along visited rollout states (motion-compensated
+  lateral churn, same pinned term), added to the actor loss with
+  w_consistency 1.0 (mean churn ~0.2 m -> ~0.2 vs O(1) policy-grad
+  loss); sigma_yr 0, w_churn 0, 6000 steps, TAG v032_d3cons. No
+  REINFORCE credit path — the gradient reaches the mean directly, so
+  the exploration-noise floor does not apply. Go/no-go unchanged:
+  reactive >= 0.68 AND yr_flips <= 7.1 AND ya_p95 <= 5.7.
 - 2026-08-05 AXIS-1 ROUND 2: job 10583611 (participation), sigma_yr
   1.0, 6000 steps. SECOND MISS, informative: old currency mostly
   recovered (reactive 0.668 vs rx 0.685, was 0.654 in round 1) but
