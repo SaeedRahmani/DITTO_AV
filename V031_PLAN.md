@@ -73,17 +73,40 @@ gap and beat dev-10 85.63; then ONE 220 for the headline; then paper.
    clp_rx -> ~/ditto_out/v031_d3_rx; 10581925 init 999s champion ->
    ~/ditto_out/v031_d3_s (slurm/v031_d3.sbatch <init> <out>).
 
-### NEXT (M2 remainder)
-4. W3 re-gate: dev-10 A/B (carla_eval_chain.sbatch, routes
-   A=3514,3255,26405,25381,25378 B=25424,2091,27494,17569,28198, x3;
-   diag config pattern: configs/diag_v03_rx.yaml). GATE: beat 85.63
-   nominal / clear the band by > seed sigma (2.3) for a claim. Watch
-   the layout-vs-vehicle collision decomposition — the whole point.
-5. If cleared: seeds (s1/s2) + ONE 220 (v02_bench220_submit.sh
-   pattern; collector self-commits) vs 76.10 headline.
-6. Then E3 (factored-latent DITTO retest — latent matching inside the
-   (ego | learned-traffic) factorization; closes the v0.1 question)
-   and paper v0.3/v0.3.1 (findings ledger in V03_PLAN §9).
+### W3 re-gate: FAIL (2026-08-05) — v0.3.1 CLOSED as a negative result
+
+Dev-10 A/B x3 (jobs 10582571-74): arm rx 66.01 (layout 7 / veh 21),
+arm s 74.89 (layout 6 / veh 24) vs clp_rx 82.53 (7/6) and 999s 85.63.
+Neither arm approaches the gate. Root cause MEASURED, three links:
+1. ALL dev-10 "layout" collisions are map furniture ON drivable area
+   (static.fence at the 2091 junction corner, prop.mesh at the 3514
+   ParkingExit, vegetation at 27494): our query reads them 0.3-1.5 m
+   INSIDE the lane+margin. The training penalty was satisfied
+   (lviol -> 0) while CARLA's layout collisions stayed unchanged —
+   the signal cannot express the failure mode it was built for.
+2. These objects exist in NO available data source: annos carry only
+   vehicle/walker/bicycle (+signs), OpenDRIVE Driving lanes exclude
+   fences/vegetation; nothing to replay into the world.
+3. The refinement candidate (heading-conditioned drivability: only
+   lanes aligned within 45 deg count) FAILS the expert pre-gate:
+   2.795% val violations (>1%; Town06 10.2%, Town12 3.8%) — a turning
+   expert's heading legitimately excludes both roads' corridors
+   mid-junction. Wider cones re-admit the corner blindness.
+Suggestive but NOT conclusive (1 training seed, ~1 sigma_train=8):
+the w=0.5 penalty coincided with veh collisions 6 -> 21/24. Zero
+benefit + possible harm => penalty default stays 0. KEEP the
+layout_viol metric (free diagnostics); keep layout_torch/LayoutQuery
+infra. Both-world in-sim reward canary IMPROVED in both arms while
+CARLA dropped — logged as another "sim never grades itself" instance.
+
+### NEXT
+- E3: factored-latent DITTO retest — latent matching inside the
+  (ego | learned-traffic) factorization; closes the v0.1 question.
+- Paper v0.3/v0.3.1 (findings ledger in V03_PLAN §9): the v0.3
+  reactivity dividend + the v0.3.1 negative result (what static
+  geometry can and cannot buy in a log-replay world) are both
+  publishable findings. Headline stays v0.2 220 76.10 / v0.3 dev-10
+  82.53 with the collision decomposition story.
 
 ## 3. Rules that keep this project honest (do not relax)
 
