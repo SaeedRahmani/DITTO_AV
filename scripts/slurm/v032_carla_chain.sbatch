@@ -15,6 +15,10 @@
 # VARIANTS: "<tag>:<agent_conf>:<routes>:<reps>" space-separated
 # (dev-10 A/B protocol: A=3255,3514,25378,25381,26405 x3,
 #  B=2091,17569,25424,27494,28198 x3).
+# SUBMIT AS:  VARIANTS='...' sbatch scripts/slurm/v032_carla_chain.sbatch
+# NEVER via sbatch --export=ALL,VARIANTS=... — sbatch splits --export
+# on commas, truncating the route list (burned 2026-08-05, jobs
+# 10582601/02).
 
 set -euo pipefail
 VENVPY=/scratch/$USER/ditto_av/envs/carla_eval/bin/python
@@ -38,6 +42,7 @@ export CARLA_ROOT=$BASE/carla_root
 cd $B2D
 for spec in $VARIANTS; do
     IFS=: read -r TAG CONF ROUTES REPS <<< "$spec"
+    [ -n "${REPS:-}" ] || { echo "bad VARIANTS spec: '$spec'"; exit 1; }
     echo "===== VARIANT $TAG conf=$CONF routes=$ROUTES reps=$REPS ====="
     PORT=$((20000 + RANDOM % 10000)); TMPORT=$((PORT + 50))
     export DITTO_AGENT_LOG=$OUT/agent_ticks_$TAG.jsonl
