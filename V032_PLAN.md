@@ -83,6 +83,21 @@ S1/driving gates. 3x3 stays a canary, never a selector.
 
 ## 9. Ledger
 
+- 2026-08-05 AXIS-3 ROUND 1: job 10585878 (participation), w_cons
+  1.0, 6000 steps. MECHANISM VALIDATED: churn 0.38 -> 0.050 (floor
+  0.043), ya_p95 24.6 -> 2.80 (GATE PASSED, at the label-replay
+  floor 2.83), yr_flips 39.2 -> 10.8 (gate 7.1 missed). Cost: the
+  term overpowered the trust region (kl 1.22 vs usual ~0.85) and
+  taxed the old currency (reactive 0.657 vs 0.685, replay collisions
+  0.083 vs 0.047) -> go/no-go missed on driving. The three-mechanism
+  story is complete: reward-side terms can't see mean churn (axes
+  1-2); the differentiable mean-plan term removes it outright.
+- 2026-08-05 AXIS-3 ROUND 2 pre-registered BEFORE the run: ONE knob,
+  w_cons 1.0 -> 0.5. Round 1 proves there is large slack (churn at
+  the floor with ya_p95 2x under gate); halving the weight rebalances
+  toward the driving objective (target: kl back near the ~0.85
+  regime). Everything else unchanged; TAG v032_d3cons2. Go/no-go
+  unchanged: reactive >= 0.68 AND yr_flips <= 7.1 AND ya_p95 <= 5.7.
 - 2026-08-05 AXIS-2 ROUND 1: job 10584355 (participation), w_churn
   0.5 on SAMPLED plans, sigma_yr 0, 6000 steps. THIRD MISS at the
   same plateau (S1b yr_flips 26.8 / ya_p95 14.6 / churn 0.208), old
