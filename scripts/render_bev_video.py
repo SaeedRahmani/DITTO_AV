@@ -293,6 +293,13 @@ def detect_town(ego: np.ndarray, layout_dir: Path) -> str | None:
 
 
 # -------------------------------------------------------------- render
+def _hud(img, text, org, scale):
+    """Caption with a dark rim so it survives light sidewalk fills."""
+    for col, th in (((0, 0, 0), 4), (HUD, 2)):
+        cv2.putText(img, text, org, cv2.FONT_HERSHEY_SIMPLEX, scale, col,
+                    th, cv2.LINE_AA)
+
+
 def box_pts(x, y, yaw, ex, ey, to_px):
     c, s = math.cos(yaw), math.sin(yaw)
     pts = []
@@ -380,13 +387,12 @@ def main():
                            dtype=np.int32)
             cv2.polylines(img, [pts], False, TRAIL, 2, cv2.LINE_AA)
         cv2.fillPoly(img, [box_pts(x0, y0, eyaw, 2.45, 1.06, to_px)], EGO)
-        cv2.putText(img, f"t={k / args.fps:5.1f}s  v={espeed:4.1f} m/s",
-                    (12, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.7, HUD, 2,
-                    cv2.LINE_AA)
-        cap = " | ".join(x for x in (args.label, town or "") if x)
+        _hud(img, f"t={k / args.fps:5.1f}s  v={espeed:4.1f} m/s",
+             (12, 28), 0.7)
+        cap = " | ".join(x for x in (args.label,
+                                    resolve_town(town) if town else "") if x)
         if cap:
-            cv2.putText(img, cap, (12, W - 16), cv2.FONT_HERSHEY_SIMPLEX,
-                        0.6, HUD, 2, cv2.LINE_AA)
+            _hud(img, cap, (12, W - 16), 0.6)
         vw.write(img)
     vw.release()
     print(f"wrote {args.out} ({len(ticks)} frames, town={town})")
