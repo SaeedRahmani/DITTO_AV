@@ -38,7 +38,7 @@ periodically as runs land. Scores are Bench2Drive closed-loop **driving score
 | v0.1 | learned RSSM latent; reward = whole-latent match | 22.10 (220 routes) | frozen |
 | v0.2 | log replayed as the world; reward = ego-state match | 76.10 / 75.88 (220 routes); 85.63 / 83.60 (dev-10) | frozen |
 | v0.3 | v0.2 + learned reactive traffic model | 82.53 (dev-10) | frozen |
-| v0.3.1 | v0.3 + static map geometry | 66.01 / 74.89 (dev-10) | closed |
+| v0.3.1 | v0.3 + static map geometry | 66.01 / 74.89 (dev-10) | reopened |
 | v0.3.2 | v0.3 + smoothness reward channels | in progress | active |
 
 Two arms are reported where two seeds/configs were run. **dev-10** is the
@@ -65,10 +65,12 @@ v0.2 and v0.3 differ almost entirely in *which* collisions they have:
 
 v0.3's reactive traffic reduces vehicle collisions by 33–50%. Its training
 world contains no static geometry, so driving close to walls costs nothing
-during training and costs 7 layout collisions in CARLA. v0.3.1 added map
-geometry to close that gap and did not: the objects actually hit (fences,
-props, vegetation) stand *on* drivable area and are absent from every available
-data source.
+during training and costs 7 layout collisions in CARLA. v0.3.1 added road
+geometry to close that gap and did not: the objects actually hit are map
+furniture — fences, props, vegetation — standing *on* drivable area, which a
+lane-based drivability signal cannot express. That axis is now reopened, since
+CARLA does expose the collidable furniture offline even though the annotations
+and OpenDRIVE do not.
 
 ### Videos
 
