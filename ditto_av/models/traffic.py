@@ -172,9 +172,10 @@ CTX_DIM = 5  # ego speed + light (presence, tv_xy, state)
 
 class TrafficModel(nn.Module):
     def __init__(self, hist: int = 10, d_model: int = 256,
-                 n_layers: int = 4, n_heads: int = 8):
+                 n_layers: int = 4, n_heads: int = 8, n_modes: int = 4):
         super().__init__()
         self.hist = hist
+        self.n_modes = n_modes
         feat_dim = hist + (hist - 1) + 4 + 2 + 2 + 3
         self.embed = nn.Linear(feat_dim, d_model)
         self.embed_ctx = nn.Linear(CTX_DIM, d_model)
@@ -184,27 +185,53 @@ class TrafficModel(nn.Module):
             norm_first=True)
         self.encoder = nn.TransformerEncoder(layer, n_layers)
         self.head = nn.Sequential(nn.Linear(d_model, d_model), nn.GELU(),
-                                  nn.Linear(d_model, 6))
+                                  nn.Linear(d_model, n_modes * 7))
         # target scales: ~1.4 m/step forward max, lateral small, dyaw
         self.register_buffer("t_scale",
                              torch.tensor([1.0, 0.2, 0.05]))
 
-    def dist(self, hist, pres, cls, ego, light) -> Independent:
+    def modes(self, hist, pres, cls, ego, light):
+        """GMM heads: (mu (B,A,M,3), log_std (B,A,M,3),
+        logits (B,A,M)). Futures at 4 s genuinely branch (regime
+        decomposition 2026-08-04: error mass in cruising/launching =
+        future behavior changes); a unimodal mean averages modes."""
         feat, ctx = featurize(hist, pres, cls, ego, light)
         x = self.embed(feat)                                # (B, A, D)
         x = torch.cat([self.embed_ctx(ctx)[:, None], x], dim=1)
         pad = torch.cat([torch.zeros_like(pres[:, :1]), ~pres], dim=1)
         x = self.encoder(x, src_key_padding_mask=pad)
-        mu, log_std = self.head(x[:, 1:]).chunk(2, dim=-1)  # (B, A, 3)
-        mu = mu * self.t_scale
-        log_std = log_std.clamp(-5.0, 1.0)
-        return Independent(Normal(mu, log_std.exp() * self.t_scale), 1)
+        out = self.head(x[:, 1:])                           # (B, A, M*7)
+        B, A, _ = out.shape
+        out = out.view(B, A, self.n_modes, 7)
+        mu = out[..., 0:3] * self.t_scale
+        log_std = out[..., 3:6].clamp(-5.0, 1.0)
+        return mu, log_std, out[..., 6]
+
+    def dist(self, hist, pres, cls, ego, light) -> Independent:
+        """Highest-probability mode as a Gaussian (rollout/back-compat
+        path; training uses the winner-take-all loss over all modes)."""
+        mu, log_std, logits = self.modes(hist, pres, cls, ego, light)
+        b = torch.argmax(logits, dim=-1, keepdim=True)      # (B, A, 1)
+        take = lambda t: torch.gather(
+            t, 2, b[..., None].expand(-1, -1, 1, 3)).squeeze(2)
+        return Independent(Normal(take(mu),
+                                  take(log_std).exp() * self.t_scale), 1)
 
     def loss(self, hist, pres, cls, ego, light, target,
              pred_mask) -> Tensor:
-        d = self.dist(hist, pres, cls, ego, light)
-        nll = -d.log_prob(target)                           # (B, A)
-        return (nll * pred_mask).sum() / pred_mask.sum().clamp_min(1)
+        """Winner-take-all GMM loss: NLL of the best mode + mode-choice
+        cross-entropy (standard MTP recipe)."""
+        mu, log_std, logits = self.modes(hist, pres, cls, ego, light)
+        std = log_std.exp() * self.t_scale
+        t = target[:, :, None, :]                           # (B, A, 1, 3)
+        nll = 0.5 * (((t - mu) / std) ** 2 + 2 * log_std
+                     + math.log(2 * math.pi)).sum(-1)       # (B, A, M)
+        best_nll, best = nll.min(dim=-1)
+        ce = torch.nn.functional.cross_entropy(
+            logits.reshape(-1, self.n_modes), best.reshape(-1),
+            reduction="none").view_as(best)
+        l = (best_nll + 0.5 * ce) * pred_mask
+        return l.sum() / pred_mask.sum().clamp_min(1)
 
     def advance(self, cur: Tensor, delta: Tensor) -> Tensor:
         """Integrate local deltas to world states (differentiable)."""
@@ -216,6 +243,13 @@ class TrafficModel(nn.Module):
             cur[..., 0] + dx_w, cur[..., 1] + dy_w,
             dx_w / DT, dy_w / DT, yaw0 + delta[..., 2],
             cur[..., 5], cur[..., 6]], dim=-1)
+
+    @torch.no_grad()
+    def step_mode(self, hist, pres, cls, ego, light,
+                  mode: int) -> Tensor:
+        """Rollout step following a FIXED mode index (minADE eval)."""
+        mu, _, _ = self.modes(hist, pres, cls, ego, light)
+        return self.advance(hist[:, :, -1], mu[:, :, mode])
 
     @torch.no_grad()
     def step(self, hist, pres, cls, ego, light,

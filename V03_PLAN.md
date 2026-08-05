@@ -158,6 +158,20 @@ PRIORITY CLAIMS: arXiv 2512.18662 (Dec 2025).
 
 ## 9. Status ledger (newest first)
 
+- 2026-08-04 night — W0 round-2 verdict + round-3 design: rollout
+  fine-tuning MOVED ADE 7.62 -> 5.00 @4s (1-2 s now at CV parity) but
+  (a) plateaus at extrapolation level and (b) COLLAPSED ego-reactivity
+  0.21 -> 0.04 m/s — finding: naive rollout fine-tuning of a
+  conditional world model destroys the conditioning (logged-ego
+  pairing makes ego-ignoring optimal). Regime decomposition (the
+  lever picker): stopped 1.48 (n=493) EXCELLENT vs launching 6.97 /
+  cruising 7.85 / turning 9.41 — error mass = FUTURE BEHAVIOR CHANGES
+  = multimodal, as pre-registered. ROUND-3 (running): GMM mode heads
+  (WTA + mode-CE loss, argmax-mode rollouts) + JOINT objective
+  (teacher NLL term restores conditioning) + minADE-over-modes
+  reported per the pre-registered refinement rule (decomposition
+  justifies it). Primary mean-ADE gate UNCHANGED.
+
 - 2026-08-04 eve: W0 round-1 verdicts: (a) first FAIL was an EVAL BUG
   (slot-vs-id matching produced a 91 m ADE artifact; fixed, windows
   cache v2); (b) corrected verdict = HONEST FAIL: teacher-forced model

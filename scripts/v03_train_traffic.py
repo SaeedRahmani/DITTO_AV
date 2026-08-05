@@ -167,6 +167,14 @@ def rollout_finetune(model, sw, ch, steps, batch, device, K=15,
                     err[m], torch.zeros_like(err[m]), delta=2.0)
                 n += 1
         loss = loss / max(n, 1)
+        # JOINT objective: keep one-step teacher-forced NLL in the mix —
+        # pure rollout fine-tuning collapsed ego-reactivity in round-2
+        # (0.21 -> 0.04 m/s): with the logged ego always paired with
+        # logged futures, ignoring the ego minimizes rollout loss.
+        ti = rng.integers(len(sw.frames), size=batch)
+        th_, tpr, tcl, teg, tli, ttg, tpm = batch_tensors(sw, ti, device)
+        loss = loss + model.loss(th_, tpr, tcl, teg, tli, ttg,
+                                 tpm.float())
         opt.zero_grad()
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), 10.0)
@@ -189,6 +197,7 @@ def fast_rollout_ade(models, val, device, n_scenes=256,
           if all(int(f) + k in frame_to_i for k in (10, 20, ROLL))]
     pick = ok[:: max(1, len(ok) // n_scenes)][:n_scenes]
     ades = {10: [], 20: [], ROLL: []}
+    min_ades = []   # per-agent min over fixed-mode rollouts @4s
     # error decomposition @4s by log-behavior regime (lever picker):
     #   stopped (<0.5 m/s), launching (stopped->moving), cruising
     #   (straight), turning (|yaw rate| > 0.05 rad/frame)
@@ -245,6 +254,44 @@ def fast_rollout_ade(models, val, device, n_scenes=256,
                                 regime_err["turning"].append(e)
                             else:
                                 regime_err["cruising"].append(e)
+        # minADE over fixed-mode rollouts (pre-registered refinement,
+        # justified by the regime decomposition: futures branch)
+        n_modes = getattr(models[0], "n_modes", 1)
+        i_R = frame_to_i.get(int(frames[i0]) + ROLL)
+        if n_modes > 1 and i_R is not None:
+            per_mode = []
+            for mm in range(n_modes):
+                hh = h.clone()
+                for k in range(1, ROLL + 1):
+                    i_k2 = frame_to_i.get(int(frames[i0]) + k)
+                    eg_k2 = torch.as_tensor(val.ego[[i_k2]],
+                                            device=device) \
+                        if i_k2 is not None else eg
+                    li_k2 = torch.as_tensor(val.light[[i_k2]],
+                                            device=device) \
+                        if i_k2 is not None else li
+                    nn_ = models[0].step_mode(hh, pr, cl, eg_k2, li_k2,
+                                              mm)
+                    hh = torch.cat([hh[:, :, 1:], nn_[:, :, None]],
+                                   dim=2)
+                ids0m = val.ids[i0]
+                slot_R = {int(v): b for b, v in
+                          enumerate(val.ids[i_R]) if v >= 0}
+                fin = hh[0, :, -1, 0:2].cpu().numpy()
+                errs_m = {}
+                for a in np.where(pm[0].cpu().numpy())[0]:
+                    b = slot_R.get(int(ids0m[a]))
+                    if b is not None:
+                        errs_m[a] = float(np.linalg.norm(
+                            fin[a] - val.hist[i_R][b, -1, 0:2]))
+                per_mode.append(errs_m)
+            agents = set().union(*[set(d) for d in per_mode]) \
+                if per_mode else set()
+            for a in agents:
+                vals = [d[a] for d in per_mode if a in d]
+                if vals:
+                    min_ades.append(min(vals))
+
         # proximity events at final step (model) vs log
         i_R = frame_to_i.get(int(frames[i0]) + ROLL)
         if i_R is not None:
@@ -267,6 +314,8 @@ def fast_rollout_ade(models, val, device, n_scenes=256,
             pass
     out = {f"ade_{k//10}s": float(np.mean(v)) for k, v in ades.items()
            if v}
+    if min_ades:
+        out["min_ade_4s_modes"] = float(np.mean(min_ades))
     out["regimes_4s"] = {
         r: {"n": len(v), "ade": float(np.mean(v)) if v else None}
         for r, v in regime_err.items()}
