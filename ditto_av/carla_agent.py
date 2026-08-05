@@ -647,6 +647,8 @@ try:  # pragma: no cover - requires the carla package + leaderboard on path
             self._steer_gain = float(conf.get("steer_gain", 1.0))
             self._throttle_gain = float(conf.get("throttle_gain", 1.0))
             self._prev_xy: Dict[object, np.ndarray] = {}
+            self._ext_cache: Dict[object, tuple] = {}
+            self._state_meta = False
             self._step = -1
             self._last = carla.VehicleControl()
             # per-model-tick behavior log (jsonl) for debugging closed-loop
@@ -654,8 +656,21 @@ try:  # pragma: no cover - requires the carla package + leaderboard on path
             self._log_path = _os.environ.get("DITTO_AGENT_LOG")
 
         def sensors(self):
-            return [{"type": "sensor.speedometer", "id": "speed",
+            sens = [{"type": "sensor.speedometer", "id": "speed",
                      "reading_frequency": 20}]
+            # presentation-only chase camera (the policy never sees
+            # pixels — privileged vector planner). Enabled by
+            # DITTO_VIDEO_DIR; needs SAVE_PATH set in the job env so
+            # the harness allows the >3 m rig radius (Bench2Drive's
+            # own visualization affordance).
+            import os as _os
+            if _os.environ.get("DITTO_VIDEO_DIR"):
+                sens.append({"type": "sensor.camera.rgb",
+                             "x": -8.0, "y": 0.0, "z": 4.5,
+                             "roll": 0.0, "pitch": -18.0, "yaw": 0.0,
+                             "width": 960, "height": 540, "fov": 100,
+                             "id": "rgb_chase"})
+            return sens
 
         def set_global_plan(self, global_plan_gps, global_plan_world_coord):
             # the base class downsamples the stored plan to ~50 m spacing;
@@ -748,6 +763,13 @@ try:  # pragma: no cover - requires the carla package + leaderboard on path
 
         def run_step(self, input_data, timestamp):
             self._step += 1
+            import os as _os
+            vdir = _os.environ.get("DITTO_VIDEO_DIR")
+            if vdir and "rgb_chase" in input_data \
+                    and self._step % 2 == 0:
+                import cv2 as _cv2
+                _cv2.imwrite(f"{vdir}/{self._step:06d}.jpg",
+                             input_data["rgb_chase"][1][:, :, :3])
             if self._step % self._repeat:
                 return self._last
             if getattr(self, "_route_pid_conf", None) is not None:
@@ -779,6 +801,38 @@ try:  # pragma: no cover - requires the carla package + leaderboard on path
                                    np.array([loc.location.x,
                                              loc.location.y]),
                                    float(np.deg2rad(loc.rotation.yaw))))
+                    if vdir and a.id not in self._ext_cache:
+                        bb = getattr(a, "bounding_box", None)
+                        if bb is not None:
+                            self._ext_cache[a.id] = (
+                                float(bb.extent.x), float(bb.extent.y))
+            if vdir:
+                # per-tick world state for the paired 2D BEV rendering
+                # of the SAME run (render_bev_video.py)
+                import json as _json
+                try:
+                    with open(f"{vdir}/state.jsonl", "a") as f:
+                        if not self._state_meta:
+                            # town + deck height let the renderer put the
+                            # right map under the run
+                            self._state_meta = True
+                            f.write(_json.dumps({"meta": {
+                                "town": CarlaDataProvider.get_map().name,
+                            }}) + "\n")
+                        f.write(_json.dumps({
+                            "step": self._step,
+                            "ego": [float(ego_xy[0]), float(ego_xy[1]),
+                                    float(ego_yaw - self._yaw_off),
+                                    float(ego_speed),
+                                    float(tr.location.z)],
+                            "actors": [
+                                [int(i), float(p[0]), float(p[1]),
+                                 float(y),
+                                 *self._ext_cache.get(i, (2.2, 1.0))]
+                                for i, p, y in actors],
+                        }) + "\n")
+                except Exception:
+                    pass    # presentation-only: never fail a run for it
 
             route = None
             if self._with_route:
