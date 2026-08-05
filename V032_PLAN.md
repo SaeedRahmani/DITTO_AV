@@ -83,6 +83,14 @@ S1/driving gates. 3x3 stays a canary, never a selector.
 
 ## 9. Ledger
 
+- 2026-08-06 AXIS-3 ROUND 4 RESULT (jobs 10587827/28) + CAMPAIGN
+  CLOSE: gated arm recovers driving FULLY — reactive 0.693 (s1) /
+  0.703 (s2), BOTH beat clp_rx 0.685; replay col 0.068 <= 0.07 — but
+  MISSES the S1b ya_p95 bar (13.27 / 6.31 vs 5.7): fading consistency
+  near traffic re-admits wobble exactly where the metric samples too
+  (churn 0.13-0.16, between uncond 0.07 and rx 0.38). Per the
+  committed rule: no CARLA lanes, campaign closes. Session report in
+  section 10.
 - 2026-08-06 w_cons 0.25 point (job 10587614, s0): DOMINATED — less
   smooth (flips 22.3, churn 0.125) AND worse replay collisions
   (0.089 vs rx 0.047), reactive 0.666. The flat 0.25-0.5 segment does
@@ -273,3 +281,39 @@ S1/driving gates. 3x3 stays a canary, never a selector.
   abandoned, remove the worktree, keep the branch.
 - Commits as Saeed Rahmani, no AI attribution. Scratch has a 1M-inode
   quota; extractions go to node-local /tmp.
+
+## 10. Campaign report — session 1 (2026-08-05/06), all numbers in §9
+
+The jiggle is EXPLAINED and (unconditionally) KILLED; the open cost
+is vehicle collisions. One-line history: A0 localized the wobble to
+the RL stage (plans, not labels, not the executor, unpriced by the
+reward); axes 1-2 proved reward-side pricing cannot see mean-plan
+churn under exploration noise (measured negatives with mechanisms);
+axis 5 proved test-time filtering spends the reactivity dividend;
+axis 3 (differentiable mean-plan consistency on dist means) is the
+working mechanism.
+
+CARLA-proven (s2 arm, w_cons 0.5): steering SMOOTHER THAN THE EXPERT
+(6.7 flips/100 vs expert 9.8, clp_rx 18.1; |dsteer| p95 6x lower),
+layout collisions 7 -> 0 with zero map data (the v0.3.1 objective,
+reached from the opposite direction — wobble WAS the furniture
+mechanism), DS 82.80 >= gate, 30/30. NOT BANKED: vehicle collisions
+6 -> 12 (gate <= 8) — commitment trades away part of the reactivity
+that lives in constant replanning. Both smoothing routes (filter,
+training) landed on veh 12: the trade-off is real, not an artifact.
+
+Round 4 (proximity-gated consistency) recovered ALL driving reward
+(both seeds beat clp_rx in-sim) but re-admitted wobble near traffic;
+its CARLA behavior is untested by rule.
+
+Next-session leads, in order of information value: (1) autopsy the 12
+vehicle collisions in the s2 dev-10 ticks vs clp_rx's 6 (same routes;
+are they lead-follow, cut-in, or junction? does commitment delay
+braking or steering-avoidance?); (2) TTC-gated (not distance-gated)
+consistency — fade commitment only under closing velocity; (3)
+longitudinal/lateral split: keep lateral commitment (kills layout
+hits + jiggle), free the longitudinal plan (reactivity is mostly
+speed); (4) recalibrate the S1b in-sim proxy against measured
+CLOSED-LOOP floors before it gates anything again (the 7.1/5.7 bars
+came from open-loop floors; the closed-loop corrective floor is ~11
+flips even with churn at the execution floor).
