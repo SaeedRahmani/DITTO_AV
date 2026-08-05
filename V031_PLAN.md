@@ -68,13 +68,11 @@ gap and beat dev-10 85.63; then ONE 220 for the headline; then paper.
    (b) penalty arm: reward -= w_layout * relu(off) (start w=0.5,
    dose axis) — mirror how collision_penalty is wired in
    egosim.RewardParams (penalty flags live there).
-3. Rerun D3 (scripts/v03_train_reactive.py + slurm/v03_d3.sbatch from
-   the v0.3 worktree — port them to main or run from the worktree
-   after merging main->saeed/v0.3? NO: v0.3 stays frozen; copy the two
-   files into main if not already merged — CHECK: they ARE on main via
-   the 73c0e0f merge) with the layout signal on, init from clp_rx or
-   from the 999s champion (run BOTH arms if lanes allow: layout-on
-   fine-tune of each; ~2 h/job on participation H100).
+3. Rerun D3 (scripts/v03_train_reactive.py + slurm/v03_d3.sbatch —
+   both already on main via the 73c0e0f merge) with the layout signal
+   on, init from clp_rx or from the 999s champion (run BOTH arms if
+   lanes allow: layout-on fine-tune of each; ~2 h/job on
+   participation H100).
 4. W3 re-gate: dev-10 A/B (carla_eval_chain.sbatch, routes
    A=3514,3255,26405,25381,25378 B=25424,2091,27494,17569,28198, x3;
    diag config pattern: configs/diag_v03_rx.yaml). GATE: beat 85.63
