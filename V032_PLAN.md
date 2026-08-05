@@ -69,14 +69,39 @@ Driving gate (pinned NOW, judges every arm; same dev-10 A/B chain
 protocol as W3): DS mean(A,B) >= 82.5 (clp_rx tie-or-beat), vehicle
 collisions <= 8 over the 30 runs (dividend kept; clp_rx = 6),
 completion 30/30. An arm that smooths but breaks this gate FAILS.
-Smoothness gate S1: numbers pinned from A0's expert band BEFORE any
-arm's training/eval runs (form: CARLA steer sign flips/100 ticks and
-yaw-accel p95 within a fixed multiple of expert; multiple chosen and
-committed at A0 close). 3x3 stays a canary, never a selector.
+Smoothness gate S1 (numbers pinned at A0 close, 2026-08-05, BEFORE
+any arm's training/eval runs; multiples committed once, per metric):
+- S1a CARLA: steer sign flips/100 ticks <= 14.8
+  (1.5x expert-log steer flips 9.84; clp_rx today: 18.1).
+- S1b EgoSim closed-loop (deterministic, val, B=192 H=40, the A0
+  protocol): yr sign flips/100 <= 7.1 (1.5x label-replay floor 4.7)
+  AND yaw-accel p95 <= 5.7 rad/s^2 (2x floor 2.83 — 2x not 1.5x
+  because a p95 of a second difference is the noisiest of the three
+  estimators; clp_rx today: 39.2 / 24.6).
+The EMA control arm (1.3.5) is attribution-only and is NOT judged by
+S1/driving gates. 3x3 stays a canary, never a selector.
 
 ## 9. Ledger
 
-- (open) A0 audit: submitted; results land here with job ids.
+- 2026-08-05 A0 CLOSED (login-CPU, no jobs; outputs/v032/a0_*.json).
+  Exact lat churn of consecutive plans at wp1 (m, val): expert labels
+  0.0126 / clp_bc 0.037 / clp_rl 0.166 / clp_rx 0.208 open-loop;
+  clp_rx closed-loop in sim 0.38. Sim-state wobble (closed-loop):
+  clp_rx yr-flips 39.2/100, yaw-accel p95 24.6 rad/s^2, yaw rate
+  RIDES the dtheta_max clamp (max 3.5 rad/s) — vs label-replay floor
+  4.7 / 2.83 (execution adds ~nothing; sim kinematics innocent) and
+  expert log 7.0 / 3.0. clp_bc closed-loop is smooth (6.2 flips) but
+  low-reward 0.35 (drifts); clp_rx collects reward 0.770 > label
+  replay 0.724 while wobbling 8x harder -> the reward PAYS MORE for
+  churny driving than for near-perfect label execution. CARLA
+  (existing v03rx dev-10 ticks): steer flips 18.1/100 moving 16.8,
+  |dsteer| p95 0.36, wp1 churn proxy 0.22 m (expert same-proxy
+  0.038). VERDICT: jiggle is born in the RL stage (BC 0.037 -> RL
+  0.166), amplified closed-loop, invisible to the reward. Labels are
+  clean -> Axis 4 dead. Sim execution clean -> Axis 2 not the lever.
+  PROCEED: Axis 1 (sigma_yawrate reward channel), sigma_yr = 0.5
+  rad/s pre-registered (expert yr p95 0.497 costs exp(-0.5); clp_rx
+  wobble 1.5 rad/s costs exp(-4.5)). Axis 5 EMA arm = attribution.
 
 ## 2. Ops deltas vs V03_PLAN §7 (everything else inherits)
 
