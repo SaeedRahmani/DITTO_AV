@@ -219,6 +219,10 @@ class CLPConfig:
     #                       plan churn in reactive rollouts (0 = off)
     w_consistency: float = 0.0  # v0.3.2 axis-3: differentiable
     #                             mean-plan consistency loss (0 = off)
+    cons_gate_d0: float = 0.0  # m; >0 fades the consistency loss out
+    cons_gate_w: float = 3.0   # when the nearest actor is closer than
+    #                            ~d0 (sigmoid width w) — smooth when
+    #                            alone, free to replan near traffic
     collision_penalty: float = 0.0  # 0 = thesis-pure arm
     penalty_ignore_rear: bool = True  # ghost rear-ends don't count
 

@@ -53,6 +53,7 @@ def main():
     ap.add_argument("--sigma-yawrate", type=float, default=0.5)
     ap.add_argument("--w-churn", type=float, default=0.0)
     ap.add_argument("--w-consistency", type=float, default=0.0)
+    ap.add_argument("--cons-gate-d0", type=float, default=0.0)
     ap.add_argument("--steps", type=int, default=3500)
     ap.add_argument("--seed", type=int, default=-1,
                     help="override cfg.seed (training seed)")
@@ -70,6 +71,7 @@ def main():
     cfg.clp.sigma_yawrate = args.sigma_yawrate   # TRAIN sims only
     cfg.clp.w_churn = args.w_churn               # rollout-only term
     cfg.clp.w_consistency = args.w_consistency   # actor aux loss
+    cfg.clp.cons_gate_d0 = args.cons_gate_d0
     if args.seed >= 0:
         cfg.seed = args.seed
 

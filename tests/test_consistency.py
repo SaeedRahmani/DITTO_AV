@@ -47,3 +47,9 @@ def test_gradient_flows_through_both_plans():
     assert prev.grad is not None and torch.isfinite(prev.grad).all()
     assert cur.grad is not None and torch.isfinite(cur.grad).all()
     assert prev.grad.abs().sum() > 0 and cur.grad.abs().sum() > 0
+
+
+def test_proximity_gate_direction():
+    from ditto_av.consistency import proximity_gate
+    g = proximity_gate(torch.tensor([2.0, 12.0, 40.0]), 12.0, 3.0)
+    assert g[0] < 0.05 and abs(g[1] - 0.5) < 1e-6 and g[2] > 0.95

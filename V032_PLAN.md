@@ -83,6 +83,23 @@ S1/driving gates. 3x3 stays a canary, never a selector.
 
 ## 9. Ledger
 
+- 2026-08-06 w_cons 0.25 point (job 10587614, s0): DOMINATED — less
+  smooth (flips 22.3, churn 0.125) AND worse replay collisions
+  (0.089 vs rx 0.047), reactive 0.666. The flat 0.25-0.5 segment does
+  not contain the answer; no CARLA lanes for it.
+- 2026-08-06 AXIS-3 ROUND 4 pre-registered BEFORE the runs:
+  PROXIMITY-GATED consistency — the CARLA split says commitment wins
+  on empty road (layout 7->0) and loses near traffic (veh 6->12), so
+  the loss now fades with nearest-actor distance: gate =
+  sigmoid((dmin - d0)/w), d0 12 m, w 3 m (live reactive actors from
+  sim._buf when present, logged otherwise); w_cons 0.5, sigma_yr 0,
+  w_churn 0, 6000 steps, seeds 1+2 (seed-bar lesson: never judge on
+  seed 0 alone). Go/no-go to CARLA: mean(2 seeds) reactive >= 0.68
+  AND replay collision <= 0.07 AND S1b ya_p95 <= 5.7 (S1b-flips
+  recorded, known closed-loop floor ~11); then the median... with 2
+  seeds, the LOWER-reactive seed goes (conservative pick). CARLA
+  gates unchanged (1.4). This is the LAST arm of the session's
+  campaign: pass or miss, the campaign report follows.
 - 2026-08-06 AXIS-3 CARLA VERDICT (jobs 10587720 d10A / 10587721
   d10B, s2 arm): DS A 84.0 / B 81.6 -> mean 82.80 (gate >= 82.5
   PASS; clp_rx 82.53). Completion 30/30 PASS. S1a steer flips

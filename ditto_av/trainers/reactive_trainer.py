@@ -49,13 +49,22 @@ def _rollout(policy, sim, log, starts, horizon, burn_in,
     dead = torch.zeros(len(starts), dtype=torch.bool, device=device)
     obs_l, act_l, rew_l, col_l, err_l, dis_l = [], [], [], [], [], []
     prev_plan = prev_pxy = prev_pth = None
-    pxy_l, pth_l = [], []
+    pxy_l, pth_l, gate_l = [], [], []
     for _ in range(horizon):
         obs = sim.build_obs(frame, xy, th, v)
         # emission pose of this tick's plan (pre-step) — constants for
         # the mean-plan consistency loss's motion compensation
         pxy_l.append(xy)
         pth_l.append(th)
+        # nearest-actor distance for the proximity-gated consistency
+        # loss — live reactive actors when the sim has them, else log
+        act = getattr(sim, "_buf", None)
+        if act is None:
+            act = log.act[frame]
+        adist = (act[..., 1:3] - xy.unsqueeze(1)).norm(dim=-1)
+        adist = torch.where(act[..., 0] > 0.5, adist,
+                            torch.full_like(adist, 1e3))
+        gate_l.append(adist.min(dim=1).values)
         emb = policy.encode(obs)
         h = policy.step(emb, h)
         d = policy.dist(policy.features(emb, h))
@@ -92,7 +101,8 @@ def _rollout(policy, sim, log, starts, horizon, burn_in,
             torch.stack(rew_l), final_obs, torch.stack(col_l),
             torch.stack(err_l), dead,
             torch.stack(dis_l) if dis_l else None,
-            torch.stack(pxy_l), torch.stack(pth_l))
+            torch.stack(pxy_l), torch.stack(pth_l),
+            torch.stack(gate_l))
 
 
 def train_clp_reactive(cfg: Config, log: GlobalLog,
@@ -139,7 +149,7 @@ def train_clp_reactive(cfg: Config, log: GlobalLog,
                           generator=gen)
         starts = pool[i]
         (burn_obs, obs_seq, act_seq, rewards, final_obs, cols, errs,
-         dead, dis, pxy, pth) = _rollout(
+         dead, dis, pxy, pth, dmin) = _rollout(
              policy, sim, log, starts, c.horizon,
              c.burn_in, reactive, w1_thresh, perturb, gen,
              w_churn=getattr(c, "w_churn", 0.0))
@@ -181,6 +191,13 @@ def train_clp_reactive(cfg: Config, log: GlobalLog,
                 mu[1:].reshape((T - 1) * B, -1, 2),
                 pxy[:-1].reshape(-1, 2), pxy[1:].reshape(-1, 2),
                 pth[:-1].reshape(-1), pth[1:].reshape(-1))
+            ch = ch.view(T - 1, B)
+            d0 = getattr(c, "cons_gate_d0", 0.0)
+            if d0 > 0.0:
+                from ..consistency import proximity_gate
+                g = proximity_gate(dmin[1:], d0,
+                                   getattr(c, "cons_gate_w", 3.0))
+                ch = ch * g
             cons = ch.mean()
             actor_loss = actor_loss + w_cons * cons
 
@@ -240,7 +257,8 @@ def eval_both_worlds(cfg, policy, log, rsim, w1_thresh=0.25,
             ("reactive", rsim, True, pool_r)):
         starts = pool[torch.randint(len(pool), (batch,), device=device,
                                     generator=gen)]
-        (_, _, _, rewards, _, cols, errs, dead, _, _, _) = _rollout(
+        (_, _, _, rewards, _, cols, errs, dead, _, _, _,
+         _) = _rollout(
             policy, sim, log, starts, c.horizon, c.burn_in, reactive,
             w1_thresh, stochastic=False)
         out[name] = {"reward": float(rewards.mean()),

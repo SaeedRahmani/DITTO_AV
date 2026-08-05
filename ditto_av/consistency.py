@@ -16,6 +16,14 @@ from torch import Tensor
 from .egosim import _wrap
 
 
+def proximity_gate(dmin: Tensor, d0: float, width: float) -> Tensor:
+    """(B,) in (0,1): ~1 when the nearest actor is far (> d0), ~0 when
+    near — consistency pressure fades exactly where reactivity lives
+    (the CARLA split: commitment fixed layout collisions on empty road
+    and doubled vehicle collisions near traffic)."""
+    return torch.sigmoid((dmin - d0) / width)
+
+
 def plan_churn_lat(prev_plan: Tensor, plan: Tensor, prev_xy: Tensor,
                    xy: Tensor, prev_theta: Tensor, theta: Tensor
                    ) -> Tensor:
