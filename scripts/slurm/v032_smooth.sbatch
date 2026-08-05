@@ -19,6 +19,7 @@ set -euo pipefail
 export OMP_NUM_THREADS=1 PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
 export WANDB_DISABLED=1 XDG_CACHE_HOME=$HOME/ditto_out/cache
 SIGMA_YR=${SIGMA_YR:-0.5}
+W_CHURN=${W_CHURN:-0.0}
 STEPS=${STEPS:-3500}
 TAG=${TAG:-v032_d3sm}
 PY=$HOME/envs/ditto_gpu/bin/python
@@ -30,7 +31,7 @@ $PY scripts/v032_train_smooth.py \
     --champion $HOME/ditto_out/b2d_v02_999s/checkpoints/clp_rl.pt \
     --champion-cfg $HOME/ditto_out/b2d_v02_999s_cpu.yaml \
     --out $HOME/ditto_out/$TAG \
-    --sigma-yawrate $SIGMA_YR --steps $STEPS \
+    --sigma-yawrate $SIGMA_YR --w-churn $W_CHURN --steps $STEPS \
     --n-ensemble 2 --p-reactive 0.5 --device cuda
 # stage the ckpt where configs/diag_v032_sm.yaml expects it (the
 # "current arm" slot — only a gate-passing round keeps it)

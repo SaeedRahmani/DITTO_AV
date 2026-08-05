@@ -83,6 +83,24 @@ S1/driving gates. 3x3 stays a canary, never a selector.
 
 ## 9. Ledger
 
+- 2026-08-05 AXIS-1 ROUND 2: job 10583611 (participation), sigma_yr
+  1.0, 6000 steps. SECOND MISS, informative: old currency mostly
+  recovered (reactive 0.668 vs rx 0.685, was 0.654 in round 1) but
+  smoothness DID NOT MOVE — S1b yr_flips 26.4 (round 1: 24.2), ya_p95
+  11.35 (12.24), churn 0.249 (0.215). Both sigmas plateau at the same
+  wobble: the executor low-passes plan churn into a weak yaw-rate
+  shadow, and stochastic rollouts bury the mean policy's churn under
+  exploration noise — the channel cannot see below that floor.
+  AXIS 1 CLOSED per the round-2 pre-registration.
+- 2026-08-05 AXIS-2 ROUND 1 pre-registered BEFORE the run: price the
+  churn ITSELF in reactive rollouts — w_churn 0.5 (churn in meters;
+  policy sits at 0.2-0.4 -> 0.1-0.2 reward tax; expert floor 0.013 ->
+  negligible), sigma_yawrate 0 (ONE axis at a time), 6000 steps (the
+  committed capacity for extra-objective runs). Machinery: commit
+  909c515, torch term pinned to the audit metric. Go/no-go unchanged:
+  reactive >= 0.68 AND yr_flips <= 7.1 AND ya_p95 <= 5.7. On a miss
+  at gradient-visible churn: examine entropy_coef interplay before
+  any Axis-3 move (aux losses).
 - 2026-08-05 AXIS-1 ROUND 1: job 10582600 (a100-small, 54 min),
   sigma_yr 0.5, 3500 steps. Wobble HALVED but gate missed: S1b
   yr_flips 24.2 (gate 7.1), ya_p95 12.24 (gate 5.7), churn 0.38 ->

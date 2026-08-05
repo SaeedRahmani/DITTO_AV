@@ -51,6 +51,7 @@ def main():
     ap.add_argument("--champion-cfg", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--sigma-yawrate", type=float, default=0.5)
+    ap.add_argument("--w-churn", type=float, default=0.0)
     ap.add_argument("--steps", type=int, default=3500)
     ap.add_argument("--n-ensemble", type=int, default=2)
     ap.add_argument("--p-reactive", type=float, default=0.5)
@@ -64,6 +65,7 @@ def main():
     cfg.device = device
     cfg.clp.rl_steps = args.steps
     cfg.clp.sigma_yawrate = args.sigma_yawrate   # TRAIN sims only
+    cfg.clp.w_churn = args.w_churn               # rollout-only term
 
     log = GlobalLog([Path(args.data) / "b2d_train.npz"], device=device)
     raw = np.load(Path(args.data) / "b2d_train.npz")
@@ -94,6 +96,7 @@ def main():
     vrsim = ReactiveEgoSim(vlog, vsw, models, vraw["act_id"],
                            vsim_p.p, vsim_p.r)
     report = {"sigma_yawrate": args.sigma_yawrate,
+              "w_churn": args.w_churn,
               "clp_sm": eval_both_worlds(cfg, policy, vlog, vrsim,
                                          W1_THRESH)}
     # clp_rx baseline row on the same held-out sims
