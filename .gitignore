@@ -9,9 +9,12 @@ videos
 .pytest_cache
 checkpoints/*
 .vscode
-# ignore bulky run outputs but track small result/summary files
+# ignore bulky run outputs but track small summary files
 runs/**
 !runs/**/
-!runs/**/*.md
 !runs/**/*.json
 runs/smoke/
+
+# only README files are tracked; plans, notes, drafts and run ledgers stay local
+*.md
+!README.md
