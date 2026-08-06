@@ -157,7 +157,7 @@ abstraction goes matters (output head yes, dynamics action no).
 Note the closest published analogue to our no-distillation setting is
 TCP-traj w/o distillation (49.30/20.45); all starred baselines distill
 Think2Drive expert features.
-Policy triage (Phase-0a, 3 seeds + dev-10): latent-BC beats
+Policy triage (Phase-0a, 3 seeds + test-10): latent-BC beats
 DITTO-multi closed-loop at gen-2 scale on completion/SR while multi
 holds a small DS edge on the 220 — report both rows; the
 when-does-imagination-matching-help analysis is a core contribution.
@@ -212,7 +212,7 @@ online-RL upper reference), NOT sensor-based UniAD/VAD without the
 explicit caveat. Performance program (no compromises): 1000-clip data
 scale, training-length scaling (all runs so far were smoke-scale:
 wm 6000 steps), closed-loop-selected hyperparameters, >=3 seeds on the
-final config, wedge-directed fixes; 220-route benchmark run twice —
+final config, wedge-directed fixes; full 220-route benchmark run twice —
 gen-1 (small-data, dress rehearsal + ablation row) and gen-2 final.
 
 ### Phase 2 — Bench2Drive (paper benchmark)

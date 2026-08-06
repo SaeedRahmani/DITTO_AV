@@ -27,7 +27,7 @@ class EnvConfig:
     # and only the BC head outputs waypoints, tracked by a PID at
     # deployment with the executed control fed back to the WM. The v2
     # answer to gen3_wp's action-channel drift (wp-as-WM-action lost
-    # dev-10 to control actions). Requires action_space: continuous.
+    # test-10 to control actions). Requires action_space: continuous.
     wp_head: bool = False
     # appended observation dims beyond the vehicle rows (e.g. Bench2Drive
     # route conditioning: 16 = near/far command point + one-hot command)

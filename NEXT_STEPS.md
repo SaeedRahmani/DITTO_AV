@@ -11,7 +11,7 @@ verdicts live in runs/ and the settled-facts list below.
 
 **GEN-4 DITTO-WP CLOSED (2026-08-02): the DITTO-loyal imagination
 refinement of the wp head LOSES to plain BC at EVERY dose — 5-point
-curve, all dev-10 (champion BC = 30.49/83.2, 20/30):**
+curve, all test-10 (champion BC = 30.49/83.2, 20/30):**
 | variant | score/compl | full |
 |---|---|---|
 | v1: kl 0.1 + divergent starts | 3.46/50.4 | 4/30 |
@@ -38,22 +38,22 @@ CHAMPION UNCHANGED: gen3_wph BC + rec (220: DS 22.10 / SR 39.1%).
 State: GEN-3 Phases 0 AND 1 are CLOSED. **Champion = gen3_wph rec**
 (waypoint BC head on the reused gen3_clean control-action WM,
 WaypointTracker + reverse recovery; configs/diag_gen3_wph_bc_rec.yaml;
-ckpts ~/ditto_out/b2d_gen3_wph): **220-route FINAL DS 22.10 /
+ckpts ~/ditto_out/b2d_gen3_wph): **full 220-route FINAL DS 22.10 /
 completion 68.7% / SR 39.1%** (runs/bench220_gen3wph) — project
 records; SR beats all published baselines (DriveAdapter 33.08).
-Phase-5 seed bars exist (dev-10 seeds 0/1/2: 30.49/25.86/28.45,
+Phase-5 seed bars exist (test-10 seeds 0/1/2: 30.49/25.86/28.45,
 mean ~28.3 +- 2.3 — full-pipeline retrains s1/s2).
-The COMPLETE post-champion probe ledger (7 verdicts, all dev-10-gated,
+The COMPLETE post-champion probe ledger (7 verdicts, all test-10-gated,
 evidence in runs/carla_smoke/gen3_wph_era/) is in the sections below —
 read it before proposing any deployment tweak or BC-sampling change:
 everything cheap has been measured; upweighting family DEAD (both
-doses collapse penalty), 3-route 3x3 now actively MISLEADS vs dev-10
-(lw2: 45.40 3x3 vs 15.64 dev-10 — even short-route closed-loop is not
-a selector; dev-10 is the minimum honest signal).
+doses collapse penalty), 3-route 3x3 now actively MISLEADS vs test-10
+(lw2: 45.40 3x3 vs 15.64 test-10 — even short-route closed-loop is not
+a selector; test-10 is the minimum honest signal).
 Binding constraint for DS 40+: the 104/220 in-game-budget timeouts
 (plan slows/stalls in obstructed+dense states, state-level OOD).
 PROBE LEDGER FINAL (2026-08-01): SEVEN consecutive post-220 probes
-failed the dev-10 gate — v12/v14g (speed), gap1/gap2 (corridor),
+failed the test-10 gate — v12/v14g (speed), gap1/gap2 (corridor),
 lw/lw2 (upweight), cap 512x3 (20.40/68.7, 10/30: capacity HURT —
 sharper copy-prior, timeouts 14). The champion config is a genuine
 local optimum on every cheap axis; do NOT burn more compute on
@@ -75,7 +75,7 @@ what-transfers arc. Check `outputs/PIPELINE_STATUS.md` +
 `squeue -u $USER` at session start (self-driving chains may be in
 flight).
 
-Benchmark rows banked (runs/bench220*, all 220 routes each):
+Benchmark rows banked (runs/bench220*, all full 220 routes each):
 | model | DS | completion | success |
 |---|---|---|---|
 | gen-1 kl01 multi (297 clips) | 11.47 | 53.5% | 18.2% |
@@ -90,7 +90,7 @@ DS trails sensor SOTA (~60, all with expert-feature distillation;
 TCP-traj w/o distillation: 49.30/20.45).
 
 Phase-0 verdicts (2026-07-30/31, all committed):
-- 0a: **BC beats DITTO-multi closed-loop at scale** (3 seeds + dev-10:
+- 0a: **BC beats DITTO-multi closed-loop at scale** (3 seeds + test-10:
   27.78/70.1% vs 22.51/64.2%) — BC is the deployed policy; the
   when-does-imagination-matching-help question is a paper contribution
   (Phase-1 highway says multimodal data; B2D at scale says BC).
@@ -103,13 +103,13 @@ Phase-0 verdicts (2026-07-30/31, all committed):
   scripts/waypoint_check.py certifies waypoint targets
   (WAYPOINT_CHECK_OK: phys .069, backward 0, lateral .33 m).
   Frame fact: in the compass frame FORWARD = -y, LATERAL = x.
-- 0d: **route-PID oracle scores 100.00 smoke / 94.00 dev-10 (30/30
+- 0d: **route-PID oracle scores 100.00 smoke / 94.00 test-10 (30/30
   routes, incl the wedge route)** — waypoint-tracking ceiling ==
   benchmark max; RoutePIDDriver in ditto_av/carla_agent.py
   (configs/diag_route_pid.yaml), also the paper's privileged
   rule-based reference row. GO for Phase 1.
 - gen3_clean (cleaned-obs BC retrain, runs/b2d_gen3_clean): smoke
-  25.36/82.7% (up from 22.12/65.8%); dev-10 ~19.2/75.3%, 16/30 full —
+  25.36/82.7% (up from 22.12/65.8%); test-10 ~19.2/75.3%, 16/30 full —
   completion up, penalty mixed (single-seed noise). Cleanup's main
   role: certified poses for Phase-1 targets.
 
@@ -131,7 +131,7 @@ mini end-to-end train + deployment-tail run on 12 clips):
    world round-trip identity on a curved trajectory.
 **v1 VERDICT (2026-07-31, jobs 10556343/4/5): wp-BC LOSES.**
 3x3 11.99/58.4%/0.301 (vs gen3_clean control-BC 25.36/82.7%/0.297);
-dev-10 ~19.3/60.3% (vs ~19.2/75.3%). Same penalty, far less completion.
+test-10 ~19.3/60.3% (vs ~19.2/75.3%). Same penalty, far less completion.
 Diagnosis (runs/carla_smoke tick logs, agent_ticks_gen3_wp_3x3.jsonl):
 - NOT inert (the plan-copy fear): plans command v_wp~3.4 mean, agent
   commits to lateral maneuvers. Failure is the opposite: plan DRIFT
@@ -158,9 +158,9 @@ Probe round VERDICT (2026-07-31, jobs 10556814/5; 3x3 each):
 - multi wp head collapses (7.34/25.1): BC>multi extends to waypoint
   actions, stronger than for control actions.
 - completion still 62 vs control-BC 82.7 — plan drift remains the
-  binding constraint; if dev-10 confirms, the next training-side lever
+  binding constraint; if test-10 confirms, the next training-side lever
   list: shorter wp horizon (k=4), prev-action noise augmentation.
-dev-10 on rec VERDICT (jobs 10557053/4): **GATE FAILED — no 220.**
+test-10 on rec VERDICT (jobs 10557053/4): **GATE FAILED — no 220.**
 wp+rec 16.37/69.0%/0.251 (12/30 full) vs v1 19.27/60.3 (6/30) vs
 gen3_clean control-BC ~19.2/75.3 (16/30) vs gen2_10x BC 27.78/70.1.
 Recovery is a real, consistent lever (completion +8.7, penalty -0.06,
@@ -179,20 +179,20 @@ into the WM (training-consistent). DITTO heads skipped in this mode
 (12-dim head cannot drive a 3-dim-action dream; BC>multi settled for
 both action types anyway). env config: action_space continuous +
 wp_head true; same npz cache as wp mode (a8074aa357d4 — has both
-action and wp). Gates: pytest + mini e2e, 3x3 (plain + rec), dev-10,
-220 only if it beats gen2_10x BC dev-10.
+action and wp). Gates: pytest + mini e2e, 3x3 (plain + rec), test-10,
+220 only if it beats gen2_10x BC test-10.
 **3x3 VERDICT (2026-07-31, train 10557266, eval 10557267):
 BREAKTHROUGH.** plain 48.98/73.5%/pen 0.542 (6/9 full) — nearly 2x
 the best composed 3x3 ever banked; rec 33.16/86.1%/0.341 (7/9, best
 completion banked). The output-parameterization hypothesis (TCP-traj
 lesson) confirmed once the action-channel drift was removed; penalty
 0.542 = far cleaner driving. plain-vs-rec trades penalty vs
-completion; dev-10 on BOTH = jobs 10557439/40 (A/B splits). 220 gate:
-beat gen2_10x BC dev-10 27.78/70.1.
-**dev-10 VERDICT: GATE PASSED.** wph+rec 30.49/83.2%/0.335 (20/30
+completion; test-10 on BOTH = jobs 10557439/40 (A/B splits). 220 gate:
+beat gen2_10x BC test-10 27.78/70.1.
+**test-10 VERDICT: GATE PASSED.** wph+rec 30.49/83.2%/0.335 (20/30
 full - record) beats the champion 27.78/70.1; plain 29.69/67.6 (13/30,
 29 runs - one rep lost, winner unaffected). Reverse recovery earns its
-keep at dev-10 scale in wph too (completion +15.6 over plain).
+keep at test-10 scale in wph too (completion +15.6 over plain).
 **FINAL 220 LAUNCHED on gen3_wph_bc_rec** (2026-07-31 ~17:30): 19
 chunks wph220_00..18 = jobs 10557555-10557573 (participation/visual
 alternating), collector 10557574 -> runs/bench220_gen3wph (self-
@@ -206,7 +206,7 @@ eliminated (9 blocked vs 136 in gen-1 era); 104/220 routes now die at
 the ~200 s in-game budget ("Failed - TickRuntime", mean completion
 47.6% at cutoff; completed routes take 65 s) with min_speed 2750.
 SPEED is the binding constraint for completion AND penalty.
-DEPLOYMENT-LEVER LEDGER (2026-08-01, all dev-10, gate = rec
+DEPLOYMENT-LEVER LEDGER (2026-08-01, all test-10, gate = rec
 30.49/83.2/0.335 20-30 full; verdicts committed):
 - v_max 12 / 14+gain: NEGATIVE (21.55/75.3; cap engaged 16% of ticks
   but mean speed unchanged 1.4 m/s — standstill time dominates).
@@ -224,7 +224,7 @@ DEPLOYMENT-LEVER LEDGER (2026-08-01, all dev-10, gate = rec
 CONCLUSION (echoes the control-era settled lesson): deployment levers
 are exhausted; the binding constraint is PLAN QUALITY IN
 STOPPED/OBSTRUCTED (OOD) STATES — training-side.
-TRAINING-SIDE ROUND (2026-08-01, all dev-10):
+TRAINING-SIDE ROUND (2026-08-01, all test-10):
 - lw@4/2 (launch 4x + maneuver 2x upweight): 19.72/78.4/0.258 — fixed
   launches (blocked 1/30) but penalty collapsed. GATE FAILED.
 - lw2 (launch 2x only): 15.64/75.2/0.185 — WORSE penalty at the lower
@@ -261,7 +261,7 @@ success; our gap is imitation quality, not a ceiling.
 **Phase 0 — correctness & triage review (gates everything; IN PROGRESS)**
 - 0a Policy-objective triage: BC beat multi closed-loop at gen-2 scale
   (22.12/65.8% vs 16.80/48.1% smoke)! Confirm: BC on seeds s1/s2 +
-  BC dev-10 vs multi dev-10. If BC holds, the deployed policy AND the
+  BC test-10 vs multi test-10. If BC holds, the deployed policy AND the
   anchor story need rethink (paper finding either way: when does
   imagination matching help? Phase-1 says multimodal data; B2D may be
   effectively unimodal per-state — measure with the multimodality
@@ -273,7 +273,7 @@ success; our gap is imitation quality, not a ceiling.
   replay_frame_check-style exact test to future-pose extraction
   (frame convention pi/2 again — never trust, always replay-test).
 - 0d Control-ceiling test: PID-tracking GROUND-TRUTH future waypoints
-  (privileged oracle) on the 3 smoke routes + dev-10. This bounds the
+  (privileged oracle) on the 3 smoke routes + test-10. This bounds the
   waypoint abstraction: expect near-expert scores; go/no-go for
   Phase 1. Also calibrates the PID gains offline of any learning.
 - 0e Protocol audit: published baselines run the SENSORS track; we run
@@ -314,7 +314,7 @@ imagination-DAgger (perturbed-start WM rollouts relabeled via
 retrieval) — one axis at a time, closed-loop selected.
 
 **Phase 5 — final protocol (no cherry-picking)**
-3 seeds of the final config; dev-10 select; ONE honest 220 run
+3 seeds of the final config; test-10 select; ONE honest 220 run
 (+2 more reps if budget allows for variance); per-ability error
 analysis; full comparison table with track caveats.
 
