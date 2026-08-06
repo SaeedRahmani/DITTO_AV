@@ -72,7 +72,19 @@ RULES = [
 ]
 
 
+def dirty_files(root: Path) -> set:
+    """Paths with uncommitted changes. Never rewritten: in a shared
+    repo those edits belong to whoever is mid-task on that worktree
+    (here: another session's video-renderer patches, deliberately
+    uncommitted across every branch)."""
+    out = subprocess.run(["git", "status", "--porcelain"], cwd=root,
+                         capture_output=True, text=True, check=True)
+    return {line[3:].strip() for line in out.stdout.splitlines()
+            if line[:2] != "??"}
+
+
 def tracked_files(root: Path):
+    skip = dirty_files(root)
     out = subprocess.run(["git", "ls-files"], cwd=root,
                          capture_output=True, text=True, check=True)
     for line in out.stdout.splitlines():
@@ -80,6 +92,9 @@ def tracked_files(root: Path):
         if p.suffix not in EXTS:
             continue
         if any(str(p).startswith(d) for d in SKIP_DIRS):
+            continue
+        if line in skip:
+            print(f"SKIP (uncommitted changes): {line}")
             continue
         yield root / p
 
