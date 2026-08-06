@@ -115,35 +115,28 @@ def dump_town(client, town_npz: str, town_carla: str, out: Path,
 
 
 def merge_bands(town: str, out: Path):
-    """Merge band npzs into the final per-town file (rounded-key
-    dedup across band overlaps)."""
+    """Merge band npzs into the final per-town file (vectorized
+    rounded-key dedup across band overlaps; the per-row loop version
+    OOMed on Town13's ~2.5M rows)."""
     parts = sorted(out.glob(f"{town}_furniture_band*.npz"))
     assert parts, f"no band files for {town}"
-    cen, ext, yaw, lab, src = [], [], [], [], []
-    seen = set()
-    for p in parts:
-        d = np.load(p)
-        for i in range(len(d["center"])):
-            k = (int(d["label"][i]), int(d["source"][i]),
-                 round(float(d["center"][i, 0]), 1),
-                 round(float(d["center"][i, 1]), 1),
-                 round(float(d["center"][i, 2]), 1),
-                 round(float(d["extent"][i, 0]), 1))
-            if k in seen:
-                continue
-            seen.add(k)
-            cen.append(d["center"][i]); ext.append(d["extent"][i])
-            yaw.append(d["yaw"][i]); lab.append(d["label"][i])
-            src.append(d["source"][i])
+    ds = [np.load(p) for p in parts]
+    cen = np.concatenate([d["center"] for d in ds])
+    ext = np.concatenate([d["extent"] for d in ds])
+    yaw = np.concatenate([d["yaw"] for d in ds])
+    lab = np.concatenate([d["label"] for d in ds])
+    src = np.concatenate([d["source"] for d in ds])
+    key = np.stack([lab.astype(np.float64), src.astype(np.float64),
+                    np.round(cen[:, 0], 1), np.round(cen[:, 1], 1),
+                    np.round(cen[:, 2], 1), np.round(ext[:, 0], 1)], 1)
+    _, idx = np.unique(key, axis=0, return_index=True)
+    idx.sort()
     np.savez_compressed(
         out / f"{town}_furniture.npz",
-        center=np.array(cen, dtype=np.float32),
-        extent=np.array(ext, dtype=np.float32),
-        yaw=np.array(yaw, dtype=np.float32),
-        label=np.array(lab, dtype=np.int16),
-        source=np.array(src, dtype=np.int8),
-        labels=np.load(parts[0])["labels"])
-    print(f"{town}: merged {len(parts)} bands -> {len(cen)} boxes")
+        center=cen[idx], extent=ext[idx], yaw=yaw[idx],
+        label=lab[idx], source=src[idx], labels=ds[0]["labels"])
+    print(f"{town}: merged {len(parts)} bands, "
+          f"{len(cen)} -> {len(idx)} boxes")
 
 
 def main():
