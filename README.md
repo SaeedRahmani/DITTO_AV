@@ -1,30 +1,14 @@
 # DITTO-AV: Offline Imitation Learning with World Models for Autonomous Driving
 
-Closed-loop imitation learning for driving, trained **entirely offline**. The
-policy is never rolled out in a simulator during training: it is trained
-on-policy inside a world built from the recorded logs themselves, and rewarded
-for staying close to what the expert did in that same scene. Built on **DITTO**
-([DeMoss et al., 2023](https://arxiv.org/abs/2302.03086)).
+This repository adapts **DITTO** ([DeMoss et al., 2023](https://arxiv.org/abs/2302.03086),
+offline imitation learning inside a learned world model) to **autonomous
+driving**, with a driving-native factorization of the world and its reward.
 
-**The problem.** Behavior cloning breaks under covariate shift — it never sees
-its own mistakes, so it never learns to recover. The usual fixes cost either an
-online simulator or a learned model of the entire scene, which the policy then
-exploits.
-
-**The approach.**
-
-1. **Factor the world.** The ego moves by analytic kinematics — never learn
-   what is already known. Everything exogenous (traffic, route, lights) comes
-   from the log, either replayed directly or advanced by a learned traffic
-   model.
-2. **Reward only what the agent controls.** A time-tolerant kernel matches the
-   simulated ego's state — position, heading, speed — against the expert's in
-   the same scene. No traffic enters the reward, so there is nothing to game.
-   Off the expert path, reward is earned by *returning* to it: the recovery
-   incentive behavior cloning cannot represent.
-3. **Let the simulator be the judge, never the trainer.** Bench2Drive
-   closed-loop in CARLA is the only verdict; the training world never grades
-   itself.
+**Core idea.** Build a world model from offline driving logs. Then learn a
+policy *fully offline* by unrolling it inside that world from expert start
+states and rewarding closeness to expert trajectories — on-policy imitation
+without a simulator, which corrects the covariate shift that breaks behavior
+cloning.
 
 ## Status — under active development
 
@@ -39,68 +23,47 @@ periodically as runs land. Scores are Bench2Drive closed-loop **driving score
 | v0.2 | log replayed as the world; reward = ego-state match | 76.10 / 75.88 (full 220 routes); 85.63 / 83.60 (test-10) | frozen |
 | v0.3 | v0.2 + learned reactive traffic model | 82.53 (test-10) | frozen |
 | v0.3.1 | v0.3 + static map geometry | 66.01 / 74.89 (test-10) | reopened |
-| v0.3.2 | v0.3 + smoothness reward channels | in progress | active |
+| v0.3.2 | v0.3 + plan-consistency (smoothness) reward | 82.80 (test-10) | active |
 
 Two variants are reported where two seeds/configs were run. **test-10** is the
 development gate: 10 Bench2Drive routes (A-half 3514, 3255, 26405, 25381,
 25378; B-half 25424, 2091, 27494, 17569, 28198) × 3 repetitions = 30 runs.
-**full 220 routes** is the full Bench2Drive closed-loop benchmark, run only on a
-model that has already cleared test-10.
+**full 220 routes** is the complete Bench2Drive closed-loop benchmark, run only
+on a model that has already cleared test-10.
 
-### What separates the versions
-
-Each version changes what the training world is made of, and therefore what the
-reward can grade. v0.1 unrolled a learned RSSM latent and matched the whole
-latent, which mostly graded traffic rather than driving. v0.2 replays the
-logged clip as the world, moves the ego analytically, and grades only the ego's
-own state. v0.3 keeps that and returns agency to the traffic through a learned
-per-agent model, so other vehicles react to the ego.
-
-v0.2 and v0.3 differ almost entirely in *which* collisions they have:
-
-| test-10 collisions | v0.2 | v0.3 |
-|---|---|---|
-| with vehicles | 9 / 12 | **6** |
-| with static layout | 0 / 1 | 7 |
-
-v0.3's reactive traffic reduces vehicle collisions by 33–50%. Its training
-world contains no static geometry, so driving close to walls costs nothing
-during training and costs 7 layout collisions in CARLA. v0.3.1 added road
-geometry to close that gap and did not: the objects actually hit are map
-furniture — fences, props, vegetation — standing *on* drivable area, which a
-lane-based drivability signal cannot express. That axis is now reopened, since
-CARLA does expose the collidable furniture offline even though the annotations
-and OpenDRIVE do not.
+v0.3.2's measured variant drives *smoother than the expert* — 6.7 steering sign
+flips per 100 ticks against the expert's 9.8 and v0.3's 18.1 — and takes its
+static-layout collisions from 7 to 0 with no map data at all, which reframes
+v0.3.1's negative: the wobble was the furniture-hitting mechanism, not missing
+geometry. It is not banked, because the same commitment that kills the wobble
+costs half the reactivity dividend: vehicle collisions 6 -> 12 against a
+pre-registered ceiling of 8.
 
 ### Videos
 
-Closed-loop CARLA rollouts, same routes rendered for both versions. `2d` is the
-bird's-eye state render, `3d` is the CARLA camera. These are the test-10 routes
-that both versions complete cleanly — **DS 100, route completion 100%, no
-collisions** — spanning five towns and five scenario types. The routes that
-still fail are the ones in the collision table above; these clips show what the
-policy does when it works, on in-development checkpoints rather than a finished
-system.
+Closed-loop CARLA rollouts of the **v0.3.2** policy (mean-plan consistency,
+`w_cons` 0.5) on three routes it completes without collisions. Each pair is ONE
+run recorded two ways: the bird's-eye view is the simulated state drawn over
+the town's OpenDRIVE geometry, the camera view is CARLA. Previews are trimmed
+GIFs; full-quality mp4s are in [docs/media/](docs/media/).
 
-| route | town | scenario | v0.2 | v0.3 |
-|---|---|---|---|---|
-| 25378 | Town03 | yield to emergency vehicle | [2d](docs/media/v02_route25378_2d.mp4) · [3d](docs/media/v02_route25378_3d.mp4) | [2d](docs/media/v03_route25378_2d.mp4) · [3d](docs/media/v03_route25378_3d.mp4) |
-| 25381 | Town05 | hazard at side lane | [2d](docs/media/v02_route25381_2d.mp4) · [3d](docs/media/v02_route25381_3d.mp4) | [2d](docs/media/v03_route25381_2d.mp4) · [3d](docs/media/v03_route25381_3d.mp4) |
-| 25424 | Town11 | construction obstacle, two-way road | [2d](docs/media/v02_route25424_2d.mp4) · [3d](docs/media/v02_route25424_3d.mp4) | [2d](docs/media/v03_route25424_2d.mp4) · [3d](docs/media/v03_route25424_3d.mp4) |
-| 26405 | Town15 | static cut-in | [2d](docs/media/v02_route26405_2d.mp4) | [2d](docs/media/v03_route26405_2d.mp4) |
-| 17569 | Town12 | sequential lane change | [2d](docs/media/v02_route17569_2d.mp4) | [2d](docs/media/v03_route17569_2d.mp4) |
-
-<video src="https://github.com/SaeedRahmani/DITTO_AV/raw/main/docs/media/v03_route25424_3d.mp4" controls width="100%"></video>
-
-### Next experiments (todo)
-
-- **E3 — factored-latent retest**: latent matching inside the
-  (ego | learned-traffic) factorization, closing the question v0.1 opened.
-- **v0.3.2 smoothness**: yaw-rate reward channel, then an in-world plan-churn
-  penalty and a policy-side temporal-consistency loss.
-- **full 220-route run** for the v0.3 line, once a test-10 gate is cleared.
-- **Paper** covering the v0.2 result, the v0.3 collision decomposition, and the
-  v0.3.1 negative result.
+<table>
+<tr>
+<td width="50%"><img src="docs/media/v032_route27494_2d.gif" width="100%" alt="Bird's-eye rollout, Town04"></td>
+<td width="50%"><img src="docs/media/v032_route27494_3d.gif" width="100%" alt="Camera rollout, Town04"></td>
+</tr>
+<tr><td colspan="2" align="center"><sub>Town04 · <a href="docs/media/v032_route27494_2d.mp4">2d</a> · <a href="docs/media/v032_route27494_3d.mp4">3d</a></sub></td></tr>
+<tr>
+<td width="50%"><img src="docs/media/v032_route17569_2d.gif" width="100%" alt="Bird's-eye rollout, Town12"></td>
+<td width="50%"><img src="docs/media/v032_route17569_3d.gif" width="100%" alt="Camera rollout, Town12"></td>
+</tr>
+<tr><td colspan="2" align="center"><sub>Town12 · <a href="docs/media/v032_route17569_2d.mp4">2d</a> · <a href="docs/media/v032_route17569_3d.mp4">3d</a></sub></td></tr>
+<tr>
+<td width="50%"><img src="docs/media/v032_route26405_2d.gif" width="100%" alt="Bird's-eye rollout, Town15"></td>
+<td width="50%"><img src="docs/media/v032_route26405_3d.gif" width="100%" alt="Camera rollout, Town15"></td>
+</tr>
+<tr><td colspan="2" align="center"><sub>Town15 · <a href="docs/media/v032_route26405_2d.mp4">2d</a> · <a href="docs/media/v032_route26405_3d.mp4">3d</a></sub></td></tr>
+</table>
 
 ## Layout
 
