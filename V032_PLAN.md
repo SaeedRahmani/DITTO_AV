@@ -83,6 +83,17 @@ S1/driving gates. 3x3 stays a canary, never a selector.
 
 ## 9. Ledger
 
+- 2026-08-06 ROUND 5b VERDICT (jobs 10588075/76) + FINAL CLOSE:
+  s2-gated DS A 89.95 / B 72.81 -> mean 81.38, veh 12 (25424 newly
+  flipped, 2091+28198 fail) -> BANK RULE FAIL. The recipe has strong
+  seed variance in CARLA (s1 86.80/9 vs s2 81.38/12) and s1 is the
+  strong draw. Per pre-registration the campaign CLOSES: s1-gated
+  (v032_d3gate_s1, staged copy restored to b2d_v032_sm) is the FINAL
+  ARM — DS 86.80 (all-time dev-10 high), S1a 10.9 expert-level,
+  layout 0, 30/30, veh 9 = ONE over the dividend gate -> NOT banked
+  as champion by the letter of the gate; champion remains v0.2 999s.
+  A bench-220 characterization run (confirmer, NON-gating, standard
+  for every terminal model) completes the record for the paper.
 - 2026-08-06 ROUND 5 VERDICT (jobs 10588070/71, gated s1): DS A 92.0
   / B 81.6 -> mean 86.80 = ALL-TIME PROJECT HIGH on dev-10 (999s
   champion 85.63, clp_rx 82.53); 30/30; S1a 10.9 flips (PASS <=14.8,
@@ -353,6 +364,19 @@ training) landed on veh 12: the trade-off is real, not an artifact.
 Round 4 (proximity-gated consistency) recovered ALL driving reward
 (both seeds beat clp_rx in-sim) but re-admitted wobble near traffic;
 its CARLA behavior is untested by rule.
+
+SESSION-2 ADDENDUM (2026-08-06, after the collision autopsy and
+rounds 5/5b): the proximity-gated s1 arm is the campaign's terminal
+model — dev-10 DS 86.80 (ALL-TIME project high, +1.2 over the v0.2
+champion's 85.63 and +4.3 over clp_rx), steering at expert level
+(S1a 10.9 vs rx 18.1), layout collisions 0, 30/30 — one vehicle
+collision over the dividend gate (9 vs 8; 6 of the 9 are pre-existing
+failures shared with clp_rx). The creep-lock mechanism (consistency
+makes launch hesitation sticky) was found by forensics and its
+release by proximity gating was predicted and confirmed. Not banked
+as champion by the letter of the pre-registered gate; recorded as the
+project's best driving + smoothest model. Superseded leads below are
+kept for the record.
 
 Next-session leads, in order of information value: (1) autopsy the 12
 vehicle collisions in the s2 dev-10 ticks vs clp_rx's 6 (same routes;
