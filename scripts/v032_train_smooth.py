@@ -5,7 +5,7 @@ Identical to scripts/v03_train_reactive.py (champion fine-tune in the
 reactive world, 3500 steps, p_r 0.5, W1 0.25) with ONE knob: the
 training sims price motion quality (clp.sigma_yawrate > 0). The
 both-world G2 verdict is computed with sigma_yawrate = 0 so the
-yardstick is the SAME one that graded clp_rx — the arm must win on
+yardstick is the SAME one that graded clp_rx — the variant must win on
 the old currency while trained on the new one.
 
 Usage:

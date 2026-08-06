@@ -9,8 +9,8 @@ later), and submits the next stage's jobs plus itself.
 
 Stages:
   confirm3x3  pick anchor-grid winner from the 3x3 confirmations,
-              launch dev-10 (winner vs v3) split over the fast lanes
-  dev10       aggregate dev-10, pick overall winner, launch the full
+              launch test-10 (winner vs v3) split over the fast lanes
+  dev10       aggregate test-10, pick overall winner, launch the full
               220-route benchmark in <=4h chunks
   bench220    aggregate benchmark chunks into the final table
 
@@ -199,7 +199,7 @@ def stage_confirm3x3():
             f"({t12['n']} run) — Town12 leaderboard path "
             f"{'OK' if t12['completion'] > 0 else 'DUBIOUS'}")
     except Exception as e:
-        log(f"  t12 smoke MISSING ({e}) — dev-10 will still launch; "
+        log(f"  t12 smoke MISSING ({e}) — test-10 will still launch; "
             "Town12 was boot-verified, watch its routes")
 
     new_json = [p for n, (p, _) in CANDIDATES.items()
@@ -256,15 +256,15 @@ def stage_dev10():
                 subprocess.run(["cp", p, os.path.join(
                     REPO, "runs/carla_smoke", f"d10_{name}_{t}.json")])
     git_commit([os.path.join(REPO, "runs/carla_smoke")],
-               f"dev-10 eval: {winner} vs v3")
+               f"test-10 eval: {winner} vs v3")
 
     live = {k: v for k, v in summary.items() if v}
     if not live:
-        log("dev-10 empty — stopping before the 220 benchmark; investigate")
+        log("test-10 empty — stopping before the 220 benchmark; investigate")
         return
     overall = max(live, key=lambda k: live[k]["completion"])
     oconf = wconf if overall == winner else V3_CONF
-    log(f"OVERALL WINNER for the 220-route benchmark: {overall}")
+    log(f"OVERALL WINNER for the full 220-route benchmark: {overall}")
 
     ids = re.findall(r'<route id="(\d+)"',
                      open(os.path.join(B2D, "leaderboard/data/bench2drive220.xml")).read())
@@ -296,7 +296,7 @@ def stage_bench220():
     if not s:
         log("no benchmark records — investigate chunk jobs")
         return
-    log(f"FINAL 220-route result for {overall}: driving score {s['score']:.2f}, "
+    log(f"FINAL full 220-route result for {overall}: driving score {s['score']:.2f}, "
         f"completion {s['completion']:.1f}%, penalty {s['penalty']:.3f} "
         f"({s['n']}/220 routes scored, {s['completed']} completed)")
     if s["n"] < 220:
@@ -309,7 +309,7 @@ def stage_bench220():
               open(os.path.join(REPO, "runs/bench220/summary.json"), "w"),
               indent=2)
     git_commit([os.path.join(REPO, "runs/bench220")],
-               f"220-route benchmark: {overall} score {s['score']:.2f} "
+               f"full 220-route benchmark: {overall} score {s['score']:.2f} "
                f"completion {s['completion']:.1f}% ({s['n']} routes)")
 
 

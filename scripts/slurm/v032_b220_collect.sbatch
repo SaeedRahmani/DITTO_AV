@@ -7,7 +7,7 @@
 #SBATCH --mem-per-cpu=2G
 #SBATCH --output=/scratch/%u/ditto_av/outputs/slurm-%j.out
 #SBATCH --account=research-ceg-tp
-# Aggregate v0.3.2 220-route chunks (tags v032b220_<LABEL>_*) into
+# Aggregate v0.3.2 full 220-route chunks (tags v032b220_<LABEL>_*) into
 # outputs/v032/bench220_<LABEL>.json + a PIPELINE_STATUS line.
 set -euo pipefail
 : "${LABEL:?set LABEL}"

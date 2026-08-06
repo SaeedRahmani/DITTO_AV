@@ -289,7 +289,7 @@ def test_token_policy_shapes():
 
 def test_clp_end_to_end_smoke(glog, tmp_path):
     from ditto_av.config import Config
-    from ditto_av.trainers.clp_trainer import (evaluate_in_sim,
+    from ditto_av.trainers.clp_trainer import (evaluate_in_wm,
                                                sim_from_config,
                                                train_clp_bc, train_clp_rl)
     cfg = Config()
@@ -315,6 +315,6 @@ def test_clp_end_to_end_smoke(glog, tmp_path):
     pol.load_state_dict(torch.load(
         Path(cfg.run_dir) / "checkpoints" / "clp_rl.pt"))
     sim = sim_from_config(cfg, glog)
-    m = evaluate_in_sim(pol, sim, glog, c.horizon, c.burn_in,
+    m = evaluate_in_wm(pol, sim, glog, c.horizon, c.burn_in,
                         batch=8, n_batches=1)
     assert all(np.isfinite(v) for v in m.values())

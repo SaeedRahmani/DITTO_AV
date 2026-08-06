@@ -39,7 +39,7 @@ $PY scripts/v032_train_smooth.py \
     --steps $STEPS --seed $SEED \
     --n-ensemble 2 --p-reactive 0.5 --device cuda
 # stage the ckpt where configs/diag_v032_sm.yaml expects it (the
-# "current arm" slot — only a gate-passing round keeps it)
+# "current variant" slot — only a gate-passing round keeps it)
 mkdir -p $HOME/ditto_out/b2d_v032_sm/checkpoints
 cp $HOME/ditto_out/$TAG/clp_rx.pt \
    $HOME/ditto_out/b2d_v032_sm/checkpoints/clp_rx.pt

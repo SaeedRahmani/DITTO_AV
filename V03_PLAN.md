@@ -16,8 +16,8 @@ what a latent encodes.
 ## 1. Goal
 
 v0.2 proved the mechanism (on-policy imitation in a replayed world,
-pure ego-state-matching reward; 220-route DS ~76; RL > same-net BC
-+12 dev-10) but its world is NON-REACTIVE: replayed traffic ignores the
+pure ego-state-matching reward; full 220-route DS ~76; DITTO-AV v0.2 > same-net BC
++12 test-10) but its world is NON-REACTIVE: replayed traffic ignores the
 ego. v0.3 learns the ONE thing replay cannot provide — reactions:
 
 - Keep the factorization. Ego = analytic kinematics (never learn what
@@ -118,14 +118,14 @@ W0-passing model). Serializing them wastes wall-clock.
   analogue, on both synthetic and real clips; regression-tested).
 - D3: **W2 curriculum**: init from the v0.2 champion; anneal
   replay->reactive batch ratio; KL anchor to the replay-trained
-  policy; in-sim eval in BOTH worlds every N steps (divergence between
+  policy; in-WM eval in BOTH worlds every N steps (divergence between
   the two eval verdicts is itself a diagnostic).
 
 ## 6. Phase E — EXTERNAL GATES + SCIENCE (V3-M4)
 
-- E1 **W3, the only verdicts that count**: 3x3 canary -> dev-10 vs the
+- E1 **W3, the only verdicts that count**: 3x3 canary -> test-10 vs the
   v0.2 champion band (83.60-85.63; seed bars from main's G5) -> ONE
-  220 only for a clear dev-10 winner. The learned world NEVER grades
+  220 only for a clear test-10 winner. The learned world NEVER grades
   itself (most-replicated lesson of the whole project).
 - E2 reactivity-dividend analysis: per-scenario-family deltas
   (interaction-heavy families should move most; divergent-start
@@ -158,7 +158,7 @@ PRIORITY CLAIMS: arXiv 2512.18662 (Dec 2025).
 
 ## 9. Status ledger (newest first)
 
-- 2026-08-05 — **W3 dev-10 verdict (clp_rx): DS 82.53/100% 30/30 —
+- 2026-08-05 — **W3 test-10 verdict (clp_rx): DS 82.53/100% 30/30 —
   gate NOT cleared (band 83.60-85.63, sigma 2.3: statistical tie with
   pure, nominally below shaped). THE REACTIVITY DIVIDEND IS CONFIRMED:
   vehicle collisions 6 = best of any model ever (shaped 9, pure 12,

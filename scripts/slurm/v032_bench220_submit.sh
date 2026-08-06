@@ -1,10 +1,10 @@
 #!/bin/bash
-# v0.3.2 220-route characterization launcher (run on a LOGIN node).
+# v0.3.2 full 220-route characterization launcher (run on a LOGIN node).
 #   scripts/slurm/v032_bench220_submit.sh <diag_config> <run_label>
 # Same chunking as v02_bench220_submit.sh (12 routes x 1 rep per job,
 # spread over participation+visual, collector afterany) but runs the
 # WORKTREE code via v032_carla_chain.sbatch. NON-gating: this
-# characterizes the terminal arm at scale for the record/paper.
+# characterizes the terminal variant at scale for the record/paper.
 set -euo pipefail
 CONF=${1:?diag config}
 LABEL=${2:?run label}

@@ -132,7 +132,7 @@ class RewardParams:
     # (v0.3 behavior); active only when the caller passes the sim
     # ego's yaw rate to reward().
     sigma_yawrate: float = 0.0  # rad/s
-    collision_penalty: float = 0.0  # 0 = thesis-pure arm
+    collision_penalty: float = 0.0  # 0 = thesis-pure variant
     # only front/side impacts count for the penalty: a slower-than-log
     # ego being rear-ended by replayed (non-reactive) traffic is a
     # ghost artifact, not the policy's fault

@@ -43,7 +43,7 @@ proxy on CARLA tick logs). Populations:
   (a) expert logs (target band + label noise floor),
   (b) BC/champion/clp_rx plans open-loop on logged obs,
   (c) clp_rx closed-loop in EgoSim,
-  (d) clp_rx dev-10 CARLA tick logs (existing
+  (d) clp_rx test-10 CARLA tick logs (existing
       agent_ticks_v03rx_d10A/B.jsonl — no new CARLA runs needed).
 Decision tree: churn already in (b) -> labels/policy axis; born in
 (c) -> reward/entropy axis; only in (d) -> tracker-interaction axis.
@@ -59,18 +59,18 @@ Decision tree: churn already in (b) -> labels/policy axis; born in
 3. Policy-side temporal-consistency aux loss (BC and/or RL).
 4. Refit expert tracks with a smoother if A0 shows the label noise
    floor dominates.
-5. Control arm (attribution only, NOT the contribution): eval-only
+5. Control variant (attribution only, NOT the contribution): eval-only
    tracker damping on the unchanged clp_rx — plan EMA 0.5 (~0.2 s
    lag). Bounds how much jiggle is tracker-side vs model-side.
 
 ### 1.4 Pre-registered gates
 
-Driving gate (pinned NOW, judges every arm; same dev-10 A/B chain
+Driving gate (pinned NOW, judges every variant; same test-10 A/B chain
 protocol as W3): DS mean(A,B) >= 82.5 (clp_rx tie-or-beat), vehicle
 collisions <= 8 over the 30 runs (dividend kept; clp_rx = 6),
-completion 30/30. An arm that smooths but breaks this gate FAILS.
+completion 30/30. An variant that smooths but breaks this gate FAILS.
 Smoothness gate S1 (numbers pinned at A0 close, 2026-08-05, BEFORE
-any arm's training/eval runs; multiples committed once, per metric):
+any variant's training/eval runs; multiples committed once, per metric):
 - S1a CARLA: steer sign flips/100 ticks <= 14.8
   (1.5x expert-log steer flips 9.84; clp_rx today: 18.1).
 - S1b EgoSim closed-loop (deterministic, val, B=192 H=40, the A0
@@ -78,18 +78,18 @@ any arm's training/eval runs; multiples committed once, per metric):
   AND yaw-accel p95 <= 5.7 rad/s^2 (2x floor 2.83 — 2x not 1.5x
   because a p95 of a second difference is the noisiest of the three
   estimators; clp_rx today: 39.2 / 24.6).
-The EMA control arm (1.3.5) is attribution-only and is NOT judged by
+The EMA control variant (1.3.5) is attribution-only and is NOT judged by
 S1/driving gates. 3x3 stays a canary, never a selector.
 
 ## 9. Ledger
 
-- 2026-08-06 BENCH-220 CHARACTERIZATION of the terminal s1-gated arm
+- 2026-08-06 BENCH-220 CHARACTERIZATION of the terminal s1-gated variant
   (19 chunks + retry of chunk 00 after a transient Lustre stdlib
   read failure; collector 10588113): 220/220 runs, DS 79.57 vs the
   v0.2 champions' 75.88/76.10 (+3.5 AT SCALE, the project's best
   @220 by a wide margin), RC 99.2, 216/220 full completions, veh 93,
-  lay 10. Non-gating by design; the dev-10 veh-gate letter-miss does
-  not extend to a scale collapse — the arm is the strongest @220
+  lay 10. Non-gating by design; the test-10 veh-gate letter-miss does
+  not extend to a scale collapse — the variant is the strongest @220
   model the project has produced. Record complete for the paper.
 - 2026-08-06 ROUND 5b VERDICT (jobs 10588075/76) + FINAL CLOSE:
   s2-gated DS A 89.95 / B 72.81 -> mean 81.38, veh 12 (25424 newly
@@ -97,47 +97,47 @@ S1/driving gates. 3x3 stays a canary, never a selector.
   seed variance in CARLA (s1 86.80/9 vs s2 81.38/12) and s1 is the
   strong draw. Per pre-registration the campaign CLOSES: s1-gated
   (v032_d3gate_s1, staged copy restored to b2d_v032_sm) is the FINAL
-  ARM — DS 86.80 (all-time dev-10 high), S1a 10.9 expert-level,
+  ARM — DS 86.80 (all-time test-10 high), S1a 10.9 expert-level,
   layout 0, 30/30, veh 9 = ONE over the dividend gate -> NOT banked
   as champion by the letter of the gate; champion remains v0.2 999s.
   A bench-220 characterization run (confirmer, NON-gating, standard
   for every terminal model) completes the record for the paper.
 - 2026-08-06 ROUND 5 VERDICT (jobs 10588070/71, gated s1): DS A 92.0
-  / B 81.6 -> mean 86.80 = ALL-TIME PROJECT HIGH on dev-10 (999s
+  / B 81.6 -> mean 86.80 = ALL-TIME PROJECT HIGH on test-10 (999s
   champion 85.63, clp_rx 82.53); 30/30; S1a 10.9 flips (PASS <=14.8,
   expert-level; |dsteer| p95 0.147 vs rx 0.36); layout 0. The
   25381 creep-lock RELEASED exactly as predicted (route clean at 100
   x3). Vehicle collisions 9 vs gate <= 8 — ONE over: 6 shared with
   clp_rx (3255+28198, pre-existing) + 3 on 2091 (non-deterministic
-  encounter variant — different actor/coords than the uncond arm's).
+  encounter variant — different actor/coords than the uncond variant's).
   3 of 4 binding gates pass; veh gate FAILS by one collision on one
   route. Predictions scored: creep-release CONFIRMED, layout/S1a
   CONFIRMED, near-traffic wobble leak confirmed mild (10.9 vs 6.7).
 - 2026-08-06 ROUND 5b pre-registered BEFORE the run — final
   selection step, then the campaign closes either way: the OTHER
-  same-recipe seed (v032_d3gate_s2; in-sim reactive 0.703, better
-  S1b diagnostics) goes to dev-10 A/B. Dev-10 selection among
+  same-recipe seed (v032_d3gate_s2; in-WM reactive 0.703, better
+  S1b diagnostics) goes to test-10 A/B. Test-10 selection among
   same-recipe seeds is settled project practice (v0.2 champion =
   dev10_winner among variants). BANK RULE, committed now: s2-gated
   banks as v0.3.2 champion iff veh <= 8 AND DS mean >= 82.5 AND
   30/30 AND S1a <= 14.8. Otherwise close with s1-gated recorded as
-  best smooth arm (veh gate unmet by 1). No further arms after 5b.
+  best smooth variant (veh gate unmet by 1). No further variants after 5b.
 - 2026-08-06 COLLISION AUTOPSY (session 2, existing artifacts only):
-  the s2 arm's +6 vehicle collisions are NOT diffuse reactivity loss —
+  the s2 variant's +6 vehicle collisions are NOT diffuse reactivity loss —
   they are TWO deterministic scenario flips (25381: DS 100->60,
-  mustang at fixed coords x3 reps; 2091: charger x3), while the arm
+  mustang at fixed coords x3 reps; 2091: charger x3), while the variant
   FIXED two routes rx failed (3514, 27494); 3255/28198 fail
   identically for both models (pre-existing). Tick forensics on
-  25381: the arm's own plan commands a crawl (v_t 2.2-3.6 for 60% of
+  25381: the variant's own plan commands a crawl (v_t 2.2-3.6 for 60% of
   the route at ~1.4 m/s; rx launches to 7 immediately) -> LAUNCH
   HESITATION MADE STICKY BY CONSISTENCY (once the mean plan says
   slow, the loss makes the next plan agree), timing shifts, ends in
   a low-speed following contact — the known v0.2 bumper-contact
   regime, not an evasion failure.
 - 2026-08-06 ROUND 5 pre-registered BEFORE the run: the round-4
-  PROXIMITY-GATED arm targets exactly this (consistency fades to ~0
+  PROXIMITY-GATED variant targets exactly this (consistency fades to ~0
   near actors; the 25381 creep happens with na up to 27), so it goes
-  to dev-10 A/B — seed s1 (the conservative pick its own rule named).
+  to test-10 A/B — seed s1 (the conservative pick its own rule named).
   GATE STRUCTURE refinement, committed with justification: S1b is
   DEMOTED from gate to diagnostic — (i) V03_PLAN §3: the sim NEVER
   grades itself, CARLA is the only verdict; S1b was a lane-economy
@@ -151,7 +151,7 @@ S1/driving gates. 3x3 stays a canary, never a selector.
   frees the launch); risk: S1a lands between 6.7 and 18 if near-
   traffic wobble leaks into the average.
 - 2026-08-06 AXIS-3 ROUND 4 RESULT (jobs 10587827/28) + CAMPAIGN
-  CLOSE: gated arm recovers driving FULLY — reactive 0.693 (s1) /
+  CLOSE: gated variant recovers driving FULLY — reactive 0.693 (s1) /
   0.703 (s2), BOTH beat clp_rx 0.685; replay col 0.068 <= 0.07 — but
   MISSES the S1b ya_p95 bar (13.27 / 6.31 vs 5.7): fading consistency
   near traffic re-admits wobble exactly where the metric samples too
@@ -173,20 +173,20 @@ S1/driving gates. 3x3 stays a canary, never a selector.
   AND replay collision <= 0.07 AND S1b ya_p95 <= 5.7 (S1b-flips
   recorded, known closed-loop floor ~11); then the median... with 2
   seeds, the LOWER-reactive seed goes (conservative pick). CARLA
-  gates unchanged (1.4). This is the LAST arm of the session's
+  gates unchanged (1.4). This is the LAST variant of the session's
   campaign: pass or miss, the campaign report follows.
 - 2026-08-06 AXIS-3 CARLA VERDICT (jobs 10587720 d10A / 10587721
-  d10B, s2 arm): DS A 84.0 / B 81.6 -> mean 82.80 (gate >= 82.5
+  d10B, s2 variant): DS A 84.0 / B 81.6 -> mean 82.80 (gate >= 82.5
   PASS; clp_rx 82.53). Completion 30/30 PASS. S1a steer flips
   6.7/100 (gate <= 14.8; clp_rx 18.1; the EXPERT ITSELF 9.8) PASS —
-  the arm drives SMOOTHER THAN THE EXPERT; |dsteer| p95 0.058 (rx
+  the variant drives SMOOTHER THAN THE EXPERT; |dsteer| p95 0.058 (rx
   0.36), wp1 churn proxy 0.046 = label level. LAYOUT COLLISIONS
   7 -> 0: the v0.3.1 objective, achieved with ZERO map data — the
   wobble itself was the furniture-hitting mechanism, not missing
   layout knowledge (reframes the v0.3.1 negative). VEHICLE
   collisions 6 -> 12 FAIL (gate <= 8): the reactivity dividend
-  halved — same count as the EMA arm's 12, but at DS 82.8 vs EMA's
-  76.1. VERDICT: arm NOT banked (one gate failed; the mission says
+  halved — same count as the EMA variant's 12, but at DS 82.8 vs EMA's
+  76.1. VERDICT: variant NOT banked (one gate failed; the mission says
   the dividend is not for sale). BANKED FINDINGS: (1) differentiable
   mean-plan consistency is the mechanism that kills the jiggle and it
   transfers to CARLA in full; (2) smoothness eliminates layout
@@ -204,9 +204,9 @@ S1/driving gates. 3x3 stays a canary, never a selector.
   vs 7.1 FAIL — NOT waived, recorded as failed. Note: even w_cons 1.0
   with churn AT the execution floor flips 10.8, so residual flips are
   closed-loop micro-corrections, not churn; the 7.1 number was pinned
-  from open-loop floors. The gate is NOT refined; the in-sim go/no-go
+  from open-loop floors. The gate is NOT refined; the in-WM go/no-go
   was lane economy, lanes are free, and the BINDING 1.4 gates are
-  CARLA-side — s2 goes to dev-10 A/B to be judged by those exactly as
+  CARLA-side — s2 goes to test-10 A/B to be judged by those exactly as
   pre-registered (DS >= 82.5, veh col <= 8, 30/30, S1a <= 14.8).
   (w_cons 0.25 Pareto point 10587614 still running; completes the
   curve, does not affect this decision.)
@@ -221,7 +221,7 @@ S1/driving gates. 3x3 stays a canary, never a selector.
   before more knob-turning: (a) SEED BARS for the w_cons 0.5 recipe
   (seeds 1, 2 vs the existing seed 0) to learn whether 0.661 vs the
   0.68 bar is signal or training-seed noise (v0.2 G5 precedent: DS
-  seed-varies, completion is robust; in-sim reward variance never
+  seed-varies, completion is robust; in-WM reward variance never
   measured); (b) one more Pareto point w_cons 0.25 seed 0. Decision
   rule, committed now: if mean(3 seeds) reactive >= 0.68, the
   MEDIAN-reactive seed (not max — no cherry-picking) goes to CARLA
@@ -247,7 +247,7 @@ S1/driving gates. 3x3 stays a canary, never a selector.
   currency ~tied (reactive 0.681 vs 0.685). ROOT CAUSE FOUND in the
   telemetry: training reward sat at -0.96 -> the penalty measured
   ~2.4 m/tick of SAMPLED churn = exploration noise, 10x the mean
-  policy's 0.2 m. All three arms priced signals that exploration
+  policy's 0.2 m. All three variants priced signals that exploration
   noise drowns; the mean policy's indecision was never
   gradient-visible. AXIS 2 (sampled-reward form) CLOSED.
 - 2026-08-05 AXIS-3 ROUND 1 pre-registered BEFORE the run: price the
@@ -281,7 +281,7 @@ S1/driving gates. 3x3 stays a canary, never a selector.
   sigma_yr 0.5, 3500 steps. Wobble HALVED but gate missed: S1b
   yr_flips 24.2 (gate 7.1), ya_p95 12.24 (gate 5.7), churn 0.38 ->
   0.215; old-currency G2 REGRESSED vs clp_rx (reactive 0.654 vs
-  0.685, perr 1.71 vs 1.38) -> does NOT go to CARLA (in-sim no-go).
+  0.685, perr 1.71 vs 1.38) -> does NOT go to CARLA (in-WM no-go).
   Training telemetry: reward plateaus 0.22-0.28 from step 500 (init
   0.092) — at sigma 0.5 the channel is a CLIFF: residual wobble
   0.9-1.5 rad/s scores e^-1.6..e^-4.5 ~ 0, so no gradient through the
@@ -298,7 +298,7 @@ S1/driving gates. 3x3 stays a canary, never a selector.
 - 2026-08-05 AXIS-5 (EMA attribution) CLOSED — jobs 10582712 (d10A) /
   10582713 (d10B), visual; earlier 10582601/02 burned by the sbatch
   --export comma trap (documented in v032_carla_chain.sbatch).
-  UNCHANGED clp_rx + tracker ema 0.5: dev-10 A 89.67 (IDENTICAL to
+  UNCHANGED clp_rx + tracker ema 0.5: test-10 A 89.67 (IDENTICAL to
   clp_rx A, same 3 veh + 1 lay collisions) / B 62.60 (vs 75.40) ->
   mean 76.14 vs 82.53. Vehicle collisions 12 vs 6 — the 0.2 s plan
   lag DOUBLES vehicle collisions, all on the interaction-heavy B
@@ -320,14 +320,14 @@ S1/driving gates. 3x3 stays a canary, never a selector.
   low-reward 0.35 (drifts); clp_rx collects reward 0.770 > label
   replay 0.724 while wobbling 8x harder -> the reward PAYS MORE for
   churny driving than for near-perfect label execution. CARLA
-  (existing v03rx dev-10 ticks): steer flips 18.1/100 moving 16.8,
+  (existing v03rx test-10 ticks): steer flips 18.1/100 moving 16.8,
   |dsteer| p95 0.36, wp1 churn proxy 0.22 m (expert same-proxy
   0.038). VERDICT: jiggle is born in the RL stage (BC 0.037 -> RL
   0.166), amplified closed-loop, invisible to the reward. Labels are
   clean -> Axis 4 dead. Sim execution clean -> Axis 2 not the lever.
   PROCEED: Axis 1 (sigma_yawrate reward channel), sigma_yr = 0.5
   rad/s pre-registered (expert yr p95 0.497 costs exp(-0.5); clp_rx
-  wobble 1.5 rad/s costs exp(-4.5)). Axis 5 EMA arm = attribution.
+  wobble 1.5 rad/s costs exp(-4.5)). Axis 5 EMA variant = attribution.
 
 ## 2. Ops deltas vs V03_PLAN §7 (everything else inherits)
 
@@ -360,7 +360,7 @@ axis 5 proved test-time filtering spends the reactivity dividend;
 axis 3 (differentiable mean-plan consistency on dist means) is the
 working mechanism.
 
-CARLA-proven (s2 arm, w_cons 0.5): steering SMOOTHER THAN THE EXPERT
+CARLA-proven (s2 variant, w_cons 0.5): steering SMOOTHER THAN THE EXPERT
 (6.7 flips/100 vs expert 9.8, clp_rx 18.1; |dsteer| p95 6x lower),
 layout collisions 7 -> 0 with zero map data (the v0.3.1 objective,
 reached from the opposite direction — wobble WAS the furniture
@@ -370,12 +370,12 @@ that lives in constant replanning. Both smoothing routes (filter,
 training) landed on veh 12: the trade-off is real, not an artifact.
 
 Round 4 (proximity-gated consistency) recovered ALL driving reward
-(both seeds beat clp_rx in-sim) but re-admitted wobble near traffic;
+(both seeds beat clp_rx in-WM) but re-admitted wobble near traffic;
 its CARLA behavior is untested by rule.
 
 SESSION-2 ADDENDUM (2026-08-06, after the collision autopsy and
-rounds 5/5b): the proximity-gated s1 arm is the campaign's terminal
-model — dev-10 DS 86.80 (ALL-TIME project high, +1.2 over the v0.2
+rounds 5/5b): the proximity-gated s1 variant is the campaign's terminal
+model — test-10 DS 86.80 (ALL-TIME project high, +1.2 over the v0.2
 champion's 85.63 and +4.3 over clp_rx), steering at expert level
 (S1a 10.9 vs rx 18.1), layout collisions 0, 30/30 — one vehicle
 collision over the dividend gate (9 vs 8; 6 of the 9 are pre-existing
@@ -387,13 +387,13 @@ project's best driving + smoothest model. Superseded leads below are
 kept for the record.
 
 Next-session leads, in order of information value: (1) autopsy the 12
-vehicle collisions in the s2 dev-10 ticks vs clp_rx's 6 (same routes;
+vehicle collisions in the s2 test-10 ticks vs clp_rx's 6 (same routes;
 are they lead-follow, cut-in, or junction? does commitment delay
 braking or steering-avoidance?); (2) TTC-gated (not distance-gated)
 consistency — fade commitment only under closing velocity; (3)
 longitudinal/lateral split: keep lateral commitment (kills layout
 hits + jiggle), free the longitudinal plan (reactivity is mostly
-speed); (4) recalibrate the S1b in-sim proxy against measured
+speed); (4) recalibrate the S1b in-WM proxy against measured
 CLOSED-LOOP floors before it gates anything again (the 7.1/5.7 bars
 came from open-loop floors; the closed-loop corrective floor is ~11
 flips even with churn at the execution floor).
