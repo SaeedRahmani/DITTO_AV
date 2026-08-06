@@ -3,7 +3,7 @@
 
 Reads only committed evidence (runs/); writes paper/figures/*.{pdf,png}.
 Rerunnable end to end — no hand-entered numbers except the champion
-dev-10 reference (30.49, runs/carla_smoke/gen3_wph_era d10_wphr_*),
+test-10 reference (30.49, runs/carla_smoke/gen3_wph_era d10_wphr_*),
 which is also recomputed here from its jsons.
 
 Design: colorblind-safe fixed categorical assignment (multi=blue,
@@ -163,7 +163,7 @@ def fig4():
                 (champ - 0.4, len(rows) - 0.55), fontsize=7.5,
                 color=C_REF, ha="right")
     ax.set_yticks(y, [r for r, _ in rows], fontsize=8)
-    ax.set_xlabel("dev-10 driving score")
+    ax.set_xlabel("test-10 driving score")
     ax.set_title("Imagination refinement of the waypoint head: "
                  "every dose loses to BC", fontsize=9)
     ax.grid(axis="y", visible=False)

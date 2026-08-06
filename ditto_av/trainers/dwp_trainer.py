@@ -7,7 +7,7 @@ Three evidence-driven components on top of train_latent_policy:
    through the batched tracker port (plan -> control), with ego speed
    decoded from the latent — the rollout dynamics ARE the deployment
    stack (policy + tracker + WM-as-vehicle). gen-3 showed both naive
-   alternatives fail: waypoints as the WM action drift (dev-10 16.4 vs
+   alternatives fail: waypoints as the WM action drift (test-10 16.4 vs
    19.2), and a control-space DITTO head cannot emit plans at all.
 2. TASK-PROJECTED MATCHING: rewards are computed after projecting h
    through a frozen ridge probe h -> expert-waypoint labels. Raw latent

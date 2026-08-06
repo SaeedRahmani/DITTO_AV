@@ -7,7 +7,7 @@ already banked its in-model metrics (results/results.json: on-policy
 imagined-rollout latent match vs held-out expert windows, the
 expert-replay ceiling, action MAE/NLL, H-step obs MSE) — computed at
 train time with that run's era-correct data. This script JOINS those
-with the banked closed-loop results (3-route 3x3 and dev-10) and
+with the banked closed-loop results (3-route 3x3 and test-10) and
 reports Spearman rank correlations per metric.
 
 Scope: the CONTROL-action family (one action/label space, so MAE is
@@ -33,7 +33,7 @@ OUT_DIRS = [REPO / "runs/carla_smoke", REPO / "runs/carla_smoke/gen3_wph_era",
 CKPT_BASE = Path.home() / "ditto_out"
 
 # label, run dir, policy, closed-loop 3x3 file candidates,
-# dev-10 file pair (or None), family
+# test-10 file pair (or None), family
 REGISTRY = [
     ("kl01 multi",      "b2d_v3kl01",      "ditto_multi",
      ["kl01_3x3.json"], ["d10_kl01_A.json", "d10_kl01_B.json"], "control"),
@@ -190,9 +190,9 @@ def main():
     lines = ["# Phase-2: in-model metrics vs closed-loop (selector study)",
              "",
              f"{len(ctl)} control-family (run, policy) pairs; ground truth "
-             "= banked 3-route 3x3 (all) and dev-10 (subset).", "",
+             "= banked 3-route 3x3 (all) and test-10 (subset).", "",
              "| model | latent match | divergence | H-step MSE | MAE | NLL "
-             "| 3x3 compl | 3x3 score | dev-10 compl |", "|" + "---|" * 9]
+             "| 3x3 compl | 3x3 score | test-10 compl |", "|" + "---|" * 9]
     for r in sorted(rows, key=lambda r: -r["cl3_completion"]):
         f = lambda v, p=4: "-" if v is None or not np.isfinite(v) \
             else f"{v:.{p}f}"
@@ -204,7 +204,7 @@ def main():
             f"| {f(r['d10_completion'], 1)} |")
     lines += ["", "## Spearman rank correlations (control family)", "",
               "| metric | vs 3x3 completion | vs 3x3 score "
-              "| vs dev-10 completion |", "|---|---|---|---|"]
+              "| vs test-10 completion |", "|---|---|---|---|"]
     for m in metrics:
         cells = []
         for t in ("cl3_completion", "cl3_score", "d10_completion"):

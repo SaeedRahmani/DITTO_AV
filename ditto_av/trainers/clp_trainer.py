@@ -7,7 +7,7 @@ train_clp_rl  — the DITTO loop, driving-native: on-policy rollouts in
     closeness to the same-scene expert; A2C with lambda-returns, EMA
     target critic, entropy bonus, and a KL trust region to the frozen
     BC anchor (v0.1 settled lesson: the anchor is load-bearing).
-evaluate_in_sim — shared closed-loop metrics (G2 gate + selector).
+evaluate_in_wm — shared closed-loop metrics (G2 gate + selector).
 
 Rollouts are collected no-grad, then the GRU unroll is recomputed with
 grad on the stored obs/action sequences (same recompute pattern as
@@ -256,7 +256,7 @@ def train_clp_rl(cfg: Config, log: GlobalLog, seed: int = 0
 
 
 @torch.no_grad()
-def evaluate_in_sim(policy: TokenPolicy, sim: EgoSim, log: GlobalLog,
+def evaluate_in_wm(policy: TokenPolicy, sim: EgoSim, log: GlobalLog,
                     horizon: int, burn_in: int, batch: int = 256,
                     n_batches: int = 4, perturb: Optional[dict] = None,
                     seed: int = 0) -> dict:

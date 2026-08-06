@@ -7,7 +7,7 @@
 #SBATCH --mem-per-cpu=2G
 #SBATCH --output=/scratch/%u/ditto_av/outputs/slurm-%j.out
 #SBATCH --account=research-ceg-tp
-# Aggregate gen-2 220-route chunks (tags g3bc_*) — fresh prefix so the
+# Aggregate gen-2 full 220-route chunks (tags g3bc_*) — fresh prefix so the
 # committed gen-1 b220_* files can never contaminate the aggregate.
 set -euo pipefail
 PY=/scratch/$USER/ditto_av/envs/carla_eval/bin/python
@@ -33,7 +33,7 @@ for f in glob.glob("/scratch/srahmani/ditto_av/outputs/carla_results_g3bc_*.json
     subprocess.run(["cp", f, repo + "/runs/bench220_gen2bc/"])
 subprocess.run(["git", "-C", repo, "add", "runs/bench220_gen2bc"])
 subprocess.run(["git", "-C", repo, "commit", "-q", "-m",
-                f"GEN-2 FINAL 220-route benchmark: gen2_10x_bc score {s['score']:.2f} "
+                f"GEN-2 FINAL full 220-route benchmark: gen2_10x_bc score {s['score']:.2f} "
                 f"completion {s['completion']:.1f}% success {100*s['completed']/n:.1f}% ({n} routes)"])
 PYEOF
 echo "[$(date '+%Y-%m-%d %H:%M')] bench220_gen2bc collector done" >> /scratch/$USER/ditto_av/outputs/PIPELINE_STATUS.md

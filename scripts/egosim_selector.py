@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """G1 gate: does the egosim reward rank real closed-loop drivers?
 
-Drives the banked v0.1 wp-output models (known dev-10 truth, range
+Drives the banked v0.1 wp-output models (known test-10 truth, range
 3.46-30.49) through EgoSim with their full deployment semantics — RSSM
 posterior filter on the rebuilt obs, waypoint head, executed-control
 feedback through the torch tracker port — and rank-correlates the
-egosim score against the banked dev-10 numbers.
+egosim score against the banked test-10 numbers.
 
 v0.1's on-policy latent metric scored Spearman -0.60 on this exact
 question (runs/phase2_selector). The v0.2 reward must score clearly
@@ -42,8 +42,8 @@ from ditto_av.trainers.wm_trainer import load_world_model  # noqa: E402
 
 HOME_OUT = Path.home() / "ditto_out"
 
-# label, train config, ckpt dir, policy file, dev-10 (score, completion)
-# dev-10 numbers are the banked champion-config (rec) runs; see
+# label, train config, ckpt dir, policy file, test-10 (score, completion)
+# test-10 numbers are the banked champion-config (rec) runs; see
 # saeed/ver0.1 NEXT_STEPS + runs/carla_smoke/{gen3_wph_era,gen4_dwp}
 REGISTRY = [
     ("wph_bc_s0",   "configs/b2d_gen3_wph.yaml",
@@ -98,7 +98,7 @@ def load_model(cfg_path: str, ckpt_dir: Path, policy_name: str,
 def launch_starts(log: GlobalLog, pool: torch.Tensor,
                   n: int) -> torch.Tensor:
     """Start frames where the expert is (nearly) stopped but moves off
-    within 2 s — the launch states where dev-10 actually differentiated
+    within 2 s — the launch states where test-10 actually differentiated
     the banked models (41% of champion ticks were plan-GO-static)."""
     speed = log.ego[:, 3]
     ahead = torch.stack([speed[(pool + k).clamp(
@@ -208,7 +208,7 @@ def main():
     gen.manual_seed(0)
     starts = pool[torch.randint(len(pool), (args.windows,),
                                 generator=gen)].to(device)
-    # three batteries mirror where dev-10 differentiates: clean cruise,
+    # three batteries mirror where test-10 differentiates: clean cruise,
     # launches (stopped expert about to move), recovery from
     # perturbed poses (same-scene targets)
     batteries = {
@@ -277,7 +277,7 @@ def main():
              f"windows x {args.horizon} steps, burn-in {BURN_IN}; "
              "batteries: clean / launch / divergent (score = "
              "battery-mean late-half reward)", "",
-             "| model | sim score | pos err@H | col rate | dev-10 |",
+             "| model | sim score | pos err@H | col rate | test-10 |",
              "|---|---|---|---|---|"]
     for r in sorted(rows, key=lambda r: -r["sim_score"]):
         lines.append(f"| {r['label']} | {r['sim_score']:.3f} "
@@ -291,7 +291,7 @@ def main():
     verdict = ("PASS" if res["spearman_sim_score_vs_d10_score"] >= 0.4
                else "FAIL")
     lines += ["", f"**G1 VERDICT: {verdict}** "
-              "(gate: sim_score vs dev-10 score >= +0.4; v0.1 latent "
+              "(gate: sim_score vs test-10 score >= +0.4; v0.1 latent "
               "metric was -0.60 on the same question)"]
     (out / "selector.md").write_text("\n".join(lines) + "\n")
     print("\n".join(lines[-8:]))
