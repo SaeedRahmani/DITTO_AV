@@ -62,38 +62,37 @@ pre-registered ceiling of 8.
 ### Videos
 
 Closed-loop CARLA rollouts of the **v0.3.2** policy (mean-plan consistency,
-`w_cons` 0.5) on five test-10 routes it completes cleanly — DS 100, route
-completion 100%, no collisions — spanning five towns and five scenario types.
-Each pair is ONE run recorded two ways: the bird's-eye view is the simulated
-state drawn over the town's OpenDRIVE geometry, the camera view is CARLA.
-Previews are trimmed GIFs; full-quality mp4s are in [docs/media/](docs/media/).
+`w_cons` 0.5) on five routes it completes without collisions. Each pair is ONE
+run recorded two ways: the bird's-eye view is the simulated state drawn over
+the town's OpenDRIVE geometry, the camera view is CARLA. Previews are trimmed
+GIFs; full-quality mp4s are in [docs/media/](docs/media/).
 
 <table>
 <tr>
-<td width="50%"><img src="docs/media/v032_route25424_2d.gif" width="100%" alt="Bird's-eye rollout, construction obstacle on a two-way road, Town11"></td>
-<td width="50%"><img src="docs/media/v032_route25424_3d.gif" width="100%" alt="Camera rollout, construction obstacle on a two-way road, Town11"></td>
+<td width="50%"><img src="docs/media/v032_route27494_2d.gif" width="100%" alt="Bird's-eye rollout, Town04"></td>
+<td width="50%"><img src="docs/media/v032_route27494_3d.gif" width="100%" alt="Camera rollout, Town04"></td>
 </tr>
-<tr><td colspan="2" align="center"><sub>Construction obstacle, two-way road — Town11 · <a href="docs/media/v032_route25424_2d.mp4">2d</a> · <a href="docs/media/v032_route25424_3d.mp4">3d</a></sub></td></tr>
+<tr><td colspan="2" align="center"><sub>Town04 · <a href="docs/media/v032_route27494_2d.mp4">2d</a> · <a href="docs/media/v032_route27494_3d.mp4">3d</a></sub></td></tr>
 <tr>
-<td width="50%"><img src="docs/media/v032_route25378_2d.gif" width="100%" alt="Bird's-eye rollout, yielding to an emergency vehicle, Town03"></td>
-<td width="50%"><img src="docs/media/v032_route25378_3d.gif" width="100%" alt="Camera rollout, yielding to an emergency vehicle, Town03"></td>
+<td width="50%"><img src="docs/media/v032_route17569_2d.gif" width="100%" alt="Bird's-eye rollout, Town12"></td>
+<td width="50%"><img src="docs/media/v032_route17569_3d.gif" width="100%" alt="Camera rollout, Town12"></td>
 </tr>
-<tr><td colspan="2" align="center"><sub>Yielding to an emergency vehicle — Town03 · <a href="docs/media/v032_route25378_2d.mp4">2d</a> · <a href="docs/media/v032_route25378_3d.mp4">3d</a></sub></td></tr>
+<tr><td colspan="2" align="center"><sub>Town12 · <a href="docs/media/v032_route17569_2d.mp4">2d</a> · <a href="docs/media/v032_route17569_3d.mp4">3d</a></sub></td></tr>
 <tr>
-<td width="50%"><img src="docs/media/v032_route26405_2d.gif" width="100%" alt="Bird's-eye rollout, static cut-in, Town15"></td>
-<td width="50%"><img src="docs/media/v032_route26405_3d.gif" width="100%" alt="Camera rollout, static cut-in, Town15"></td>
+<td width="50%"><img src="docs/media/v032_route26405_2d.gif" width="100%" alt="Bird's-eye rollout, Town15"></td>
+<td width="50%"><img src="docs/media/v032_route26405_3d.gif" width="100%" alt="Camera rollout, Town15"></td>
 </tr>
-<tr><td colspan="2" align="center"><sub>Static cut-in — Town15 · <a href="docs/media/v032_route26405_2d.mp4">2d</a> · <a href="docs/media/v032_route26405_3d.mp4">3d</a></sub></td></tr>
+<tr><td colspan="2" align="center"><sub>Town15 · <a href="docs/media/v032_route26405_2d.mp4">2d</a> · <a href="docs/media/v032_route26405_3d.mp4">3d</a></sub></td></tr>
 <tr>
-<td width="50%"><img src="docs/media/v032_route17569_2d.gif" width="100%" alt="Bird's-eye rollout, sequential lane change, Town12"></td>
-<td width="50%"><img src="docs/media/v032_route17569_3d.gif" width="100%" alt="Camera rollout, sequential lane change, Town12"></td>
+<td width="50%"><img src="docs/media/v032_route3514_2d.gif" width="100%" alt="Bird's-eye rollout, Town13"></td>
+<td width="50%"><img src="docs/media/v032_route3514_3d.gif" width="100%" alt="Camera rollout, Town13"></td>
 </tr>
-<tr><td colspan="2" align="center"><sub>Sequential lane change — Town12 · <a href="docs/media/v032_route17569_2d.mp4">2d</a> · <a href="docs/media/v032_route17569_3d.mp4">3d</a></sub></td></tr>
+<tr><td colspan="2" align="center"><sub>Town13 · <a href="docs/media/v032_route3514_2d.mp4">2d</a> · <a href="docs/media/v032_route3514_3d.mp4">3d</a></sub></td></tr>
 <tr>
-<td width="50%"><img src="docs/media/v032_route27494_2d.gif" width="100%" alt="Bird's-eye rollout, blocked intersection, Town04"></td>
-<td width="50%"><img src="docs/media/v032_route27494_3d.gif" width="100%" alt="Camera rollout, blocked intersection, Town04"></td>
+<td width="50%"><img src="docs/media/v032_route26406_2d.gif" width="100%" alt="Bird's-eye rollout, Town04"></td>
+<td width="50%"><img src="docs/media/v032_route26406_3d.gif" width="100%" alt="Camera rollout, Town04"></td>
 </tr>
-<tr><td colspan="2" align="center"><sub>Blocked intersection — Town04 · <a href="docs/media/v032_route27494_2d.mp4">2d</a> · <a href="docs/media/v032_route27494_3d.mp4">3d</a></sub></td></tr>
+<tr><td colspan="2" align="center"><sub>Town04 · <a href="docs/media/v032_route26406_2d.mp4">2d</a> · <a href="docs/media/v032_route26406_3d.mp4">3d</a></sub></td></tr>
 </table>
 
 ## Layout
