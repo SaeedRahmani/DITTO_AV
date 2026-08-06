@@ -37,8 +37,16 @@ Key checkpoints (all under ~/ditto_out/):
 - Reports: v03_w0c/w0_report.json, v03_d3/d3_report.json
 - Layout geometry (v0.3.1 M1): /scratch/$USER/ditto_av/data/layout/
   (Town*_lanes.npz + xodr/); query module ditto_av/layout.py
-- Videos: runs/videos20 (v0.2, untracked), runs/videos20_v03 (v0.3,
-  untracked); backups in ~/ditto_out/videos20*/
+- Videos (2026-08-06, one folder per line's best model, each 10 dev-10
+  routes x {2d BEV over the town map, 3d chase cam, state.jsonl}):
+  /scratch/$USER/ditto_av/outputs/videos/{v0.1_gen3wph_bc,
+  v0.2_999s_shaped, v0.3_reactive_rx, v0.3.1_layout_s,
+  v0.3.2_smooth_cons}/ — MODEL.md in each names the checkpoint and
+  its per-route scores. Producer scripts/slurm/videos_best.sbatch
+  (REPO/CONF/VID/LABEL/ROUTES); the 2D can be re-rendered offline from
+  the state logs (scripts/render_bev_video.py, town geometry cached as
+  data/layout/Town*_bev.npz). Superseded: runs/videos20{,_v03} (v0.2 /
+  v0.3, no map under the BEV).
 
 ## 2. v0.3.1 mission
 
