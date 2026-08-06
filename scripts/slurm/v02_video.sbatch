@@ -28,12 +28,6 @@ VID=$OUT/videos
 mkdir -p $VID
 export XDG_CACHE_HOME=$BASE/cache
 export PYTHONPATH=$B2D/leaderboard:$B2D/scenario_runner:$BASE/carla_pythonapi:$REPO
-# Bench2Drive's route_scenario.get_all_scenario_classes() globs
-# ${SCENARIO_RUNNER_ROOT:-./}/srunner/scenarios/*.py — unset, it
-# resolves to $B2D/srunner (nonexistent), the class registry comes
-# up empty and EVERY scenario is skipped with a KeyError. Runs then
-# score background traffic only. Their run_evaluation.sh exports it.
-export SCENARIO_RUNNER_ROOT=$B2D/scenario_runner
 export CARLA_ROOT=$BASE/carla_root
 export SAVE_PATH=$VID   # unlocks the 100 m sensor rig radius (B2D flag)
 
