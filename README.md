@@ -10,26 +10,6 @@ states and rewarding closeness to expert trajectories — on-policy imitation
 without a simulator, which corrects the covariate shift that breaks behavior
 cloning.
 
-**What's new vs. DITTO (the paper contribution).**
-
-1. **Factored world, not a generated one.** The ego is advanced by analytic
-   kinematics — never learn what is already known — while everything exogenous
-   (traffic, route, lights) comes from the log, either replayed directly or
-   advanced by a learned per-agent traffic model. Only the part replay cannot
-   provide, how other agents react to the ego, is ever learned, which is also
-   the only part the policy could exploit.
-2. **Ego-state matching reward.** A time-tolerant kernel (`tau`) scores the
-   simulated ego against the expert's own trajectory in position, heading and
-   speed (`sigma_p`, `sigma_yaw`, `sigma_v`). Traffic never enters the reward,
-   so it grades driving rather than the scene. Two components proved necessary:
-   a **broad second position kernel** (`sigma_p2`, `p2_weight`) because a
-   single tight kernel floors out exactly where recovery must be learned, and
-   **rear-impact rejection** (`penalty_ignore_rear`) so a slower-than-log ego
-   rear-ended by non-reactive replayed traffic is not charged for it.
-3. **Driving-native evaluation.** Closed-loop Bench2Drive in CARLA — driving
-   score, route completion, and the per-class collision decomposition — against
-   same-network BC baselines. The training world never grades itself.
-
 ## Status — under active development
 
 The numbers below are current measurements, not final results, and are updated
@@ -62,38 +42,27 @@ pre-registered ceiling of 8.
 ### Videos
 
 Closed-loop CARLA rollouts of the **v0.3.2** policy (mean-plan consistency,
-`w_cons` 0.5) on five test-10 routes it completes cleanly — DS 100, route
-completion 100%, no collisions — spanning five towns and five scenario types.
-Each pair is ONE run recorded two ways: the bird's-eye view is the simulated
-state drawn over the town's OpenDRIVE geometry, the camera view is CARLA.
-Previews are trimmed GIFs; full-quality mp4s are in [docs/media/](docs/media/).
+`w_cons` 0.5) on three routes it completes without collisions. Each pair is ONE
+run recorded two ways: the bird's-eye view is the simulated state drawn over
+the town's OpenDRIVE geometry, the camera view is CARLA. Previews are trimmed
+GIFs; full-quality mp4s are in [docs/media/](docs/media/).
 
 <table>
 <tr>
-<td width="50%"><img src="docs/media/v032_route25424_2d.gif" width="100%" alt="Bird's-eye rollout, construction obstacle on a two-way road, Town11"></td>
-<td width="50%"><img src="docs/media/v032_route25424_3d.gif" width="100%" alt="Camera rollout, construction obstacle on a two-way road, Town11"></td>
+<td width="50%"><img src="docs/media/v032_route27494_2d.gif" width="100%" alt="Bird's-eye rollout, Town04"></td>
+<td width="50%"><img src="docs/media/v032_route27494_3d.gif" width="100%" alt="Camera rollout, Town04"></td>
 </tr>
-<tr><td colspan="2" align="center"><sub>Construction obstacle, two-way road — Town11 · <a href="docs/media/v032_route25424_2d.mp4">2d</a> · <a href="docs/media/v032_route25424_3d.mp4">3d</a></sub></td></tr>
+<tr><td colspan="2" align="center"><sub>Town04 · <a href="docs/media/v032_route27494_2d.mp4">2d</a> · <a href="docs/media/v032_route27494_3d.mp4">3d</a></sub></td></tr>
 <tr>
-<td width="50%"><img src="docs/media/v032_route25378_2d.gif" width="100%" alt="Bird's-eye rollout, yielding to an emergency vehicle, Town03"></td>
-<td width="50%"><img src="docs/media/v032_route25378_3d.gif" width="100%" alt="Camera rollout, yielding to an emergency vehicle, Town03"></td>
+<td width="50%"><img src="docs/media/v032_route17569_2d.gif" width="100%" alt="Bird's-eye rollout, Town12"></td>
+<td width="50%"><img src="docs/media/v032_route17569_3d.gif" width="100%" alt="Camera rollout, Town12"></td>
 </tr>
-<tr><td colspan="2" align="center"><sub>Yielding to an emergency vehicle — Town03 · <a href="docs/media/v032_route25378_2d.mp4">2d</a> · <a href="docs/media/v032_route25378_3d.mp4">3d</a></sub></td></tr>
+<tr><td colspan="2" align="center"><sub>Town12 · <a href="docs/media/v032_route17569_2d.mp4">2d</a> · <a href="docs/media/v032_route17569_3d.mp4">3d</a></sub></td></tr>
 <tr>
-<td width="50%"><img src="docs/media/v032_route26405_2d.gif" width="100%" alt="Bird's-eye rollout, static cut-in, Town15"></td>
-<td width="50%"><img src="docs/media/v032_route26405_3d.gif" width="100%" alt="Camera rollout, static cut-in, Town15"></td>
+<td width="50%"><img src="docs/media/v032_route26405_2d.gif" width="100%" alt="Bird's-eye rollout, Town15"></td>
+<td width="50%"><img src="docs/media/v032_route26405_3d.gif" width="100%" alt="Camera rollout, Town15"></td>
 </tr>
-<tr><td colspan="2" align="center"><sub>Static cut-in — Town15 · <a href="docs/media/v032_route26405_2d.mp4">2d</a> · <a href="docs/media/v032_route26405_3d.mp4">3d</a></sub></td></tr>
-<tr>
-<td width="50%"><img src="docs/media/v032_route17569_2d.gif" width="100%" alt="Bird's-eye rollout, sequential lane change, Town12"></td>
-<td width="50%"><img src="docs/media/v032_route17569_3d.gif" width="100%" alt="Camera rollout, sequential lane change, Town12"></td>
-</tr>
-<tr><td colspan="2" align="center"><sub>Sequential lane change — Town12 · <a href="docs/media/v032_route17569_2d.mp4">2d</a> · <a href="docs/media/v032_route17569_3d.mp4">3d</a></sub></td></tr>
-<tr>
-<td width="50%"><img src="docs/media/v032_route27494_2d.gif" width="100%" alt="Bird's-eye rollout, blocked intersection, Town04"></td>
-<td width="50%"><img src="docs/media/v032_route27494_3d.gif" width="100%" alt="Camera rollout, blocked intersection, Town04"></td>
-</tr>
-<tr><td colspan="2" align="center"><sub>Blocked intersection — Town04 · <a href="docs/media/v032_route27494_2d.mp4">2d</a> · <a href="docs/media/v032_route27494_3d.mp4">3d</a></sub></td></tr>
+<tr><td colspan="2" align="center"><sub>Town15 · <a href="docs/media/v032_route26405_2d.mp4">2d</a> · <a href="docs/media/v032_route26405_3d.mp4">3d</a></sub></td></tr>
 </table>
 
 ## Layout
