@@ -83,6 +83,14 @@ S1/driving gates. 3x3 stays a canary, never a selector.
 
 ## 9. Ledger
 
+- 2026-08-06 BENCH-220 CHARACTERIZATION of the terminal s1-gated arm
+  (19 chunks + retry of chunk 00 after a transient Lustre stdlib
+  read failure; collector 10588113): 220/220 runs, DS 79.57 vs the
+  v0.2 champions' 75.88/76.10 (+3.5 AT SCALE, the project's best
+  @220 by a wide margin), RC 99.2, 216/220 full completions, veh 93,
+  lay 10. Non-gating by design; the dev-10 veh-gate letter-miss does
+  not extend to a scale collapse — the arm is the strongest @220
+  model the project has produced. Record complete for the paper.
 - 2026-08-06 ROUND 5b VERDICT (jobs 10588075/76) + FINAL CLOSE:
   s2-gated DS A 89.95 / B 72.81 -> mean 81.38, veh 12 (25424 newly
   flipped, 2091+28198 fail) -> BANK RULE FAIL. The recipe has strong
