@@ -1,49 +1,78 @@
 # DITTO-AV: Offline Imitation Learning with World Models for Autonomous Driving
 
-This repository adapts **DITTO** ([DeMoss et al., 2023](https://arxiv.org/abs/2302.03086),
-offline imitation learning inside a learned world model) to **autonomous
-driving**, with a new multimodal latent-matching objective.
+This repository adapts the idea of **DITTO** ([DeMoss et al., 2023](https://arxiv.org/abs/2302.03086), offline imitation learning inside a learned world model) to **autonomous driving**, with a driving-native factorization of the world and its reward.
 
-**Core idea.** Train an RSSM world model on offline driving logs. Then learn a
-policy *fully offline* by unrolling it inside the world model from expert
-start states and rewarding latent closeness to expert trajectories — on-policy
-imitation without a simulator, which corrects the covariate shift that breaks
-behavior cloning.
+**Core idea.** Build a world model from offline driving logs. Then learn a policy *fully offline* by unrolling it inside that world from expert start states and rewarding closeness to expert trajectories. This is on-policy imitation without a simulator, which corrects the covariate shift that breaks behavior cloning.
 
-**What's new vs. DITTO (the paper contribution).**
+## Status: under active development
 
-1. **Multimodal nearest-mode matching** (`reward_mode: multi`). Driving is
-   multimodal: from the same blocked-lane state, one expert overtakes and
-   another slows down. DITTO's single-trajectory reward penalizes every valid
-   mode but the demonstrated one. We retrieve the K expert windows whose start
-   latent is nearest to the rollout's start and reward the *best-matching*
-   mode (max over K), so reproducing *any* expert behavior is rewarded.
-   Two stabilizers proved necessary in driving latent spaces: a
-   **contrastive baseline** (`n_negatives`) that subtracts the mean
-   similarity to random expert windows — raw latent similarity to *any*
-   plausible traffic state is ~0.9, leaving almost no signal — and a
-   **BC trust region** (`bc_init`, `bc_kl_coef`) that keeps imagination RL
-   from drifting into world-model exploits.
-2. **Vectorized world model.** Agent-centric kinematic features instead of
-   pixels: orders of magnitude cheaper, reproducible on CPU.
-3. **Driving-native evaluation.** Closed-loop collision rate / speed /
-   return, in-distribution and under traffic-density shift, against expert,
-   BC, and single-mode DITTO baselines.
+The numbers below are current measurements, not final results, and are updated
+periodically as runs land. Scores are Bench2Drive closed-loop **driving score
+(DS)** in CARLA.
+
+| line | training world | current DS | state |
+|---|---|---|---|
+| v0.1 | learned RSSM latent; reward = whole-latent match | 22.10 (full 220 routes) | cur. frozen |
+| v0.2 | log replayed as the world; reward = ego-state match | 76.10 / 75.88 (full 220 routes); 85.63 / 83.60 (test-10) | cur. frozen |
+| v0.3 | v0.2 + learned reactive traffic model | 82.53 (test-10) | cur. frozen |
+| v0.3.1 | v0.3 + static map geometry | 66.01 / 74.89 (test-10) | reopened |
+| v0.3.2 | v0.3 + plan-consistency (smoothness) reward | 82.80 (test-10) | active |
+
+Two variants are reported where two seeds/configs were run. **test-10** is the
+development gate: 10 Bench2Drive routes (A-half 3514, 3255, 26405, 25381,
+25378; B-half 25424, 2091, 27494, 17569, 28198) × 3 repetitions = 30 runs.
+**full 220 routes** is the complete Bench2Drive closed-loop benchmark, run only
+on a model that has already cleared test-10.
+
+Challenging driving tasks (like cones, ambulance, etc.) are still on the to-do list.
+
+### Videos
+
+**Preliminary results from ongoing work: in-development checkpoints, not a
+finished system.**
+
+Closed-loop CARLA rollouts of the **v0.3.2** policy (mean-plan consistency,
+`w_cons` 0.5) on three routes it completes without collisions. Each pair is ONE
+run recorded two ways: the bird's-eye view is the simulated state drawn over
+the town's OpenDRIVE geometry, the camera view is CARLA. Previews are trimmed
+GIFs; full-quality mp4s are in [docs/media/](docs/media/).
+
+<table>
+<tr>
+<td width="50%"><img src="docs/media/v032_route27494_2d.gif" width="100%" alt="Bird's-eye rollout, Town04"></td>
+<td width="50%"><img src="docs/media/v032_route27494_3d.gif" width="100%" alt="Camera rollout, Town04"></td>
+</tr>
+<tr><td colspan="2" align="center"><sub>Town04 · <a href="docs/media/v032_route27494_2d.mp4">2d</a> · <a href="docs/media/v032_route27494_3d.mp4">3d</a></sub></td></tr>
+<tr>
+<td width="50%"><img src="docs/media/v032_route17569_2d.gif" width="100%" alt="Bird's-eye rollout, Town12"></td>
+<td width="50%"><img src="docs/media/v032_route17569_3d.gif" width="100%" alt="Camera rollout, Town12"></td>
+</tr>
+<tr><td colspan="2" align="center"><sub>Town12 · <a href="docs/media/v032_route17569_2d.mp4">2d</a> · <a href="docs/media/v032_route17569_3d.mp4">3d</a></sub></td></tr>
+<tr>
+<td width="50%"><img src="docs/media/v032_route26405_2d.gif" width="100%" alt="Bird's-eye rollout, Town15"></td>
+<td width="50%"><img src="docs/media/v032_route26405_3d.gif" width="100%" alt="Camera rollout, Town15"></td>
+</tr>
+<tr><td colspan="2" align="center"><sub>Town15 · <a href="docs/media/v032_route26405_2d.mp4">2d</a> · <a href="docs/media/v032_route26405_3d.mp4">3d</a></sub></td></tr>
+</table>
 
 ## Layout
 
 ```text
-ditto_av/            the package (new, self-contained)
-  envs.py            highway-env factory + vector featurizer
-  expert.py          scripted two-style (multimodal) expert
-  collect.py         demonstration collection
-  data.py            trajectory store, latent bank
-  rewards.py         max_cos, single/multi latent matching, lambda-returns
+ditto_av/            the package (self-contained)
+  egosim.py          the training world: log replay + analytic ego kinematics
+  reactive.py        learned traffic model, autoregressive rollout (v0.3+)
+  layout.py          static map geometry from OpenDRIVE; layout_torch.py = torch port
+  rewards.py         ego-state matching kernels, latent matching, lambda-returns
+  tracks.py          expert trajectory targets; tracker_torch.py = pure-pursuit tracker
   models/            RSSM (categorical latents), vector encoder/decoder, actor-critic
   trainers/          world-model, DITTO actor-critic, BC trainers
   evaluate.py        closed-loop evaluation harness
   bench2drive.py     Bench2Drive (CARLA) -> DITTO-AV data adapter
+  carla_agent.py     deployment agent for the CARLA leaderboard
+  envs.py            highway-env factory + vector featurizer (dev benchmark)
+  expert.py          scripted two-style (multimodal) expert for highway-env
 scripts/run_pipeline.py   A-to-Z pipeline
+scripts/slurm/            cluster jobs (training, CARLA eval, video rendering)
 configs/av.yaml           main experiment; configs/smoke.yaml for a 2-min test
 tests/                    pytest suite
 src/, paper/              original DITTO Atari code + paper (reference, untouched)
@@ -76,15 +105,6 @@ from ditto_av.bench2drive import clips_to_npz
 clips_to_npz([Path("clips/AccidentTwoWays_..._Weather10")], "runs/b2d/data/expert.npz")
 ```
 
-See `PAPER_PLAN.md` for the paper roadmap, experiment matrix, and how this
-scales to the full Bench2Drive closed-loop benchmark.
-
-## Performance note
-
-Set single-threaded BLAS (`torch.set_num_threads(1)`, done automatically in
-`scripts/run_pipeline.py`) — the small sequential RSSM ops are 15-30x slower
-under multi-threaded BLAS on Apple Silicon.
-
 ## Credit: original DITTO
 
 This project began as a fork of and builds directly on
@@ -93,13 +113,4 @@ This project began as a fork of and builds directly on
 The RSSM world-model core in `ditto_av/models/` is adapted from that
 codebase, and the original pre-release Atari implementation is preserved
 unchanged in `src/` with the paper sources in `paper/`. If you use the
-world-model imitation ideas here, please cite DITTO:
-
-```bibtex
-@article{demoss2023ditto,
-  title={DITTO: Offline Imitation Learning with World Models},
-  author={DeMoss, Branton and Duckworth, Paul and Hawes, Nick and Posner, Ingmar},
-  journal={arXiv preprint arXiv:2302.03086},
-  year={2023}
-}
-```
+world-model imitation ideas here, please cite DITTO.
