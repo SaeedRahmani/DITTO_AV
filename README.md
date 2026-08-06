@@ -41,6 +41,9 @@ pre-registered ceiling of 8.
 
 ### Videos
 
+**Preliminary results from ongoing work — in-development checkpoints, not a
+finished system.**
+
 Closed-loop CARLA rollouts of the **v0.3.2** policy (mean-plan consistency,
 `w_cons` 0.5) on three routes it completes without collisions. Each pair is ONE
 run recorded two ways: the bird's-eye view is the simulated state drawn over
