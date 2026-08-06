@@ -56,6 +56,15 @@ EGO = (60, 200, 90)
 TRAIL = (60, 200, 90)
 HUD = (230, 230, 230)
 
+# actor classes the agent tags (video_actor_class): without them a cone,
+# an ambulance and a sedan are the same grey box and the scenario the
+# clip is captioned with is unreadable
+CLASS_COLOR = {1: (150, 150, 150), 2: (70, 70, 235), 3: (90, 220, 255),
+               4: (230, 180, 90), 5: (60, 150, 240), 6: (128, 128, 128)}
+CLASS_NAME = {2: "emergency", 3: "pedestrian", 4: "two-wheeler",
+              5: "scenario prop"}
+MIN_PX = 4          # cones and pedestrians are sub-metre; keep them seen
+
 # lane types kept, painted back-to-front in this order
 LANE_TYPES = ["Sidewalk", "Median", "Border", "Shoulder", "Parking",
               "Bidirectional", "Driving"]
@@ -376,11 +385,19 @@ def main():
             if z0 is not None:
                 z_level = z0
             tmap.draw(img, x0, y0, args.view, scale, W, z0=z_level)
-        for aid, x, y, yaw, bx, by in tk["actors"]:
+        seen = set()
+        for rec in tk["actors"]:
+            aid, x, y, yaw, bx, by = rec[:6]
+            cls = int(rec[6]) if len(rec) > 6 else 1
             if abs(x - x0) > args.view + 5 or abs(y - y0) > args.view + 5:
                 continue
+            seen.add(cls)
+            col = CLASS_COLOR.get(cls, ACTOR)
+            if max(bx, by) * scale < MIN_PX:   # cone / pedestrian
+                cv2.circle(img, to_px(x, y), MIN_PX, col, -1, cv2.LINE_AA)
+                continue
             box = box_pts(x, y, yaw, bx, by, to_px)
-            cv2.fillPoly(img, [box], ACTOR)
+            cv2.fillPoly(img, [box], col)
             cv2.polylines(img, [box], True, ACTOR_EDGE, 1, cv2.LINE_AA)
         if len(trail) > 1:
             pts = np.array([to_px(px_, py_) for px_, py_ in trail[-300:]],
@@ -393,6 +410,13 @@ def main():
                                     resolve_town(town) if town else "") if x)
         if cap:
             _hud(img, cap, (12, W - 16), 0.6)
+        # legend only for the classes actually on screen
+        yl = 56
+        for cls in sorted(c for c in seen if c in CLASS_NAME):
+            cv2.rectangle(img, (14, yl - 9), (26, yl + 3),
+                          CLASS_COLOR[cls], -1)
+            _hud(img, CLASS_NAME[cls], (32, yl + 3), 0.45)
+            yl += 22
         vw.write(img)
     vw.release()
     print(f"wrote {args.out} ({len(ticks)} frames, town={town})")
