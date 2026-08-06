@@ -35,17 +35,17 @@ periodically as runs land. Scores are Bench2Drive closed-loop **driving score
 
 | line | training world | current DS | state |
 |---|---|---|---|
-| v0.1 | learned RSSM latent; reward = whole-latent match | 22.10 (220 routes) | frozen |
-| v0.2 | log replayed as the world; reward = ego-state match | 76.10 / 75.88 (220 routes); 85.63 / 83.60 (dev-10) | frozen |
-| v0.3 | v0.2 + learned reactive traffic model | 82.53 (dev-10) | frozen |
-| v0.3.1 | v0.3 + static map geometry | 66.01 / 74.89 (dev-10) | reopened |
+| v0.1 | learned RSSM latent; reward = whole-latent match | 22.10 (full 220 routes) | frozen |
+| v0.2 | log replayed as the world; reward = ego-state match | 76.10 / 75.88 (full 220 routes); 85.63 / 83.60 (test-10) | frozen |
+| v0.3 | v0.2 + learned reactive traffic model | 82.53 (test-10) | frozen |
+| v0.3.1 | v0.3 + static map geometry | 66.01 / 74.89 (test-10) | reopened |
 | v0.3.2 | v0.3 + smoothness reward channels | in progress | active |
 
-Two arms are reported where two seeds/configs were run. **dev-10** is the
+Two variants are reported where two seeds/configs were run. **test-10** is the
 development gate: 10 Bench2Drive routes (A-half 3514, 3255, 26405, 25381,
 25378; B-half 25424, 2091, 27494, 17569, 28198) × 3 repetitions = 30 runs.
-**220 routes** is the full Bench2Drive closed-loop benchmark, run only on a
-model that has already cleared dev-10.
+**full 220 routes** is the full Bench2Drive closed-loop benchmark, run only on a
+model that has already cleared test-10.
 
 ### What separates the versions
 
@@ -58,7 +58,7 @@ per-agent model, so other vehicles react to the ego.
 
 v0.2 and v0.3 differ almost entirely in *which* collisions they have:
 
-| dev-10 collisions | v0.2 | v0.3 |
+| test-10 collisions | v0.2 | v0.3 |
 |---|---|---|
 | with vehicles | 9 / 12 | **6** |
 | with static layout | 0 / 1 | 7 |
@@ -75,7 +75,7 @@ and OpenDRIVE do not.
 ### Videos
 
 Closed-loop CARLA rollouts, same routes rendered for both versions. `2d` is the
-bird's-eye state render, `3d` is the CARLA camera. These are the dev-10 routes
+bird's-eye state render, `3d` is the CARLA camera. These are the test-10 routes
 that both versions complete cleanly — **DS 100, route completion 100%, no
 collisions** — spanning five towns and five scenario types. The routes that
 still fail are the ones in the collision table above; these clips show what the
@@ -98,7 +98,7 @@ system.
   (ego | learned-traffic) factorization, closing the question v0.1 opened.
 - **v0.3.2 smoothness**: yaw-rate reward channel, then an in-world plan-churn
   penalty and a policy-side temporal-consistency loss.
-- **220-route run** for the v0.3 line, once a dev-10 gate is cleared.
+- **full 220-route run** for the v0.3 line, once a test-10 gate is cleared.
 - **Paper** covering the v0.2 result, the v0.3 collision decomposition, and the
   v0.3.1 negative result.
 

@@ -27,13 +27,13 @@ route and lights replay from the log; an analytic kinematic model moves
 the ego — and the reward is a time-tolerant kernel on the *ego's*
 pose/speed against the same-scene expert. Nothing in the loop is
 learned, so the reward cannot be exploited: it is maximized on the
-expert's real path by construction. On Bench2Drive's official 220-route
+expert's real path by construction. On Bench2Drive's official full 220-route
 closed-loop benchmark our policy scores **75.9 driving score with 99.7%
 route completion** (privileged-input, fully offline training) — 3.4×
 the best latent-DITTO system on identical data and above all published
 baselines including expert-distilled sensor methods. In a controlled
 same-architecture comparison, the on-policy stage adds **+12.1 driving
-score over behavior cloning** (83.6 vs 71.5 dev-10), and a collision
+score over behavior cloning** (83.6 vs 71.5 test-10), and a collision
 penalty is *redundant*: pure state matching ties the shaped variant at
 scale (75.88 vs 76.10). We further contribute a negative-results ledger
 on metric transfer: short-horizon expert-closeness *anti-orders*
@@ -62,7 +62,7 @@ Contributions:
    observation rebuild ≡ deployment featurizer (3e-7); expert replay
    retraces real logs to 0.07–0.14 m over 4 s.
 3. **State of the art on Bench2Drive** in the fully-offline,
-   privileged-input class (Sec. 5): 220 routes, DS 75.9–76.1,
+   privileged-input class (Sec. 5): full 220 routes, DS 75.9–76.1,
    completion 99.5–99.7%, above all published baselines [caveat
    discussion]; controlled same-net evidence that the on-policy stage
    is the cause (+12.1 DS over BC); shaping redundancy (pure ≈ shaped).
@@ -104,7 +104,7 @@ deferred and delimited.
 **CARLA / Bench2Drive.** Think2Drive (online RL expert; data source),
 sensor-track students with expert-feature distillation (TCP, ThinkTwice,
 DriveAdapter), privileged baselines (AD-MLP). We evaluate on the
-official 220-route protocol; our planner consumes privileged object
+official full 220-route protocol; our planner consumes privileged object
 states (no cameras) and trains fully offline — comparisons carry that
 caveat explicitly, and the closest published comparables are the
 privileged/no-distillation rows. [Check before submission: the Dec-2025
@@ -153,7 +153,7 @@ replay scores ≈1.0.
 Δv²/σ_v²]) against the same-scene expert states; τ=0.5 s tolerance
 absorbs timing slack; σ_p=1 m (the *tight* kernel — a wider mixture
 kernel degrades lane discipline; Sec. 5 ablation). No collision,
-progress, or comfort terms in the headline arm.
+progress, or comfort terms in the headline variant.
 
 **Policy.** Per-actor token transformer (ego/agents/route tokens,
 d=192, 3 layers) + GRU memory + Gaussian waypoint head (12-dim plan,
@@ -176,7 +176,7 @@ training objective.
 
 ## 5. Results (all closed-loop CARLA, official protocols)
 
-**Controlled same-net comparison, dev-10 (10 routes × 3 reps):**
+**Controlled same-net comparison, test-10 (10 routes × 3 reps):**
 
 | policy (identical net/data/tracker), 3 full-pipeline seeds | DS (mean ± sd; seeds) | full routes |
 |---|---|---|
@@ -195,7 +195,7 @@ Pure vs shaped is a statistical tie across seeds (Δmean +2.08 ≪ σ≈8),
 consistent with the 220-scale dead heat (75.88 vs 76.10) — the shaping
 redundancy claim survives seeding.
 
-**Official 220-route benchmark:**
+**Official full 220-route benchmark:**
 
 | system | DS | completion | success |
 |---|---|---|---|
@@ -207,10 +207,10 @@ redundancy claim survives seeding.
 *Privileged-input, fully-offline caveat applies throughout; starred
 baselines are sensor-track with expert distillation — included for
 scale, not parity.* "Strict" counts zero-infraction completions.
-Shaping is redundant at scale: the pure state-matching arm ties the
-shaped arm — the paper's cleanest single claim.
+Shaping is redundant at scale: the pure state-matching variant ties the
+shaped variant — the paper's cleanest single claim.
 
-**Ablations** (each dev-10-gated): kernel width (a 4 m mixture
+**Ablations** (each test-10-gated): kernel width (a 4 m mixture
 component costs 21-vs-0 lane infractions at 999 scale — matching
 geometry is load-bearing); data scale (297→999 flips RL past BC);
 architecture (the same recipe's BC at 297 already reaches 74.10 —
@@ -220,13 +220,13 @@ objective gains) [DECIDE: promote to its own subsection].
 ## 6. Findings: which metrics transfer?
 
 1. **Expert-closeness does not rank working drivers.** Across 12
-   banked v0.1 models with known dev-10 scores, sim-closeness
+   banked v0.1 models with known test-10 scores, sim-closeness
    *anti-orders* the healthy band (conservative champions sit far from
    the expert; aggressive trackers sit close and crash); Spearman
    +0.26 overall — but broken models separate from working ones by a
    wide margin (the metric's valid role: sanity, not selection).
 2. **Collision rate transfers** (+0.50 vs completion) — and is the
-   axis where the shaped arm helps at small scale (3×3/dev-10) before
+   axis where the shaped variant helps at small scale (3×3/test-10) before
    becoming redundant at 999.
 3. **Teacher-forced probes misread on-policy-trained recurrent
    policies**: the champion's plans anti-correlate with expert steer
@@ -247,9 +247,9 @@ divergence — reactivity is exactly what a learned world model must add
 map/lane input (lane discipline learned implicitly); single benchmark
 family (CARLA/Bench2Drive) and a single expert (Think2Drive); strict
 zero-infraction success is 48–50% — collisions with replayed-vs-live
-traffic mismatches dominate the residual; dev-10 seed variance at this performance band is
+traffic mismatches dominate the residual; test-10 seed variance at this performance band is
 large (±7.5–8.2 DS over 3 full-pipeline seeds — penalty events, not
-completion), so single-seed dev-10 comparisons within ~8 DS are not
+completion), so single-seed test-10 comparisons within ~8 DS are not
 individually conclusive; the 220-scale results and the
 completion/blocked contrast carry the load-bearing claims.
 
@@ -264,7 +264,7 @@ irreplaceably for — reacting to counterfactual egos — is the next
 question (v0.3).
 
 ---
-*Source pointers: dev-10/220 records runs/bench220_v02_999{t,s}_rl,
+*Source pointers: test-10/220 records runs/bench220_v02_999{t,s}_rl,
 runs/carla_results_v999*; gates V02_PLAN.md §8; v0.1 evidence branch
 saeed/ver0.1; visualizations runs/viz_v02_final; probe scripts
 scripts/egosim_selector.py, /tmp diag (reverse_probe).*

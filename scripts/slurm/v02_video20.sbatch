@@ -9,7 +9,7 @@
 #SBATCH --output=/scratch/%u/ditto_av/outputs/slurm-%j.out
 #SBATCH --account=research-ceg-tp
 # 20 paired videos of the best v0.2 model (DITTO-AV shaped @999):
-# for each of the 10 dev-10 routes, ONE CARLA run recorded two ways —
+# for each of the 10 test-10 routes, ONE CARLA run recorded two ways —
 # 3D chase-cam (camera frames) + 2D BEV (state.jsonl of the same run).
 # Outputs: outputs/videos20/route<R>_{3d,2d}.mp4 (+ state logs).
 

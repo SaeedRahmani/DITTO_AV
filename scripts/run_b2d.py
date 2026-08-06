@@ -288,7 +288,7 @@ def stage_clp(cfg, args):
     """v0.2: closed-loop policy (BC pretrain + egosim RL + G2 verdict)."""
     from ditto_av.egosim import GlobalLog
     from ditto_av.models.policy_v2 import make_token_policy
-    from ditto_av.trainers.clp_trainer import (evaluate_in_sim,
+    from ditto_av.trainers.clp_trainer import (evaluate_in_wm,
                                                sim_from_config,
                                                train_clp_bc, train_clp_rl)
     assert cfg.env.global_arrays, "stage clp needs env.global_arrays"
@@ -316,9 +316,9 @@ def stage_clp(cfg, args):
                                            map_location=cfg.device))
         policy.eval()
         verdict[name] = {
-            "clean": evaluate_in_sim(policy, sim, val_log, c.horizon,
+            "clean": evaluate_in_wm(policy, sim, val_log, c.horizon,
                                      c.burn_in, seed=cfg.seed),
-            "divergent": evaluate_in_sim(policy, sim, val_log, c.horizon,
+            "divergent": evaluate_in_wm(policy, sim, val_log, c.horizon,
                                          c.burn_in, perturb=div,
                                          seed=cfg.seed)}
         print(f"G2 {name}: {verdict[name]}")

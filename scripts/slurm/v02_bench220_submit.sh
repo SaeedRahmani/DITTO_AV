@@ -1,5 +1,5 @@
 #!/bin/bash
-# v0.2 220-route benchmark launcher (run on a LOGIN node).
+# v0.2 full 220-route benchmark launcher (run on a LOGIN node).
 #   scripts/slurm/v02_bench220_submit.sh <diag_config> <run_label>
 # e.g. scripts/slurm/v02_bench220_submit.sh configs/diag_v02_999t_rl.yaml v02_999t_rl
 # Splits bench2drive220.xml into 12-route chunks (1 rep), spreads them

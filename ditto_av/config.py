@@ -27,7 +27,7 @@ class EnvConfig:
     # and only the BC head outputs waypoints, tracked by a PID at
     # deployment with the executed control fed back to the WM. The v2
     # answer to gen3_wp's action-channel drift (wp-as-WM-action lost
-    # dev-10 to control actions). Requires action_space: continuous.
+    # test-10 to control actions). Requires action_space: continuous.
     wp_head: bool = False
     # appended observation dims beyond the vehicle rows (e.g. Bench2Drive
     # route conditioning: 16 = near/far command point + one-hot command)
@@ -213,7 +213,7 @@ class CLPConfig:
     sigma_v: float = 2.0
     sigma_p2: float = 4.0     # broad kernel component (0 = off)
     p2_weight: float = 0.3
-    collision_penalty: float = 0.0  # 0 = thesis-pure arm
+    collision_penalty: float = 0.0  # 0 = thesis-pure variant
     penalty_ignore_rear: bool = True  # ghost rear-ends don't count
 
 

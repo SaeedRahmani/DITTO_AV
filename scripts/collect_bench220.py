@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Aggregate v0.2 220-route chunk results and commit them.
+"""Aggregate v0.2 full 220-route chunk results and commit them.
 
 Usage: collect_bench220.py <tag_prefix> <run_subdir>
 e.g.   collect_bench220.py v02b220_v02_999t_rl bench220_v02_999t_rl
@@ -46,7 +46,7 @@ def main():
         subprocess.run(["cp", f, d + "/"])
     subprocess.run(["git", "-C", REPO, "add", f"runs/{subdir}"])
     subprocess.run(["git", "-C", REPO, "commit", "-q", "-m",
-                    f"v0.2 220-route benchmark {prefix}: DS {s['score']:.2f}"
+                    f"v0.2 full 220-route benchmark {prefix}: DS {s['score']:.2f}"
                     f" completion {s['completion']:.1f}% success "
                     f"{s['success']:.1f}% ({n}/220)"])
     if n < 220:

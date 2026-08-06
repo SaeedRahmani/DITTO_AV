@@ -7,7 +7,7 @@
 #SBATCH --mem-per-cpu=2G
 #SBATCH --output=/scratch/%u/ditto_av/outputs/slurm-%j.out
 #SBATCH --account=research-ceg-tp
-# Aggregate gen3_wph 220-route chunks (tags wph220_*) into
+# Aggregate gen3_wph full 220-route chunks (tags wph220_*) into
 # runs/bench220_gen3wph. Fresh prefix — earlier bench220 files can
 # never contaminate the aggregate.
 set -euo pipefail
@@ -33,7 +33,7 @@ for f in glob.glob("/scratch/srahmani/ditto_av/outputs/carla_results_wph220_*.js
     subprocess.run(["cp", f, repo + "/runs/bench220_gen3wph/"])
 subprocess.run(["git", "-C", repo, "add", "runs/bench220_gen3wph"])
 subprocess.run(["git", "-C", repo, "commit", "-q", "-m",
-                f"GEN-3 wph FINAL 220-route benchmark: gen3_wph_bc_rec score {s['score']:.2f} "
+                f"GEN-3 wph FINAL full 220-route benchmark: gen3_wph_bc_rec score {s['score']:.2f} "
                 f"completion {s['completion']:.1f}% success {100*s['completed']/n:.1f}% ({n} routes)"])
 PYEOF
 echo "[$(date '+%Y-%m-%d %H:%M')] bench220_gen3wph collector done" >> /scratch/$USER/ditto_av/outputs/PIPELINE_STATUS.md
