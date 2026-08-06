@@ -162,6 +162,46 @@ tuning is the v0.3.2 session's claimed lane. For the paper: this
 triple negative + the smoothness reframe is the "what static geometry
 cannot buy" section.
 
+### v0.3.1-R FINAL (2026-08-06): closed with the trade-off measured
+
+Stage C-lite: the untested w_cons 0.25 arm (v0.3.2 axis-3 Pareto
+middle, never CARLA-evaluated there) under the pre-registered gate
+(DS>85.63, layout<=2, veh<=8): DS 82.12 (30/30), layout 3, veh 12 —
+FAIL on all three. The consistency dose curve is now measured at
+three points:
+
+  w_cons   DS      layout  veh
+  0.0      82.53   7       6      (clp_rx)
+  0.25     82.12   3       12
+  0.5      82.80   0       12     (v032 s2 arm)
+
+The vehicle tax SATURATES at the first dose step while the layout
+benefit accrues gradually — no passing region exists; the mechanism
+trades layout for vehicle ~1:1 in DS and the reactive fine-tune
+family is pinned at ~82-83 against 999s' 85.63.
+
+v0.3.1(-R) closes having fully characterized the layout gap:
+- CAUSE: steering wobble corner-clipping map furniture (not
+  off-drivable driving).
+- WHAT CANNOT PRICE IT (measured): lane-union geometry, heading-
+  conditioned drivability, CARLA furniture boxes (21.1% expert
+  body-overlap; not collision-faithful), reward-side penalties
+  (price exploration noise; veh 6->21/24).
+- WHAT FIXES IT AND ITS COST: differentiable plan-consistency
+  (layout 7->0) at a saturating vehicle-collision tax (6->12) that
+  cancels the gain.
+- Champion unchanged: v0.2 999s dev-10 85.63 / 220 76.10.
+
+Candidate v0.4 mission (NOT claimed): traffic-model lane-change
+fidelity. Route 17569 (SequentialLaneChange, T12) scores 100 for
+clp_rx but 36/36/21 for EVERY arm fine-tuned further in the reactive
+world — the learned traffic's lane-change behavior is the likely
+divergence and W0 never gated it. Fixing W0-LC then re-running D3
+is a coherent next campaign if the 85.63 target stays.
+
+Next on main: the PAPER (v0.2 record + v0.3 dividend + the complete
+v0.3.1/E3 negative-result chain above).
+
 ### E3: CLOSED as a measured negative (2026-08-05, no RL run needed)
 
 A0 audit chain (wm 10584612, frozen; scripts/v031_e3_audit.py):
