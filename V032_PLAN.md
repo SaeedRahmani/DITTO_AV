@@ -83,6 +83,34 @@ S1/driving gates. 3x3 stays a canary, never a selector.
 
 ## 9. Ledger
 
+- 2026-08-06 COLLISION AUTOPSY (session 2, existing artifacts only):
+  the s2 arm's +6 vehicle collisions are NOT diffuse reactivity loss —
+  they are TWO deterministic scenario flips (25381: DS 100->60,
+  mustang at fixed coords x3 reps; 2091: charger x3), while the arm
+  FIXED two routes rx failed (3514, 27494); 3255/28198 fail
+  identically for both models (pre-existing). Tick forensics on
+  25381: the arm's own plan commands a crawl (v_t 2.2-3.6 for 60% of
+  the route at ~1.4 m/s; rx launches to 7 immediately) -> LAUNCH
+  HESITATION MADE STICKY BY CONSISTENCY (once the mean plan says
+  slow, the loss makes the next plan agree), timing shifts, ends in
+  a low-speed following contact — the known v0.2 bumper-contact
+  regime, not an evasion failure.
+- 2026-08-06 ROUND 5 pre-registered BEFORE the run: the round-4
+  PROXIMITY-GATED arm targets exactly this (consistency fades to ~0
+  near actors; the 25381 creep happens with na up to 27), so it goes
+  to dev-10 A/B — seed s1 (the conservative pick its own rule named).
+  GATE STRUCTURE refinement, committed with justification: S1b is
+  DEMOTED from gate to diagnostic — (i) V03_PLAN §3: the sim NEVER
+  grades itself, CARLA is the only verdict; S1b was a lane-economy
+  proxy from the lanes-saturated hour; (ii) chains now cost ~17 min
+  on free lanes; (iii) S1b's bars are calibrated on open-loop floors
+  and mis-scale for closed-loop policies (measured: corrective floor
+  ~11 flips vs bar 7.1). The BINDING gates are UNTOUCHED and decide
+  banking: DS mean >= 82.5, veh <= 8/30, 30/30, S1a <= 14.8.
+  Falsifiable predictions: layout stays ~0 and S1a passes (commitment
+  intact away from traffic); 25381/2091 creep-locks release (gate
+  frees the launch); risk: S1a lands between 6.7 and 18 if near-
+  traffic wobble leaks into the average.
 - 2026-08-06 AXIS-3 ROUND 4 RESULT (jobs 10587827/28) + CAMPAIGN
   CLOSE: gated arm recovers driving FULLY — reactive 0.693 (s1) /
   0.703 (s2), BOTH beat clp_rx 0.685; replay col 0.068 <= 0.07 — but
