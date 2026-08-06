@@ -8,7 +8,7 @@
 #SBATCH --output=/scratch/%u/ditto_av/outputs/slurm-%j.out
 #SBATCH --account=research-ceg-tp
 # v0.2 M3: build the ##glob1 297-clip npz (data stage) then run the G1
-# egosim-as-selector validation (12 banked wp-family models vs dev-10
+# egosim-as-selector validation (12 banked wp-family models vs test-10
 # truth). Commits results locally (compute nodes have no internet —
 # push from a login session). See V02_PLAN §4 G1.
 

@@ -49,7 +49,7 @@ def main():
     ap.add_argument("--device", default="cuda")
     # v0.3.1: static layout in the training world. --manifest ties
     # npz episode order to towns (must be the manifest the caches were
-    # built from); --w-layout 0 = metric-only, >0 = penalty arm.
+    # built from); --w-layout 0 = metric-only, >0 = penalty variant.
     ap.add_argument("--manifest",
                     default=str(REPO / "manifests" / "b2d_full999.txt"))
     ap.add_argument("--layout-dir", default=None,

@@ -10,12 +10,12 @@ DELFTBLUE.md/NEXT_STEPS.md), `saeed/v0.2` (v0.2), `saeed/v0.3` (v0.3).
 DITTO-AV: offline imitation for driving where the recorded logs ARE the
 training world. v0.1 (faithful latent-space DITTO) lost to BC — the
 latent graded traffic, not driving. v0.2 rebuilt the thesis with an
-ego-state-matching reward in a log-replay world: RL beat same-net BC by
-+11–13 DS (seeds), 220-route DS 75.88/76.10 (~3.4x v0.1, above all
+ego-state-matching reward in a log-replay world: DITTO-AV v0.2 beat same-net BC by
++11–13 DS (seeds), full 220-route DS 75.88/76.10 (~3.4x v0.1, above all
 published Bench2Drive baselines; privileged-offline caveat). v0.3 added
 a LEARNED reactive traffic model (4-round W0 fidelity campaign, all
 gates eventually passed) and confirmed the reactivity dividend: vehicle
-collisions 6 = all-time best (champions: 9–12), but net dev-10 82.53
+collisions 6 = all-time best (champions: 9–12), but net test-10 82.53
 missed the 83.60–85.63 band because the training world had NO STATIC
 LAYOUT (7 layout collisions vs 1). v0.3.1 = fix exactly that.
 
@@ -24,8 +24,8 @@ LAYOUT (7 layout collisions vs 1). v0.3.1 = fix exactly that.
 | line | branch | state |
 |---|---|---|
 | v0.1 | saeed/v0.1 | frozen; DS 22.10 @220 |
-| v0.2 | saeed/v0.2 | frozen; champions 999t/999s (dev-10 83.60/85.63, 220 75.88/76.10, seeds ±7.5-9.4); paper draft in paper/ |
-| v0.3 | saeed/v0.3 | frozen; W0 campaign PASSED (minADE 2.79, react 0.567), clp_rx dev-10 82.53, dividend + layout-gap banked |
+| v0.2 | saeed/v0.2 | frozen; champions 999t/999s (test-10 83.60/85.63, 220 75.88/76.10, seeds ±7.5-9.4); paper draft in paper/ |
+| v0.3 | saeed/v0.3 | frozen; W0 campaign PASSED (minADE 2.79, react 0.567), clp_rx test-10 82.53, dividend + layout-gap banked |
 | v0.3.1 | **main** (HEAD) | ONGOING — M1 done (below) |
 
 Key checkpoints (all under ~/ditto_out/):
@@ -33,11 +33,11 @@ Key checkpoints (all under ~/ditto_out/):
   b2d_v02_999t/checkpoints/clp_rl.pt (83.60); configs b2d_v02_999*_cpu.yaml
 - v0.3 traffic ensemble (W0-passing): v03_w0c/checkpoints/traffic_s{0..3}_rf.pt
   (+ windows3_{train,val}.npz caches, data/ npzs = 999-split ##glob2)
-- v0.3 policy: b2d_v03_rx/checkpoints/clp_rx.pt (dev-10 82.53)
+- v0.3 policy: b2d_v03_rx/checkpoints/clp_rx.pt (test-10 82.53)
 - Reports: v03_w0c/w0_report.json, v03_d3/d3_report.json
 - Layout geometry (v0.3.1 M1): /scratch/$USER/ditto_av/data/layout/
   (Town*_lanes.npz + xodr/); query module ditto_av/layout.py
-- Videos (2026-08-06, one folder per line's best model, each 10 dev-10
+- Videos (2026-08-06, one folder per line's best model, each 10 test-10
   routes x {2d BEV over the town map, 3d chase cam, state.jsonl}):
   /scratch/$USER/ditto_av/outputs/videos/{v0.1_gen3wph_bc,
   v0.2_999s_shaped, v0.3_reactive_rx, v0.3.1_layout_s,
@@ -52,7 +52,7 @@ Key checkpoints (all under ~/ditto_out/):
 
 Put static layout into the training world so boldness near walls costs
 what CARLA charges for it. Target: close the 7-vs-1 layout-collision
-gap and beat dev-10 85.63; then ONE 220 for the headline; then paper.
+gap and beat test-10 85.63; then ONE 220 for the headline; then paper.
 
 ### DONE (M1, commit 438d48d)
 - 12 towns' OpenDRIVE extracted (scripts/v031_extract_layout.py;
@@ -83,10 +83,10 @@ gap and beat dev-10 85.63; then ONE 220 for the headline; then paper.
 
 ### W3 re-gate: FAIL (2026-08-05) — v0.3.1 CLOSED as a negative result
 
-Dev-10 A/B x3 (jobs 10582571-74): arm rx 66.01 (layout 7 / veh 21),
-arm s 74.89 (layout 6 / veh 24) vs clp_rx 82.53 (7/6) and 999s 85.63.
-Neither arm approaches the gate. Root cause MEASURED, three links:
-1. ALL dev-10 "layout" collisions are map furniture ON drivable area
+Test-10 A/B x3 (jobs 10582571-74): variant rx 66.01 (layout 7 / veh 21),
+variant s 74.89 (layout 6 / veh 24) vs clp_rx 82.53 (7/6) and 999s 85.63.
+Neither variant approaches the gate. Root cause MEASURED, three links:
+1. ALL test-10 "layout" collisions are map furniture ON drivable area
    (static.fence at the 2091 junction corner, prop.mesh at the 3514
    ParkingExit, vegetation at 27494): our query reads them 0.3-1.5 m
    INSIDE the lane+margin. The training penalty was satisfied
@@ -104,7 +104,7 @@ Suggestive but NOT conclusive (1 training seed, ~1 sigma_train=8):
 the w=0.5 penalty coincided with veh collisions 6 -> 21/24. Zero
 benefit + possible harm => penalty default stays 0. KEEP the
 layout_viol metric (free diagnostics); keep layout_torch/LayoutQuery
-infra. Both-world in-sim reward canary IMPROVED in both arms while
+infra. Both-world in-WM reward canary IMPROVED in both variants while
 CARLA dropped — logged as another "sim never grades itself" instance.
 
 ### v0.3.1-R: REOPENED 2026-08-06 (user request) — furniture axis
@@ -119,7 +119,7 @@ Review verdict on the W3 FAIL — three distinct errors, not one:
 2. WRONG DELIVERY: reward-side penalty through normalized A2C
    advantages on stochastic rollouts — v0.3.2 axis-2 measured this
    channel pricing exploration noise (10x mean churn); the veh-col
-   explosion in BOTH w=0.5 arms (6 -> 21/24, two seeds agreeing) is
+   explosion in BOTH w=0.5 variants (6 -> 21/24, two seeds agreeing) is
    the same channel failing. Working channel (v0.3.2 axis-3):
    differentiable auxiliary loss on the mean plan.
 3. PREMATURELY CLOSED DATA QUESTION: "no data source has these
@@ -164,7 +164,7 @@ cannot buy" section.
 
 ### v0.3.1-R FINAL (2026-08-06): closed with the trade-off measured
 
-Stage C-lite: the untested w_cons 0.25 arm (v0.3.2 axis-3 Pareto
+Stage C-lite: the untested w_cons 0.25 variant (v0.3.2 axis-3 Pareto
 middle, never CARLA-evaluated there) under the pre-registered gate
 (DS>85.63, layout<=2, veh<=8): DS 82.12 (30/30), layout 3, veh 12 —
 FAIL on all three. The consistency dose curve is now measured at
@@ -173,7 +173,7 @@ three points:
   w_cons   DS      layout  veh
   0.0      82.53   7       6      (clp_rx)
   0.25     82.12   3       12
-  0.5      82.80   0       12     (v032 s2 arm)
+  0.5      82.80   0       12     (v032 s2 variant)
 
 The vehicle tax SATURATES at the first dose step while the layout
 benefit accrues gradually — no passing region exists; the mechanism
@@ -190,11 +190,11 @@ v0.3.1(-R) closes having fully characterized the layout gap:
 - WHAT FIXES IT AND ITS COST: differentiable plan-consistency
   (layout 7->0) at a saturating vehicle-collision tax (6->12) that
   cancels the gain.
-- Champion unchanged: v0.2 999s dev-10 85.63 / 220 76.10.
+- Champion unchanged: v0.2 999s test-10 85.63 / 220 76.10.
 
 Candidate v0.4 mission (NOT claimed): traffic-model lane-change
 fidelity. Route 17569 (SequentialLaneChange, T12) scores 100 for
-clp_rx but 36/36/21 for EVERY arm fine-tuned further in the reactive
+clp_rx but 36/36/21 for EVERY variant fine-tuned further in the reactive
 world — the learned traffic's lane-change behavior is the likely
 divergence and W0 never gated it. Fixing W0-LC then re-running D3
 is a coherent next campaign if the 85.63 target stays.
@@ -254,11 +254,11 @@ Recipe (reuses v0.1 machinery, all still on main):
    state kernel's is (if the latent cannot see a 1 m ego offset
    through shared traffic, E3 dies here and that IS the v0.1 answer,
    measured).
-4. E3-L arm: D3 protocol unchanged (init 999s champion, reactive
+4. E3-L variant: D3 protocol unchanged (init 999s champion, reactive
    p_r 0.5, W1 pessimism, KL anchor, 3500 steps) with the latent
    reward. Direct counterpart: clp_rx (state reward, same protocol,
-   dev-10 82.53).
-5. GATE (pre-registered): dev-10 A/B x3. |E3L - 82.53| <= 2.3 (seed
+   test-10 82.53).
+5. GATE (pre-registered): test-10 A/B x3. |E3L - 82.53| <= 2.3 (seed
    sigma) => latent matching ~ state matching in a factored world
    (v0.1's failure was the world/latent content, not latent matching
    per se); < 80.23 => explicit state matching is load-bearing;
@@ -267,7 +267,7 @@ Recipe (reuses v0.1 machinery, all still on main):
 Also NEXT: paper v0.3/v0.3.1 (findings ledger in V03_PLAN §9): the
 reactivity dividend + the v0.3.1 negative result (what static
 geometry can and cannot buy in a log-replay world) are both
-publishable. Headline stays v0.2 220 76.10 / v0.3 dev-10 82.53 with
+publishable. Headline stays v0.2 220 76.10 / v0.3 test-10 82.53 with
 the collision decomposition story.
 
 ## 3. Rules that keep this project honest (do not relax)
@@ -275,7 +275,7 @@ the collision decomposition story.
 - Pre-register gate numbers BEFORE the runs they judge; on FAIL fix
   the model, never the gate (refinements only with committed
   justification — see W0 minADE precedent in V03_PLAN §9).
-- The world model / sim NEVER grades itself: CARLA dev-10/220 are the
+- The world model / sim NEVER grades itself: CARLA test-10/220 are the
   only verdicts that count. 3x3 is a canary, never a selector.
 - Measure before building (the audit pattern); synthetic tests must
   include the failure modes (churn, curvature, braking experts).

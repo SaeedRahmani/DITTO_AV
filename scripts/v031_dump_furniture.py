@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """v0.3.1-R Stage A: dump CARLA static-furniture OBBs per town.
 
-The W3 root cause: every dev-10 "layout" collision was map furniture
+The W3 root cause: every test-10 "layout" collision was map furniture
 (static.fence / static.prop.mesh / static.vegetation) standing on or
 beside drivable area — invisible to lane-union geometry. This dump
 extracts the actual collidable geometry from a live CARLA server:

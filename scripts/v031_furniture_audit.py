@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """v0.3.1-R Stage A audits (gates pre-registered in V031_PLAN):
 
-A1 coverage: the 4 measured dev-10 layout-collision points must have
+A1 coverage: the 4 measured test-10 layout-collision points must have
    a non-Building furniture box within the ego contact envelope.
    CRITERION FIX (justified from scenario_runner atomic_criteria.py
    L333/L406: the logged coordinate is the EGO CENTER via
@@ -45,7 +45,7 @@ FURN_DIR = Path("/scratch/srahmani/ditto_av/data/layout/furniture")
 DEFAULT_LABELS = "Fences,Walls,Poles,Vegetation,Static,GuardRail"
 EGO_SIDE = 1.06    # ego half-width: side-contact reach from center
 
-# the four measured dev-10 layout collisions (W3 root-cause table)
+# the four measured test-10 layout collisions (W3 root-cause table)
 COLLISIONS = [
     ("2091 fence#1", "Town12", 2774.202, 1617.334, 343.542),
     ("2091 fence#2", "Town12", 2731.611, 1595.378, 344.887),

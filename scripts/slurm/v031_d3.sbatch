@@ -9,9 +9,9 @@
 #SBATCH --output=/home/%u/ditto_out/slurm-%j.out
 #SBATCH --account=research-ceg-tp
 # v0.3.1 D3 rerun: reactive-world fine-tune WITH the static layout
-# penalty (w=0.5). Two arms, one submission each:
+# penalty (w=0.5). Two variants, one submission each:
 #   sbatch v031_d3.sbatch <init_ckpt.pt> <out_dir>
-# arm rx: init from v0.3 clp_rx; arm s: init from the 999s champion.
+# variant rx: init from v0.3 clp_rx; variant s: init from the 999s champion.
 
 set -euo pipefail
 export OMP_NUM_THREADS=1 PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1

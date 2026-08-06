@@ -40,12 +40,12 @@ controls, in the scene the expert actually faced*:
    the expert path the logged action is the wrong answer). BC enters only
    as init + KL anchor (v0.1 settled: bc_kl ~0.1 is load-bearing).
 
-Where the *learned* world model lives in v0.2: Stage-2 arm. A traffic
+Where the *learned* world model lives in v0.2: Stage-2 variant. A traffic
 transformer predicting actor futures (conditioned on ego) upgrades replay
 to *reactive* imagination and extends horizons past clip end. Stage 1
 deliberately runs with pure replay so the reward/on-policy question is
 tested with zero model-error confound. (Author's "make the WM bigger"
-question = Arm A control, see §6.)
+question = Variant A control, see §6.)
 
 ## 2. Code review verdict (2026-08-03, full end-to-end read)
 
@@ -55,7 +55,7 @@ Keep unchanged (proven, do not re-litigate):
   physics-exact ego_vehicle box; V_MAX finite-difference glitch filter;
   wp targets certified by scripts/waypoint_check.py.
 - `featurize_frame` (online ≡ offline, tested), RouteCursor semantics,
-  WaypointTracker + StuckRecovery deployment stack (champion: 220-route
+  WaypointTracker + StuckRecovery deployment stack (champion: full 220-route
   DS 22.10 / SR 39.1), `wp_to_vehicle` round-trip, TorchWaypointTracker
   equivalence port.
 - BC head recipe (`bc_trainer`), Gaussian head bounds (WP_BOUND 3.0), std
@@ -73,7 +73,7 @@ Gaps vs the v0.2 idea (the work items):
   log-replay sim (kinematic ego, obs recompute mirroring
   `featurize_frame`, OBB collision flags, expert-trajectory reward).
 - **Reward machinery is latent-space** (`LatentMatcher`) → new ego-state
-  reward (keep the old module for ablation arms only).
+  reward (keep the old module for ablation variants only).
 - **Trainer trains in the RSSM dream** (`ac_trainer`) → new
   `trainers/clp_trainer.py`: same A2C skeleton (λ-returns, EMA target
   critic, entropy, BC-KL anchor) but rollouts happen in egosim.
@@ -109,17 +109,17 @@ EgoSim step (dt=0.1 s, batched over B rollouts on GPU):
    own spacing formula min(v_wp, v_curve, v_max) (reuse tracker_torch
    math so training-time speed intent ≡ deployment tracker intent),
    accel-capped (±3.5 m/s²), then move arc-length v·dt along the
-   polyline; heading = local tangent, yaw-rate capped. No reverse in-sim
+   polyline; heading = local tangent, yaw-rate capped. No reverse in-WM
    (recovery stays deployment-side).
 4. Collision flag: ego OBB (from ego box extents) vs replayed actor OBBs
-   (SAT, batched); logged for metrics + optional penalty arm.
+   (SAT, batched); logged for metrics + optional penalty variant.
 
 Reward (per step, τ=5 frames tolerance, defaults σ_p=1 m, σ_θ=0.3 rad,
 σ_v=2 m/s):
   r_t = max_{|δ|≤τ} exp(−½[‖Δxy‖²/σ_p² + Δθ²/σ_θ² + Δv²/σ_v²])
 against the expert's logged ego states of the SAME clip window. Bounded
-[0,1]; expert replay ≈ 1; dawdling decays as the window advances. Core arm
-has NO collision/comfort shaping (thesis purity); a shaped arm is a
+[0,1]; expert replay ≈ 1; dawdling decays as the window advances. Core variant
+has NO collision/comfort shaping (thesis purity); a shaped variant is a
 config flag.
 
 Policy (`policy_v2.TokenPolicy`): tokens = [ego row, 6 actor rows, route,
@@ -153,17 +153,17 @@ deterministic wp plan) → WaypointTracker + reverse recovery (config
 - **G1 selector validation** (cheap, before ANY big training): drive
   banked v0.1 policies through egosim (their full deployment semantics:
   WM filter + tracker feedback) on val windows; egosim score must rank
-  them consistently with the banked dev-10/220 truth (Spearman clearly
+  them consistently with the banked test-10/220 truth (Spearman clearly
   positive — v0.1's latent metric scored −0.60; this is the
   reward-meaning test). If G1 fails, STOP and rethink the reward — do not
   train.
-- **G2 in-sim**: closed-loop-trained policy must beat its own BC init
-  in-sim on held-out clips (val split), especially from divergent starts.
+- **G2 in-WM**: closed-loop-trained policy must beat its own BC init
+  in-WM on held-out clips (val split), especially from divergent starts.
 - **G3 CARLA smoke**: 3-route 3×3 (canary only, never a selector).
-- **G4 dev-10** (the honest gate): beat the v0.1 champion band
+- **G4 test-10** (the honest gate): beat the v0.1 champion band
   (30.49/83.2, 20/30 full; seeds mean ~28.3). Only G4 winners get seeds.
-- **G5**: 3 seeds + ONE 220-route run of the final config
-  (vs 22.10 DS / 39.1% SR). Report both thesis-pure and shaped arms.
+- **G5**: 3 seeds + ONE full 220-route run of the final config
+  (vs 22.10 DS / 39.1% SR). Report both thesis-pure and shaped variants.
 
 ## 5. Execution stages
 
@@ -176,21 +176,21 @@ deterministic wp plan) → WaypointTracker + reverse recovery (config
 - **M4**: clp BC + RL smoke on 297 clips (MIG lane), G2; wire deployment;
   G3 smoke 3×3.
 - **M5 scale**: 1000 clips, H=40, capacity sweep (d 192→384, GRU 512→1024,
-  steps ×10) selected via G2+G3, confirm at G4 dev-10.
-- **M6 iterate** (one axis at a time, each dev-10-gated): bc_kl dose,
-  divergent-start dose/shape, τ/σ reward geometry, horizon H, shaped arm
-  (collision penalty), Arm A (RSSM-scale control, §6), Stage-2 reactive
+  steps ×10) selected via G2+G3, confirm at G4 test-10.
+- **M6 iterate** (one axis at a time, each test-10-gated): bc_kl dose,
+  divergent-start dose/shape, τ/σ reward geometry, horizon H, shaped variant
+  (collision penalty), Variant A (RSSM-scale control, §6), Stage-2 reactive
   traffic model if replay's non-reactivity binds (watch: policies that
   learn to dodge ghost traffic).
 - **M7**: seeds + final 220 + paper v0.2 (the controlled story: same data,
-  same tracker — reward semantics is the only moved piece between arms).
+  same tracker — reward semantics is the only moved piece between variants).
 
 ## 6. Registered predictions (for the paper's controlled comparison)
 
-- **Arm A (author's scale question)**: v0.1 recipe unchanged, WM scaled
+- **Variant A (author's scale question)**: v0.1 recipe unchanged, WM scaled
   (deter 256→1024, steps ×10). Prediction: open-loop fidelity improves,
   closed-loop ordering vs BC does NOT flip (the reward grades traffic).
-- **Arm B (this plan)**: same data/tracker, ego-state reward in replayed
+- **Variant B (this plan)**: same data/tracker, ego-state reward in replayed
   scenes. Prediction: beats its BC init closed-loop, primarily via fewer
   stuck/blocked states (v0.1's binding constraint: 104/220 timeout
   routes, 41% plan-GO-static ticks).
@@ -216,7 +216,7 @@ reward-meaning diagnosis itself — report honestly.
 ## 8. Status ledger (newest first)
 
 - 2026-08-04 — **BC SEED BARS FINAL; v0.2 FULLY CLOSED**: BC
-  65.32 ± 9.36 (71.48/54.55/69.92; 75/90 full) vs RL pure 76.31 ± 7.54
+  65.32 ± 9.36 (71.48/54.55/69.92; 75/90 full) vs DITTO-AV v0.2 pure 76.31 ± 7.54
   / shaped 78.39 ± 8.24 (both 90/90 full). The controlled on-policy
   effect holds with bars on both sides: +11.0/+13.1 DS on seed means,
   and a categorical completion gap (180/180 vs 75/90). Nothing further
@@ -228,8 +228,8 @@ reward-meaning diagnosis itself — report honestly.
   (85.63/80.13/69.42); Δmean +2.08 ≪ σ — pure-vs-shaped TIE confirmed
   at seed level, matching the 220 dead heat. ALL 180 seed-eval runs at
   100% completion — completion is the seed-robust property; DS
-  variance (±8) is penalty events. Deploy seed 0 of either arm;
-  headline system = the pure arm (thesis-clean). BC seed evals in
+  variance (±8) is penalty events. Deploy seed 0 of either variant;
+  headline system = the pure variant (thesis-clean). BC seed evals in
   flight to complete the controlled claim's error bars; paper
   draft_v02.md markers filled.
 
@@ -238,15 +238,15 @@ reward-meaning diagnosis itself — report honestly.
   heat (+0.22).** Closing ablation: with the tight kernel at 999-clip
   scale, collision shaping adds NOTHING — pure expert-state matching
   suffices (shaping was worth +11.5 DS only in the wide-kernel 297
-  era). Headline stays the THESIS-PURE arm: DS 75.88, 3.4x the v0.1
+  era). Headline stays the THESIS-PURE variant: DS 75.88, 3.4x the v0.1
   record, above all published Bench2Drive baselines
   (privileged-offline caveats; strict zero-infraction SR 48.2% vs
   33.08 published best). Remaining: seed variance bars (999t s1/s2 on
   MIG; 297 s1/s2 done, B aggregates) -> M7 paper rewrite.
 
-- 2026-08-03 late — 999s (tight-shaped) dev-10 FINAL 85.63/100% 30/30
+- 2026-08-03 late — 999s (tight-shaped) test-10 FINAL 85.63/100% 30/30
   (A 89.67 / B 81.60) vs 999t 83.60: nominal +2.03, inside seed noise
-  (v0.1 dev-10 spread +-2.3) — statistical tie at the top; G2's in-sim
+  (v0.1 test-10 spread +-2.3) — statistical tie at the top; G2's in-WM
   sweep did partially transfer (A-half). Per the pre-registered rule
   the SECOND 220 fired on 999s = the pure-vs-shaped ablation at
   headline scale. Seeds (297 s1/s2 + 999t s1/s2, MIG) will calibrate.
@@ -256,51 +256,51 @@ reward-meaning diagnosis itself — report honestly.
   48.2%** — 3.4x the v0.1 record (22.10/39.1%) on identical data +
   benchmark; exceeds all published Bench2Drive baselines incl.
   expert-distilled sensor methods (privileged-offline caveat stands).
-  Infraction profile -> M6 order: collisions_vehicle 120 (shaped arm
-  targets this; its dev-10 in flight), stop 29, red_light 12 (no light
+  Infraction profile -> M6 order: collisions_vehicle 120 (shaped variant
+  targets this; its test-10 in flight), stop 29, red_light 12 (no light
   obs — retest with TokenPolicy), lanes 16, layout 13. Seeds s1/s2
   @999t queued (G5).
 
-- 2026-08-03 ~18:40 **G4 COMPLETE (both original arms): v02bc
-  74.10 / 100.0 / 30/30 — NEW dev-10 RECORD (2.4x the v0.1 champion's
+- 2026-08-03 ~18:40 **G4 COMPLETE (both original variants): v02bc
+  74.10 / 100.0 / 30/30 — NEW test-10 RECORD (2.4x the v0.1 champion's
   30.49/83.2/20-30); v02rl 56.89 / 100.0 / 30/30.** Completion is
-  saturated at dev-10 scale by BOTH arms; penalty (infractions) is the
-  entire remaining game — which is where the shaped arm's 3x3 leads
-  (0.844 vs bc 0.741 vs rl 0.569). Shaped dev-10 in flight
+  saturated at test-10 scale by BOTH variants; penalty (infractions) is the
+  entire remaining game — which is where the shaped variant's 3x3 leads
+  (0.844 vs bc 0.741 vs rl 0.569). Shaped test-10 in flight
   (10569623/24) = the champion decision. Seeds s1/s2 submitted
   (10569798/99, MIG). Next: 999-clip scale-up (Session A's cache
-  build) -> dev-10 confirm -> ONE 220 on the winner.
+  build) -> test-10 confirm -> ONE 220 on the winner.
 - 2026-08-03 ~18:00 **G4 PARTIAL — gate smashed, and a first-class
-  finding.** v02rl dev-10 FULL: 56.89 / 100.0 / 30/30 (champion:
-  30.49 / 83.2 / 20/30) — every v0.2 arm crushes v0.1. BUT v02bc
+  finding.** v02rl test-10 FULL: 56.89 / 100.0 / 30/30 (champion:
+  30.49 / 83.2 / 20/30) — every v0.2 variant crushes v0.1. BUT v02bc
   A-half: 92.00 / 100.0 / 15/15, penalty 0.920 — plain BC on the
-  TokenPolicy beats pure-RL in CARLA (in-sim G2 said the opposite).
-  Reading: pure state-matching RL exploits the NON-REACTIVE replay
+  TokenPolicy beats pure DITTO-AV v0.2 in CARLA (in-WM G2 said the opposite).
+  Reading: pure state-matching DITTO-AV v0.2 exploits the NON-REACTIVE replay
   traffic (threads gaps that reactive traffic closes -> infractions,
   penalty 0.569); the registered M6 ghost-traffic risk, observed.
-  Shaped arm (front-impact penalty) sits between on the canary
+  Shaped variant (front-impact penalty) sits between on the canary
   (3x3 84.36 / 100 / 9/9, penalty 0.844) — safety shaping recovers
   much of the gap, matching G1's collision-transfers finding.
   In flight: bcB (10569217), shaped d10 (10569623/24). Champion
-  candidate: v02bc or shaped, decided on full dev-10.
+  candidate: v02bc or shaped, decided on full test-10.
 - 2026-08-03 ~17:15: **G3 PASSED — best 3x3 results ever banked.**
   v02rl 57.25 / completion 100.0 / 9/9 full; v02bc 55.51 / 100.0 / 9/9
   (v0.1 best-ever 3x3: 48.98 composed, never 9/9 full; champion band
-  completions 73-86 there). RL > BC on score AND penalty; both v0.2
-  arms transfer to CARLA. Evidence: runs/carla_smoke/v02/. 3x3 remains
-  a canary — G4 dev-10 submitted for both arms (rlA 10569214,
+  completions 73-86 there). DITTO-AV v0.2 > BC on score AND penalty; both v0.2
+  variants transfer to CARLA. Evidence: runs/carla_smoke/v02/. 3x3 remains
+  a canary — G4 test-10 submitted for both variants (rlA 10569214,
   rlB 10569215, bcA 10569216, bcB 10569217; gate: champion 30.49/83.2).
   Ops lesson banked: sbatch --export comma-splits values — pass
   VARIANTS via environment, never --export.
-- 2026-08-03 ~16:30: **G2 PASSED (thesis-pure arm, job 10567542)** —
-  closed-loop RL beats its own BC init on held-out clips on EVERY
+- 2026-08-03 ~16:30: **G2 PASSED (thesis-pure variant, job 10567542)** —
+  closed-loop DITTO-AV v0.2 beats its own BC init on held-out clips on EVERY
   metric: collision 0.295->0.124 (-58%; the correlate G1 showed
   transfers), pos_err@H 6.84->2.75 m, progress 0.52->0.68, reward
   0.46->0.67; divergent-start gains equal or larger (recovery works,
   the gen-4 poison is cured). First BC-beating on-policy result at
   B2D scale in the project. runs/b2d_v02/results/clp_g2.json.
   G3 3x3 submitted: job 10568836 (participation), v02rl vs v02bc,
-  routes 25381/25378/27494 x3. Shaped arm 10567642 still training.
+  routes 25381/25378/27494 x3. Shaped variant 10567642 still training.
 - 2026-08-03 pm (G1 VERDICT — strict gate FAILED, refined role
   adopted; SESSION A login cross-checks, 48-clip val split, 12 banked
   models, two protocols H=40 and H=80+3-battery;
@@ -308,26 +308,26 @@ reward-meaning diagnosis itself — report honestly.
   with a huge margin — every gen-4 DWP scores below every healthy BC
   variant (v0.1's latent metric: −0.60 on the same question) — and is
   maximized on the expert path by construction (G0). (b) Within the
-  healthy band it CANNOT rank dev-10 DS: H=40 compresses the BC family
+  healthy band it CANNOT rank test-10 DS: H=40 compresses the BC family
   (0.175–0.202); H=80 floors the kernel (all models 17–31 m off).
   (c) SUBSTANTIVE FINDING: short-horizon expert-closeness ANTI-orders
   the healthy family (lw/cap track the expert closest yet score worst;
   the champion wins by conservatism), while collision rate correlates
-  +0.50 with dev-10 completion — safety events transfer, closeness
+  +0.50 with test-10 completion — safety events transfer, closeness
   does not (paper finding; echoes v0.1 open≠closed). CONSEQUENCES:
   reward upgraded (multi-scale kernel σ_p 1 m + 4 m mix, keeps
   gradient alive off-path; front-impact-only collision penalty — ghost
-  rear-ends by non-reactive replay excluded); shaped arm PROMOTED to
+  rear-ends by non-reactive replay excluded); shaped variant PROMOTED to
   co-primary (configs/b2d_v02_shaped.yaml) beside the registered
-  thesis-pure arm; G1's role narrowed to reward-sanity + broken-model
+  thesis-pure variant; G1's role narrowed to reward-sanity + broken-model
   detection (PASSED in that role); the decisive go/no-go is now G2
-  (beat own BC init in-sim) + G3/G4 transfer. Do NOT re-run G1
+  (beat own BC init in-WM) + G3/G4 transfer. Do NOT re-run G1
   expecting a ranking — no short-horizon matching metric ranks
   near-band drivers. RECOMMENDATION for B's queued 10567542: let it
-  run (thesis-pure G2 = the registered Arm-B ablation point), then run
-  the shaped arm.
+  run (thesis-pure G2 = the registered Variant-B ablation point), then run
+  the shaped variant.
 - 2026-08-03 pm: M3+M4 IN FLIGHT (SESSION B): G1 selector script landed
-  (scripts/egosim_selector.py — 12 banked wp-family models, dev-10 truth
+  (scripts/egosim_selector.py — 12 banked wp-family models, test-10 truth
   3.46-30.49, gate Spearman >= +0.4); v0.2 configs (b2d_v02 297-clip,
   b2d_v02_mini 12-clip); mini pipeline end-to-end verified on login CPU
   (data 150 s, clp trains, G2 json written); chain submitted:

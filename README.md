@@ -39,19 +39,19 @@ periodically as runs land. Scores are Bench2Drive closed-loop **driving score
 
 | line | training world | current DS | state |
 |---|---|---|---|
-| v0.1 | learned RSSM latent; reward = whole-latent match | 22.10 (220 routes) | frozen |
-| v0.2 | log replayed as the world; reward = ego-state match | 76.10 / 75.88 (220 routes); 85.63 / 83.60 (dev-10) | frozen |
-| v0.3 | v0.2 + learned reactive traffic model | 82.53 (dev-10) | frozen |
-| v0.3.1 | v0.3 + static map geometry | 66.01 / 74.89 (dev-10) | reopened |
-| v0.3.2 | v0.3 + plan-consistency (smoothness) reward | 82.80 (dev-10) | active |
+| v0.1 | learned RSSM latent; reward = whole-latent match | 22.10 (full 220 routes) | frozen |
+| v0.2 | log replayed as the world; reward = ego-state match | 76.10 / 75.88 (full 220 routes); 85.63 / 83.60 (test-10) | frozen |
+| v0.3 | v0.2 + learned reactive traffic model | 82.53 (test-10) | frozen |
+| v0.3.1 | v0.3 + static map geometry | 66.01 / 74.89 (test-10) | reopened |
+| v0.3.2 | v0.3 + plan-consistency (smoothness) reward | 82.80 (test-10) | active |
 
-Two arms are reported where two seeds/configs were run. **dev-10** is the
+Two variants are reported where two seeds/configs were run. **test-10** is the
 development gate: 10 Bench2Drive routes (A-half 3514, 3255, 26405, 25381,
 25378; B-half 25424, 2091, 27494, 17569, 28198) × 3 repetitions = 30 runs.
-**220 routes** is the full Bench2Drive closed-loop benchmark, run only on a
-model that has already cleared dev-10.
+**full 220 routes** is the complete Bench2Drive closed-loop benchmark, run only
+on a model that has already cleared test-10.
 
-v0.3.2's measured arm drives *smoother than the expert* — 6.7 steering sign
+v0.3.2's measured variant drives *smoother than the expert* — 6.7 steering sign
 flips per 100 ticks against the expert's 9.8 and v0.3's 18.1 — and takes its
 static-layout collisions from 7 to 0 with no map data at all, which reframes
 v0.3.1's negative: the wobble was the furniture-hitting mechanism, not missing
@@ -62,7 +62,7 @@ pre-registered ceiling of 8.
 ### Videos
 
 Closed-loop CARLA rollouts of the **v0.3.2** policy (mean-plan consistency,
-`w_cons` 0.5) on five dev-10 routes it completes cleanly — DS 100, route
+`w_cons` 0.5) on five test-10 routes it completes cleanly — DS 100, route
 completion 100%, no collisions — spanning five towns and five scenario types.
 Each pair is ONE run recorded two ways: the bird's-eye view is the simulated
 state drawn over the town's OpenDRIVE geometry, the camera view is CARLA.

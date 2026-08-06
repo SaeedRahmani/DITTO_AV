@@ -118,7 +118,7 @@ class RewardParams:
     # 1 m kernel floors out exactly where recovery must be learned)
     sigma_p2: float = 4.0     # m; 0 disables the broad component
     p2_weight: float = 0.3    # weight of the broad component
-    collision_penalty: float = 0.0  # 0 = thesis-pure arm
+    collision_penalty: float = 0.0  # 0 = thesis-pure variant
     # only front/side impacts count for the penalty: a slower-than-log
     # ego being rear-ended by replayed (non-reactive) traffic is a
     # ghost artifact, not the policy's fault

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""E3-A0: can the factored latent see ego deviation? (gates the RL arm)
+"""E3-A0: can the factored latent see ego deviation? (gates the RL variant)
 
 The v0.1 failure mode, made testable: latent similarity must respond
 to EGO deviation when traffic is shared. We rebuild sim-path obs at
@@ -48,7 +48,7 @@ OFFSETS = [0.0, 0.5, 1.0, 2.0, 4.0]
 def observe_windows(wm, obs_seq, wp, starts, burn, win):
     """Filter (B,) windows through the posterior; returns h (T, B, D).
 
-    obs_seq: (T, B, O) — burn frames logged, then the arm's window.
+    obs_seq: (T, B, O) — burn frames logged, then the variant's window.
     prev-action stream and reset mirror build_latent_bank exactly.
     """
     T, B, _ = obs_seq.shape
@@ -101,7 +101,7 @@ def main():
                              args.burn, args.win)
 
     report = {"n": B, "burn": args.burn, "win": args.win,
-              "space": "probe" if args.probe else "raw", "arms": {}}
+              "space": "probe" if args.probe else "raw", "variants": {}}
     means = []
     for off in OFFSETS:
         obs_arm = obs_log.clone()
@@ -120,7 +120,7 @@ def main():
         r = max_cos(ha, hb)
         m = float(r.mean())
         means.append(m)
-        report["arms"][str(off)] = m
+        report["variants"][str(off)] = m
         kern = float(np.exp(-0.5 * off ** 2))
         print(f"offset {off:3.1f} m: latent reward {m:.4f} "
               f"(state kernel ref {kern:.3f})")

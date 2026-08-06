@@ -22,7 +22,7 @@ matching and fix it with retrieval-based nearest-mode matching; in a
 controlled highway study the multimodal objective is near-expert
 in-distribution and degrades least under distribution shift, and the gain
 appears when and only when the demonstrations are multimodal. (2) On the
-closed-loop Bench2Drive benchmark (CARLA leaderboard 2.0, 220 routes) we
+closed-loop Bench2Drive benchmark (CARLA leaderboard 2.0, full 220 routes) we
 scale a fully offline, privileged-input planner to a **39.1% success
 rate — above every published Bench2Drive baseline** (DriveAdapter 33.08)
 — driven by a waypoint **output parameterization**: predicting short
@@ -76,7 +76,7 @@ Contributions:
    [src: runs/phase1/phase1_results.md, k16h5_seed*, unimodal_seed*].
 2. **A fully offline, privileged-input planner at state-of-the-art
    success rate on Bench2Drive.** Trained purely from the released
-   1000-clip corpus, evaluated on the official 220-route closed-loop
+   1000-clip corpus, evaluated on the official full 220-route closed-loop
    protocol: driving score 22.10, route completion 68.7%, success rate
    **39.1%** — above all published baselines on SR (DriveAdapter 33.08,
    ThinkTwice 31.23, TCP-traj 30.00), with the privileged-input caveat
@@ -85,7 +85,7 @@ Contributions:
    ego-frame waypoints tracked by a pure-pursuit PID (+ reverse
    recovery) is the single largest lever (+5.0 SR over direct control
    output). Using the *same* waypoints as the world model's action
-   channel instead *degrades* driving (dev-10 16.4/69.0 vs 19.2/75.3
+   channel instead *degrades* driving (test-10 16.4/69.0 vs 19.2/75.3
    for control actions): the 12-dim plan fed back as prev-action drifts
    — measured lateral drift −4.7 m → −10 m over 40 ticks — and carries
    the policy off-lane. Output head: yes; dynamics action: no.
@@ -202,7 +202,7 @@ vanishes exactly when the data is unimodal.*
 
 ## 5 Bench2Drive: fully offline closed-loop driving at scale
 
-Setup: official 220-route closed-loop protocol (CARLA leaderboard 2.0
+Setup: official full 220-route closed-loop protocol (CARLA leaderboard 2.0
 metrics: Driving Score = route completion × infraction penalty; Success
 Rate = routes fully completed without disqualifying infraction), MAP
 track. Training data: the released 1000-clip base corpus (999 usable),
@@ -243,11 +243,11 @@ quality is [src: Phase-0d, configs/diag_route_pid.yaml].
 Two placements of the same 6-waypoint abstraction:
 
 - **As the policy output** (world model keeps control actions): 3-route
-  smoke completion 73.5→86.1% with penalty 0.34–0.54; dev-10 30.49/83.2;
-  220-route SR +5.0 points over control output. The plan's point
+  smoke completion 73.5→86.1% with penalty 0.34–0.54; test-10 30.49/83.2;
+  full 220-route SR +5.0 points over control output. The plan's point
   spacing doubles as a learned speed profile for the tracker.
 - **As the world model's action channel**: closed-loop *degrades*
-  (dev-10 16.37/69.0 vs 19.2/75.3 for the control-action twin on the
+  (test-10 16.37/69.0 vs 19.2/75.3 for the control-action twin on the
   same data). Mechanism, measured from deployment tick logs: the
   policy's previous plan is its own prev-action input; small execution
   deviations produce (obs, prev-plan) pairs unseen in training; the
@@ -274,7 +274,7 @@ letting the trajectory feed the dynamics model's action channel.
   vs closed-loop completion (−0.47 within same-objective models);
   divergence from the expert-replay ceiling +0.56. The metric ranks by
   reward exploitation, not driving. Action MAE only re-discovers
-  "BC beats multi" across objectives (−0.90 on the dev-10 subset) and
+  "BC beats multi" across objectives (−0.90 on the test-10 subset) and
   is flat within-objective (−0.20)
   [src: runs/phase2_selector/table.md].
   Notably, the original DITTO paper already documented this decoupling
@@ -300,7 +300,7 @@ vs closed-loop completion, 17 control-family points by objective.*
 
 Highway (controlled, genuinely multimodal data): multi > single > BC on
 every metric, causally tied to multimodality (§4). Bench2Drive at
-scale: latent BC ≥ DITTO-multi closed-loop (dev-10 27.78/70.1 vs
+scale: latent BC ≥ DITTO-multi closed-loop (test-10 27.78/70.1 vs
 22.51/64.2; 220 SR 34.1 vs 23.6), and the gap *widens* on the waypoint
 action space.
 
@@ -373,7 +373,7 @@ model, relabel via retrieval) as future work.
   the trajectory-consistent variant performs identically and closes
   this hole.
 - **Selector study scope**: 17 pairs from one lab's sweep; correlations
-  are rank-based and the dev-10 subset is n=5. The within-objective
+  are rank-based and the test-10 subset is n=5. The within-objective
   inversion (n=12) is the load-bearing result.
 
 ## 8 Conclusion
@@ -395,7 +395,7 @@ as load-bearing for practitioners as the positive results.
 - A. Frame conventions + certification harnesses (compass = CARLA yaw
   + π/2; forward = −y; round-trip tests; GNSS-noise data landmine and
   the ego-box fix).
-- B. Full probe ledger with per-probe diagnosis (7 dev-10-gated
+- B. Full probe ledger with per-probe diagnosis (7 test-10-gated
   interventions), tick-log methodology.
 - C. Reproducibility: configs for every row; single-command chains
   (cache → train → eval) on Slurm; all evidence JSONs in runs/.

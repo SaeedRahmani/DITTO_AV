@@ -15,7 +15,7 @@
 #
 # Lanes (carla_eval_chain.sbatch header): participation needs
 # --gpus-per-task=1, visual takes no gpu flag. Both cap at 4 h, so a
-# half of dev-10 (5 routes) per job.
+# half of test-10 (5 routes) per job.
 #
 # Submit as (env style, never --export with commas):
 #   REPO=/scratch/$USER/ditto_av/DITTO_AV_v02 \
@@ -57,7 +57,7 @@ for R in $ROUTES; do
   PORT=$((20000 + RANDOM % 10000)); TMPORT=$((PORT + 50))
   rm -f $DITTO_AGENT_LOG
   $VENVPY $B2D/leaderboard/leaderboard/leaderboard_evaluator.py \
-      --routes=$B2D/leaderboard/data/drivetransformer_bench2drive_dev10.xml \
+      --routes=$B2D/leaderboard/data/${ROUTES_XML:-drivetransformer_bench2drive_dev10.xml} \
       --routes-subset=$R --repetitions=1 --track=MAP \
       --agent=$REPO/scripts/carla_team_agent.py \
       --agent-config=$REPO/$CONF \
