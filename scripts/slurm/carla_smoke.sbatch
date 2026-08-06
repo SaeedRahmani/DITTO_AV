@@ -31,6 +31,12 @@ PORT=$((20000 + RANDOM % 10000))
 TMPORT=$((PORT + 50))
 
 export PYTHONPATH=$B2D/leaderboard:$B2D/scenario_runner:$BASE/carla_pythonapi:$BASE/DITTO_AV
+# Bench2Drive's route_scenario.get_all_scenario_classes() globs
+# ${SCENARIO_RUNNER_ROOT:-./}/srunner/scenarios/*.py — unset, it
+# resolves to $B2D/srunner (nonexistent), the class registry comes
+# up empty and EVERY scenario is skipped with a KeyError. Runs then
+# score background traffic only. Their run_evaluation.sh exports it.
+export SCENARIO_RUNNER_ROOT=$B2D/scenario_runner
 # the evaluator launches $CARLA_ROOT/CarlaUE4.sh itself (and restarts it
 # on failure); point it at the apptainer shim
 export CARLA_ROOT=$BASE/carla_root

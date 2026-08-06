@@ -44,6 +44,12 @@ ROUTES=${ROUTES:-"3514 3255 26405 25381 25378 25424 2091 27494 17569 28198"}
 mkdir -p "$VID"
 export XDG_CACHE_HOME=$BASE/cache
 export PYTHONPATH=$B2D/leaderboard:$B2D/scenario_runner:$BASE/carla_pythonapi:$REPO
+# Bench2Drive's route_scenario.get_all_scenario_classes() globs
+# ${SCENARIO_RUNNER_ROOT:-./}/srunner/scenarios/*.py — unset, it
+# resolves to $B2D/srunner (nonexistent), the class registry comes
+# up empty and EVERY scenario is skipped with a KeyError. Runs then
+# score background traffic only. Their run_evaluation.sh exports it.
+export SCENARIO_RUNNER_ROOT=$B2D/scenario_runner
 export CARLA_ROOT=$BASE/carla_root
 export SAVE_PATH=$VID   # unlocks the >3 m camera rig radius (B2D flag)
 
@@ -57,7 +63,7 @@ for R in $ROUTES; do
   PORT=$((20000 + RANDOM % 10000)); TMPORT=$((PORT + 50))
   rm -f $DITTO_AGENT_LOG
   $VENVPY $B2D/leaderboard/leaderboard/leaderboard_evaluator.py \
-      --routes=$B2D/leaderboard/data/drivetransformer_bench2drive_dev10.xml \
+      --routes=$B2D/leaderboard/data/${ROUTES_XML:-drivetransformer_bench2drive_dev10.xml} \
       --routes-subset=$R --repetitions=1 --track=MAP \
       --agent=$REPO/scripts/carla_team_agent.py \
       --agent-config=$REPO/$CONF \

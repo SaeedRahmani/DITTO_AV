@@ -149,6 +149,27 @@ class ContinuousWMDriver:
         return a.cpu().numpy()
 
 
+def video_actor_class(type_id: str) -> int:
+    """Coarse class for the BEV render: a cone, an ambulance and a sedan
+    are all boxes in the state log otherwise, which makes the recorded
+    scenario unreadable (v0.3.2 video review)."""
+    t = type_id.lower()
+    if t.startswith("walker"):
+        return 3
+    if t.startswith("static"):
+        return 5
+    if any(k in t for k in ("ambulance", "firetruck", "police")):
+        return 2
+    if any(k in t for k in ("crossbike", "omafiets", "century", "yamaha",
+                            "harley", "vespa", "kawasaki", "diamondback",
+                            "ninja", "motorcycle")):
+        return 4
+    if any(k in t for k in ("truck", "carlacola", "sprinter", "hgv",
+                            "volkswagen.t2", "fusorosa", "bus")):
+        return 6
+    return 1
+
+
 class RouteCursor:
     """Stateful pop-radius route follower for the near/far conditioning.
 
@@ -805,7 +826,28 @@ try:  # pragma: no cover - requires the carla package + leaderboard on path
                         bb = getattr(a, "bounding_box", None)
                         if bb is not None:
                             self._ext_cache[a.id] = (
-                                float(bb.extent.x), float(bb.extent.y))
+                                float(bb.extent.x), float(bb.extent.y),
+                                video_actor_class(a.type_id))
+            props = []
+            if vdir:
+                # scenario furniture (cones, warning signs, debris) is not
+                # in the policy's actor list and never was in the video
+                # either — without it a construction route looks empty
+                for a in world.get_actors().filter("static.prop.*"):
+                    loc = a.get_transform()
+                    if (abs(loc.location.x - ego_xy[0]) > 120.0
+                            or abs(loc.location.y - ego_xy[1]) > 120.0):
+                        continue
+                    if a.id not in self._ext_cache:
+                        bb = getattr(a, "bounding_box", None)
+                        e = ((float(bb.extent.x), float(bb.extent.y))
+                             if bb is not None else (0.3, 0.3))
+                        self._ext_cache[a.id] = (
+                            e[0], e[1], video_actor_class(a.type_id))
+                    props.append((a.id,
+                                  np.array([loc.location.x,
+                                            loc.location.y]),
+                                  float(np.deg2rad(loc.rotation.yaw))))
             if vdir:
                 # per-tick world state for the paired 2D BEV rendering
                 # of the SAME run (render_bev_video.py)
@@ -828,8 +870,8 @@ try:  # pragma: no cover - requires the carla package + leaderboard on path
                             "actors": [
                                 [int(i), float(p[0]), float(p[1]),
                                  float(y),
-                                 *self._ext_cache.get(i, (2.2, 1.0))]
-                                for i, p, y in actors],
+                                 *self._ext_cache.get(i, (2.2, 1.0, 1))]
+                                for i, p, y in actors + props],
                         }) + "\n")
                 except Exception:
                     pass    # presentation-only: never fail a run for it
