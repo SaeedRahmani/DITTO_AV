@@ -183,10 +183,15 @@ def train_clp_reactive(cfg: Config, log: GlobalLog,
             # (axis 2) drowned in exploration noise (~2.4 m sampled vs
             # 0.2 m mean churn); this term sees the mean directly.
             from ..bench2drive import WP_SCALE
-            from ..consistency import plan_churn_lat
+            from ..consistency import plan_churn_lat, plan_shape_churn
+            # cons_mode "shape" (round 6): commit the PATH only —
+            # speed re-scheduling along it is free by construction
+            churn_fn = plan_shape_churn \
+                if getattr(c, "cons_mode", "time") == "shape" \
+                else plan_churn_lat
             T, B = pxy.shape[0], pxy.shape[1]
             mu = dist.base_dist.loc.view(T, B, -1, 2) * WP_SCALE
-            ch = plan_churn_lat(
+            ch = churn_fn(
                 mu[:-1].reshape((T - 1) * B, -1, 2),
                 mu[1:].reshape((T - 1) * B, -1, 2),
                 pxy[:-1].reshape(-1, 2), pxy[1:].reshape(-1, 2),

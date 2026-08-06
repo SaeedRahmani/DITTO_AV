@@ -223,6 +223,9 @@ class CLPConfig:
     cons_gate_w: float = 3.0   # when the nearest actor is closer than
     #                            ~d0 (sigmoid width w) — smooth when
     #                            alone, free to replan near traffic
+    cons_mode: str = "time"  # "time" = time-aligned lateral churn
+    #                          (rounds 3-5); "shape" = path-only
+    #                          commitment, speed re-scheduling free
     collision_penalty: float = 0.0  # 0 = thesis-pure variant
     penalty_ignore_rear: bool = True  # ghost rear-ends don't count
 

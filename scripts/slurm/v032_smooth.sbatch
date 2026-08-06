@@ -22,6 +22,7 @@ SIGMA_YR=${SIGMA_YR:-0.5}
 W_CHURN=${W_CHURN:-0.0}
 W_CONS=${W_CONS:-0.0}
 GATE_D0=${GATE_D0:-0.0}
+CONS_MODE=${CONS_MODE:-time}
 STEPS=${STEPS:-3500}
 SEED=${SEED:--1}
 TAG=${TAG:-v032_d3sm}
@@ -36,6 +37,7 @@ $PY scripts/v032_train_smooth.py \
     --out $HOME/ditto_out/$TAG \
     --sigma-yawrate $SIGMA_YR --w-churn $W_CHURN \
     --w-consistency $W_CONS --cons-gate-d0 $GATE_D0 \
+    --cons-mode $CONS_MODE \
     --steps $STEPS --seed $SEED \
     --n-ensemble 2 --p-reactive 0.5 --device cuda
 # stage the ckpt where configs/diag_v032_sm.yaml expects it (the

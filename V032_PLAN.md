@@ -83,6 +83,31 @@ S1/driving gates. 3x3 stays a canary, never a selector.
 
 ## 9. Ledger
 
+- 2026-08-06 USER DECISION (Saeed): the hard veh <= 8 bar is DROPPED
+  — no fixed collision number. New objective for the v0.3.2
+  continuation: MINIMIZE vehicle collisions subject to two floors,
+  DS >= 82.5 (no driving regression vs the clp_rx band) and S1a <=
+  14.8 (keep expert-band smoothness); among candidates passing both
+  floors pick min veh, tie-break higher DS. The steering/braking
+  split is approved.
+- 2026-08-06 ROUND 6 pre-registered BEFORE the runs: SHAPE
+  consistency — commitment applies to the plan's PATH only
+  (point-to-polyline distance, arc-overlap-limited; tests pin that
+  speed re-scheduling and braking along the same path cost ~0 while
+  a 0.25 m lateral shift costs ~0.22). This removes the creep-lock
+  mechanism STRUCTURALLY (it was longitudinal stickiness) instead of
+  spatially (the round-4/5 proximity gate). Arms: shape-ungated
+  (cons_gate_d0 0; hypothesis: full smoothness everywhere now safe)
+  and shape-gated (d0 12; hypothesis: swerve freedom near actors
+  still needed), both w_cons 0.5 / 6000 steps / seeds 1+2 = 4
+  trainings. Selection: per-family best by in-WM reactive reward ->
+  both family winners to test-10 A/B -> final pick by the new
+  objective -> @220 for the final pick. CAVEAT recorded: all numbers
+  are same-protocol comparisons under the known Bench2Drive
+  scenario-skip (docs/BENCH2DRIVE_SCENARIO_SKIP.md on main; fix
+  verified but deliberately not landed — re-baselining every model
+  is a separate project decision).
+
 - 2026-08-06 BENCH-220 CHARACTERIZATION of the terminal s1-gated variant
   (19 chunks + retry of chunk 00 after a transient Lustre stdlib
   read failure; collector 10588113): 220/220 runs, DS 79.57 vs the
