@@ -83,6 +83,26 @@ S1/driving gates. 3x3 stays a canary, never a selector.
 
 ## 9. Ledger
 
+- 2026-08-06 ROUND 5 VERDICT (jobs 10588070/71, gated s1): DS A 92.0
+  / B 81.6 -> mean 86.80 = ALL-TIME PROJECT HIGH on dev-10 (999s
+  champion 85.63, clp_rx 82.53); 30/30; S1a 10.9 flips (PASS <=14.8,
+  expert-level; |dsteer| p95 0.147 vs rx 0.36); layout 0. The
+  25381 creep-lock RELEASED exactly as predicted (route clean at 100
+  x3). Vehicle collisions 9 vs gate <= 8 — ONE over: 6 shared with
+  clp_rx (3255+28198, pre-existing) + 3 on 2091 (non-deterministic
+  encounter variant — different actor/coords than the uncond arm's).
+  3 of 4 binding gates pass; veh gate FAILS by one collision on one
+  route. Predictions scored: creep-release CONFIRMED, layout/S1a
+  CONFIRMED, near-traffic wobble leak confirmed mild (10.9 vs 6.7).
+- 2026-08-06 ROUND 5b pre-registered BEFORE the run — final
+  selection step, then the campaign closes either way: the OTHER
+  same-recipe seed (v032_d3gate_s2; in-sim reactive 0.703, better
+  S1b diagnostics) goes to dev-10 A/B. Dev-10 selection among
+  same-recipe seeds is settled project practice (v0.2 champion =
+  dev10_winner among variants). BANK RULE, committed now: s2-gated
+  banks as v0.3.2 champion iff veh <= 8 AND DS mean >= 82.5 AND
+  30/30 AND S1a <= 14.8. Otherwise close with s1-gated recorded as
+  best smooth arm (veh gate unmet by 1). No further arms after 5b.
 - 2026-08-06 COLLISION AUTOPSY (session 2, existing artifacts only):
   the s2 arm's +6 vehicle collisions are NOT diffuse reactivity loss —
   they are TWO deterministic scenario flips (25381: DS 100->60,
