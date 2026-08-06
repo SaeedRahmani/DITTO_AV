@@ -15,7 +15,11 @@ A2 expert fidelity: < 1% of expert frames with center-to-box
    EGO_SIDE 1.06 = side-contact reach, corners underpriced by
    design); largest passing MARGIN of 0.5/0.3/0.2; per-label
    breakdown printed so the ONE allowed subset refinement is
-   evidence-driven.
+   evidence-driven. Z FILTER (correctness fix, measured: the 20%
+   2D-violation rate was tree canopies 18+ m above the road): a box
+   counts only if its z-range intersects the ego body band
+   [road_z + 0.1, road_z + 1.6], road_z = nearest lane point's z
+   from Town*_lanes_z.npz (collisions happen in 3D).
 A3 discrimination: signed clearance at the collision points <= 0
    where the lane query read -0.3..-1.5 m (the blindness being fixed).
 
@@ -50,6 +54,35 @@ COLLISIONS = [
 ]
 
 
+class LaneZ:
+    """road elevation lookup: z of the 2D-nearest lane point."""
+
+    def __init__(self, town):
+        lanes = np.load(Path("/scratch/srahmani/ditto_av/data/layout")
+                        / f"{town}_lanes_z.npz")["lanes"]
+        self.xy = lanes[:, :2]
+        self.z = lanes[:, 2]
+        cell = 16.0
+        self.cell = cell
+        from collections import defaultdict as dd
+        g = dd(list)
+        ij = np.floor(self.xy / cell).astype(int)
+        for i, (cx, cy) in enumerate(ij):
+            g[(cx, cy)].append(i)
+        self.grid = {k: np.array(v) for k, v in g.items()}
+
+    def road_z(self, p):
+        cx, cy = int(p[0] // self.cell), int(p[1] // self.cell)
+        cand = [self.grid.get((cx + dx, cy + dy))
+                for dx in (-1, 0, 1) for dy in (-1, 0, 1)]
+        cand = [c for c in cand if c is not None]
+        if not cand:
+            return None
+        idx = np.concatenate(cand)
+        d = np.linalg.norm(self.xy[idx] - p, axis=1)
+        return float(self.z[idx[d.argmin()]])
+
+
 class TownFurniture:
     def __init__(self, npz, labels, source):
         legend = list(npz["labels"])
@@ -73,6 +106,8 @@ class TownFurniture:
               + np.abs(self.cos) * self.extent[:, 1])
         self.aabb_lo = self.center[:, :2] - np.stack([rx, ry], 1)
         self.aabb_hi = self.center[:, :2] + np.stack([rx, ry], 1)
+        self.z_lo = self.center[:, 2] - self.extent[:, 2]
+        self.z_hi = self.center[:, 2] + self.extent[:, 2]
 
     def dist2d(self, pts, box_idx):
         """Signed-ish 2D clearance from pts (M,2) to boxes (M,) idx:
@@ -147,6 +182,7 @@ def a2(data_dir, labels, source, margins=(0.5, 0.3, 0.2)):
         lab_of = np.full(len(reset), -1, dtype=np.int16)
         for town in sorted(set(towns)):
             tf = load_town(town, labels, source)
+            lz = LaneZ(town)
             eps = [i for i, t in enumerate(towns) if t == town]
             fr = np.concatenate([np.arange(starts[i], ends[i])
                                  for i in eps])
@@ -173,6 +209,13 @@ def a2(data_dir, labels, source, margins=(0.5, 0.3, 0.2)):
                         & (tf.aabb_lo[mega, 1] - 1 <= p[1])
                         & (tf.aabb_hi[mega, 1] + 1 >= p[1])]
                     idx = np.concatenate([idx, near_mega])
+                if len(idx) == 0:
+                    continue
+                rz = lz.road_z(p)
+                if rz is not None:
+                    zok = (tf.z_hi[idx] >= rz + 0.1) \
+                        & (tf.z_lo[idx] <= rz + 1.6)
+                    idx = idx[zok]
                 if len(idx) == 0:
                     continue
                 d = tf.dist2d(np.repeat(p[None], len(idx), 0), idx)
