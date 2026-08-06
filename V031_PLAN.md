@@ -135,22 +135,32 @@ objects), targeted (prices exactly the charged events), not through
 advantages, no global smoothness tax. Complementary to v0.3.2's
 proximity-gated consistency (their lane, do not duplicate).
 
-Stage A gates (PRE-REGISTERED before the dump lands):
-  A1 coverage: all 4 measured dev-10 collision points (2091 fences
-     x2 T12, 3514 prop T13, 27494 vegetation T04) fall inside an
-     extracted box inflated by <= 0.3 m, using non-Building labels.
-  A2 expert fidelity: < 1% of expert frames (train and val) within
-     MARGIN of any furniture box, with MARGIN chosen as the largest
-     value in {0.5, 0.3, 0.2} that passes; if even 0.2 fails, boxes
-     are over-merged -> refine by label/source subset ONCE, justified
-     in the ledger; if still failing, the axis dies here.
-  A3 discrimination: at the collision points the clearance signal
-     must read <= 0 (inside margin) where the LANE query read
-     -0.3..-1.5 m (the blindness being fixed).
-Stage B (only if A passes): loss + metric, w_furn dose axis start
-0.5 in LOSS space (not reward). Stage C: ONE D3 arm (init 999s),
-dev-10 A/B x3 gate: DS > 85.63 nominal AND layout <= 2 AND veh <= 8;
-band-clear (> +2.3) for a headline claim.
+Stage A OUTCOME (2026-08-06): AXIS CLOSED AT THE AUDIT.
+- A1 (ego-center semantics, justified from scenario_runner source):
+  3/3 map-furniture collision points covered — fences 1.21/1.44 m
+  center-to-box (touching), vegetation inside a crown box; the 3514
+  prop is a SCENARIO-SPAWNED actor (id=4948 != 0), out of map scope
+  by identity (addressable events were 6/7).
+- A2 FAILED at every margin and every allowed refinement: 21.1% of
+  expert frames body-OVERLAP a furniture box (canopy z-filter:
+  21.3 -> 19.6% only; moving vs stopped flat 23.9/22.4%; thin-box
+  subset still 2.9% overlap). CARLA's exposed geometry conflates
+  ground and overhang footprints in single boxes, includes objects
+  whose collision CARLA disables ("overlaps a driving lane" server
+  warnings), and is not a collision predicate at any subset. The
+  dumps (data/layout/furniture/) and audits are kept as the record.
+- Cost discipline held: the axis died offline; no training run.
+
+CONCLUSION of the v0.3.1 review (three representations, three
+measured deaths at three layers): lane-union geometry (wrong events),
+heading-conditioned drivability (expert-infidelity), furniture boxes
+(data not collision-faithful). The static-world CONTENT axis is
+exhausted with the data CARLA exposes. The layout gap remains real
+and remains FIXABLE — by the v0.3.2 smoothness mechanism (proximity-
+gated consistency; already measured layout 7 -> 0), whose Pareto
+tuning is the v0.3.2 session's claimed lane. For the paper: this
+triple negative + the smoothness reframe is the "what static geometry
+cannot buy" section.
 
 ### E3: CLOSED as a measured negative (2026-08-05, no RL run needed)
 
