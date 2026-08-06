@@ -43,7 +43,7 @@ periodically as runs land. Scores are Bench2Drive closed-loop **driving score
 | v0.2 | log replayed as the world; reward = ego-state match | 76.10 / 75.88 (220 routes); 85.63 / 83.60 (dev-10) | frozen |
 | v0.3 | v0.2 + learned reactive traffic model | 82.53 (dev-10) | frozen |
 | v0.3.1 | v0.3 + static map geometry | 66.01 / 74.89 (dev-10) | reopened |
-| v0.3.2 | v0.3 + smoothness reward channels | in progress | active |
+| v0.3.2 | v0.3 + plan-consistency (smoothness) reward | 82.80 (dev-10) | active |
 
 Two arms are reported where two seeds/configs were run. **dev-10** is the
 development gate: 10 Bench2Drive routes (A-half 3514, 3255, 26405, 25381,
@@ -51,22 +51,49 @@ development gate: 10 Bench2Drive routes (A-half 3514, 3255, 26405, 25381,
 **220 routes** is the full Bench2Drive closed-loop benchmark, run only on a
 model that has already cleared dev-10.
 
+v0.3.2's measured arm drives *smoother than the expert* — 6.7 steering sign
+flips per 100 ticks against the expert's 9.8 and v0.3's 18.1 — and takes its
+static-layout collisions from 7 to 0 with no map data at all, which reframes
+v0.3.1's negative: the wobble was the furniture-hitting mechanism, not missing
+geometry. It is not banked, because the same commitment that kills the wobble
+costs half the reactivity dividend: vehicle collisions 6 -> 12 against a
+pre-registered ceiling of 8.
+
 ### Videos
 
-Closed-loop CARLA rollouts on dev-10 routes the policy completes cleanly — DS
-100, route completion 100%, no collisions. Bird's-eye renders are the simulated
-state, camera views are CARLA. Full-quality mp4s for every route are in
-[docs/media/](docs/media/).
+Closed-loop CARLA rollouts of the **v0.3.2** policy (mean-plan consistency,
+`w_cons` 0.5) on five dev-10 routes it completes cleanly — DS 100, route
+completion 100%, no collisions — spanning five towns and five scenario types.
+Each pair is ONE run recorded two ways: the bird's-eye view is the simulated
+state drawn over the town's OpenDRIVE geometry, the camera view is CARLA.
+Previews are trimmed GIFs; full-quality mp4s are in [docs/media/](docs/media/).
 
 <table>
 <tr>
-<td width="50%"><img src="docs/media/v03_route25424_2d.gif" width="100%" alt="Bird's-eye rollout, construction obstacle on a two-way road, Town11"><br><sub>Construction obstacle, two-way road — Town11</sub></td>
-<td width="50%"><img src="docs/media/v03_route25378_2d.gif" width="100%" alt="Bird's-eye rollout, yielding to an emergency vehicle, Town03"><br><sub>Yielding to an emergency vehicle — Town03</sub></td>
+<td width="50%"><img src="docs/media/v032_route25424_2d.gif" width="100%" alt="Bird's-eye rollout, construction obstacle on a two-way road, Town11"></td>
+<td width="50%"><img src="docs/media/v032_route25424_3d.gif" width="100%" alt="Camera rollout, construction obstacle on a two-way road, Town11"></td>
 </tr>
+<tr><td colspan="2" align="center"><sub>Construction obstacle, two-way road — Town11 · <a href="docs/media/v032_route25424_2d.mp4">2d</a> · <a href="docs/media/v032_route25424_3d.mp4">3d</a></sub></td></tr>
 <tr>
-<td width="50%"><img src="docs/media/v03_route25424_3d.gif" width="100%" alt="Camera rollout, construction obstacle on a two-way road, Town11"><br><sub>Construction obstacle, two-way road — Town11</sub></td>
-<td width="50%"><img src="docs/media/v03_route25381_3d.gif" width="100%" alt="Camera rollout, hazard at side lane, Town05"><br><sub>Hazard at side lane — Town05</sub></td>
+<td width="50%"><img src="docs/media/v032_route25378_2d.gif" width="100%" alt="Bird's-eye rollout, yielding to an emergency vehicle, Town03"></td>
+<td width="50%"><img src="docs/media/v032_route25378_3d.gif" width="100%" alt="Camera rollout, yielding to an emergency vehicle, Town03"></td>
 </tr>
+<tr><td colspan="2" align="center"><sub>Yielding to an emergency vehicle — Town03 · <a href="docs/media/v032_route25378_2d.mp4">2d</a> · <a href="docs/media/v032_route25378_3d.mp4">3d</a></sub></td></tr>
+<tr>
+<td width="50%"><img src="docs/media/v032_route26405_2d.gif" width="100%" alt="Bird's-eye rollout, static cut-in, Town15"></td>
+<td width="50%"><img src="docs/media/v032_route26405_3d.gif" width="100%" alt="Camera rollout, static cut-in, Town15"></td>
+</tr>
+<tr><td colspan="2" align="center"><sub>Static cut-in — Town15 · <a href="docs/media/v032_route26405_2d.mp4">2d</a> · <a href="docs/media/v032_route26405_3d.mp4">3d</a></sub></td></tr>
+<tr>
+<td width="50%"><img src="docs/media/v032_route17569_2d.gif" width="100%" alt="Bird's-eye rollout, sequential lane change, Town12"></td>
+<td width="50%"><img src="docs/media/v032_route17569_3d.gif" width="100%" alt="Camera rollout, sequential lane change, Town12"></td>
+</tr>
+<tr><td colspan="2" align="center"><sub>Sequential lane change — Town12 · <a href="docs/media/v032_route17569_2d.mp4">2d</a> · <a href="docs/media/v032_route17569_3d.mp4">3d</a></sub></td></tr>
+<tr>
+<td width="50%"><img src="docs/media/v032_route27494_2d.gif" width="100%" alt="Bird's-eye rollout, blocked intersection, Town04"></td>
+<td width="50%"><img src="docs/media/v032_route27494_3d.gif" width="100%" alt="Camera rollout, blocked intersection, Town04"></td>
+</tr>
+<tr><td colspan="2" align="center"><sub>Blocked intersection — Town04 · <a href="docs/media/v032_route27494_2d.mp4">2d</a> · <a href="docs/media/v032_route27494_3d.mp4">3d</a></sub></td></tr>
 </table>
 
 ## Layout
